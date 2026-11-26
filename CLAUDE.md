@@ -1,9 +1,9 @@
 # project-szm: Pocket Parks
 
 Isometric park builder in Godot 4.6 (GDScript). You build and run a park; themes (zoo,
-festival, ...) are data packs. Fights are short raids on other parks. **The game definition
+festival, ...) are data packs. Conflict is implicit: you visit parks and send in guests and hidden bad actors. **The game definition
 lives in `docs/design/game.md`. Read it before any gameplay ticket.** Current phase:
-prototype 2, the park day simulation and raids against bot parks. Everything that doc marks
+prototype 3, visiting and sending people (bot parks stand in for friends). Everything that doc marks
 Parked stays parked.
 
 ## Roles
