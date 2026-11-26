@@ -17,7 +17,7 @@ WALL="${FACTORY_WALL:-}"   # tmux session name when started by ./wall
 GRACE=10                   # seconds a finished worker pane stays visible
 [ -x ./tix ] || { echo "factory: ./tix missing or not executable" >&2; exit 3; }
 # ponytail: tight allowlist. ./gd is the only way to run Godot (check + offscreen screenshot).
-ALLOW=(Read Edit Write Glob Grep "Bash(./tix *)" "Bash(./gd *)" "Bash(git add *)" "Bash(git commit *)"
+ALLOW=(Read Edit Write Glob Grep "Bash(./tix *)" "Bash(./gd *)" "Bash(git add *)" "Bash(git mv *)" "Bash(git rm *)" "Bash(git commit *)"
        "Bash(git status*)" "Bash(git diff*)" "Bash(git log*)" "Bash(jq *)" "Bash(ls *)")
 DENY=("Edit(tickets/**)" "Write(tickets/**)")
 mkdir -p logs

@@ -8,11 +8,11 @@ const SIZES := {
 }
 const DIRS: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
 
-static func generate(theme_id: String, seed: int, size := "small") -> ZooMap:
+static func generate(theme_id: String, seed: int, size := "small") -> ParkMap:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed
 	var cfg: Dictionary = SIZES[size]
-	var map := ZooMap.new()
+	var map := ParkMap.new()
 	map.money = 1 << 30  # bots build for free; can_place still checks every cell
 	var y0 := rng.randi_range(4, IsoGrid.SIZE.y - 5)
 	map.place(_pick(rng, theme_id, "entrance"), Vector2i(0, y0))
@@ -43,12 +43,12 @@ static func generate(theme_id: String, seed: int, size := "small") -> ZooMap:
 			break
 		if map.place(_pick(rng, theme_id, "decor"), c):
 			placed += 1
-	map.money = ZooMap.START_MONEY
+	map.money = ParkMap.START_MONEY
 	return map
 
 ## True if any footprint cell of `id` at `origin` has a path tile as a 4-neighbour.
-static func touches_path(map: ZooMap, id: String, origin: Vector2i) -> bool:
-	for c in ZooMap.footprint(id, origin):
+static func touches_path(map: ParkMap, id: String, origin: Vector2i) -> bool:
+	for c in ParkMap.footprint(id, origin):
 		for d in DIRS:
 			var o: Variant = map.occupied.get(c + d)
 			if o != null and Buildings.get_def(map.buildings[o])["role"] == "path":

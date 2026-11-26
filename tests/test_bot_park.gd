@@ -16,7 +16,7 @@ func _init() -> void:
 	ok(BotPark.generate("zoo", 1).buildings != BotPark.generate("zoo", 2).buildings, "seeds differ")
 	done()
 
-func role(map: ZooMap, origin: Vector2i) -> String:
+func role(map: ParkMap, origin: Vector2i) -> String:
 	return Buildings.get_def(map.buildings[origin])["role"]
 
 func check(theme: String, s: int, size: String) -> void:
