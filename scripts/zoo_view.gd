@@ -23,12 +23,19 @@ func rebuild() -> void:
 		return da < db if da != db else a.x < b.x)
 	for o: Vector2i in origins:
 		var v := BuildingView.new(map.buildings[o])
+		v.origin = o
 		v.position = IsoGrid.to_screen(o)
 		v.z_index = 2 * ParkMap.depth(map.buildings[o], o)  # WalkerView rows sit at the odd values
 		add_child(v)
 	ghost = null
 	update_ghost()
 	money_changed.emit(map.money)
+
+## Raid view: grey out the buildings the sim has closed.
+func show_wrecked(closed: Dictionary) -> void:
+	for v: BuildingView in get_children():
+		if v != ghost and v.wrecked != closed.has(v.origin):
+			v.wrecked = not v.wrecked
 
 func update_ghost() -> void:
 	if ghost and (ghost.id != selected or hovered == GridView.NONE):
