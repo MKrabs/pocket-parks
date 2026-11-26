@@ -4,6 +4,7 @@ extends CanvasLayer
 # guests, mood face. Bottom-left: pause / play / fast. Bottom-right: Visit. Plus the end-of-day card.
 
 signal visit_pressed
+signal new_park  # F9's card, confirmed
 
 const MARGIN := 16
 const SPEEDS := [0, 1, 3]
@@ -37,6 +38,7 @@ var _xp := -1  # sim.xp the badge last drew
 var level_card := PanelContainer.new()
 var _level_text := _label(16)
 var _level_title := _label(24)
+var new_card := PanelContainer.new()  # F9: start a new park?
 
 ## Mood face for an average happiness (0..100).
 static func face_for(happiness: float) -> int:
@@ -162,6 +164,24 @@ func _ready() -> void:
 	level_card.hide()
 	level = ParkLevel.of(sim.xp)
 
+	var nbox := BuildBar.box(Palette.CREAM, 20)
+	nbox.set_content_margin_all(22)
+	new_card.add_theme_stylebox_override("panel", nbox)
+	var nc := VBoxContainer.new()
+	nc.add_theme_constant_override("separation", 12)
+	var ask := _label(18)
+	ask.text = "Start a new park?\nThis one is gone for good."
+	ask.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	nc.add_child(ask)
+	var nrow := HBoxContainer.new()
+	nrow.add_theme_constant_override("separation", 8)
+	nrow.add_child(_button("Keep playing", new_card.hide))
+	nrow.add_child(_button("New park", new_park.emit))
+	nc.add_child(nrow)
+	new_card.add_child(nc)
+	add_child(new_card)
+	new_card.hide()
+
 func _process(delta: float) -> void:
 	_time += delta
 	if sim.money != _target:  # count to the new value; bounce at most once per MONEY_EVERY
@@ -196,6 +216,14 @@ func _process(delta: float) -> void:
 		_card.reset_size()
 		_card.set_anchors_and_offsets_preset(Control.PRESET_CENTER, Control.PRESET_MODE_MINSIZE)
 	_card.visible = over
+
+## F9: the small "start a new park?" card in the centre.
+func confirm_new_park() -> void:
+	new_card.show()
+	new_card.reset_size()
+	new_card.set_anchors_and_offsets_preset(Control.PRESET_CENTER, Control.PRESET_MODE_MINSIZE)
+	new_card.pivot_offset = new_card.size * 0.5
+	Motion.pop(new_card)
 
 ## Badge pops; the "Level up!" card drops in at the top centre listing what `lv` unlocks.
 func _level_up(lv: int) -> void:
