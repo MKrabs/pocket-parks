@@ -120,7 +120,7 @@ func announce() -> void:
 	if port == 0:
 		return
 	var msg := var_to_bytes({"id": _id, "name": park_name, "player": player, "port": port, "theme": theme})
-	for ip in ["255.255.255.255", "127.0.0.1"]:
+	for ip in ["255.255.255.255", "127.0.0.1"] + Net.broadcasts(IP.get_local_addresses()):
 		for p in range(DISCO_PORT, DISCO_PORT + DISCO_PORTS):
 			_udp.set_dest_address(ip, p)
 			_udp.put_packet(msg)
@@ -141,6 +141,21 @@ func offers() -> Array[Dictionary]:
 		var n: Dictionary = nearby[k]
 		out.append({"name": n["name"], "player": n["player"], "theme": n["theme"], "ip": n["ip"], "port": n["port"], "live": true})
 	out.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a["player"] < b["player"])
+	return out
+
+## Directed broadcast for each private IPv4 we have (a.b.c.255). Some systems don't send 255.255.255.255 out of the
+## Wi-Fi when there are other interfaces (VPN, Docker bridges); the subnet address does reach it.
+## ponytail: assumes /24 networks, which home Wi-Fi almost always is. Read real netmasks if a /16 LAN shows up.
+static func broadcasts(addrs: PackedStringArray) -> Array[String]:
+	var out: Array[String] = []
+	for a in addrs:
+		var q := a.split(".")
+		if q.size() != 4 or not a.is_valid_ip_address():
+			continue
+		var private := q[0] == "192" and q[1] == "168" or q[0] == "10" or q[0] == "172" and int(q[1]) in range(16, 32)
+		var b := "%s.%s.%s.255" % [q[0], q[1], q[2]]
+		if private and not b in out:
+			out.append(b)
 	return out
 
 ## "192.168.1.23" or "192.168.1.23:24611" -> {ip, port} (default GAME_PORT); {} if it isn't an IPv4 address.

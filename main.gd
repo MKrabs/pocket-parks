@@ -293,8 +293,11 @@ func visit(offer: Dictionary) -> void:
 
 ## The Visit picker, with our own address for a friend to type.
 func open_picker() -> void:
-	var ip := Net.local_address(IP.get_local_addresses())
-	visit_panel.open(offers, net.offers(), "%s:%d" % [ip, net.port] if ip != "" and net.port > 0 else "")
+	visit_panel.source = func() -> Dictionary:
+		var ip := Net.local_address(IP.get_local_addresses())
+		return {"nearby": net.offers(), "bots": offers, "listening": net.udp_port, "player": net.player,
+			"own": "%s:%d" % [ip, net.port] if ip != "" and net.port > 0 else ""}
+	visit_panel.open()
 
 ## A typed address: connect while staying home, travel once it answers (net.joined), toast if it never does.
 func join_address(text: String) -> void:

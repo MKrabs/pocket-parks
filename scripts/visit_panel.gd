@@ -51,66 +51,117 @@ func _ready() -> void:
 	add_child(_send)
 	_send.hide()
 
-## Show the picker: real parks on the network (with a live dot), the join-by-address field and `own` (our address
-## for a friend to type), then the bot parks, plus Cancel.
-func open(offers: Array[Dictionary], nearby: Array[Dictionary] = [], own := "") -> void:
-	for c in _choices.get_children():
-		c.queue_free()
+## At least MIN_PARKS on offer: friends on the network first, bot parks fill the rest (pure, so tests reach it).
+const MIN_PARKS := 3
+const REFRESH := 1.0  # s between list refreshes while the picker is open
+
+static func merge(nearby: Array, bots: Array) -> Array:
+	var out: Array = nearby.duplicate()
+	for o in bots:
+		if out.size() >= MIN_PARKS:
+			break
+		out.append(o)
+	return out
+
+## `source` returns {nearby: Array, bots: Array, own: String, listening: int, player: String}; called on open and
+## every REFRESH s while the picker is open, so friends appear (and drop off) live.
+var source: Callable
+var _list := VBoxContainer.new()
+var _status := Hud._label(13)
+var _field := LineEdit.new()
+var _mine := Hud._label(13)
+var _refresh_in := 0.0
+var _time := 0.0
+
+## Show the picker: one list of parks (friends found on the network, topped up with bots to MIN_PARKS), a live
+## search status, the join-by-address field and our own address, plus Cancel.
+func open() -> void:
+	if _choices.get_child_count() == 0:
+		_build()
+	_field.text = last_address
+	_picker.show()
+	_refresh()
+
+## The picker's fixed parts, once: heading, search status, the park list (refilled by _refresh), join row, own address.
+func _build() -> void:
 	var head := Hud._label(18)
 	head.text = "Visit a park"
 	_choices.add_child(head)
-	_choices.add_child(_section("Nearby"))
-	for o in nearby:
-		var b := _choice(o, "%s\n%s · %s" % [o["name"], o["player"], o["theme"]])
-		b.draw.connect(func() -> void:  # live dot just left of the park name
-			var f := b.get_theme_font("font")
-			var fs := b.get_theme_font_size("font_size")
-			var w := f.get_string_size(o["name"], HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
-			var at := Vector2((b.size.x - w) / 2 - 12, b.size.y / 2 - f.get_height(fs) / 2)
-			b.draw_colored_polygon(Squircle.points(at, Vector2(7, 7), 4.0, 24), Palette.GRASS)
-			b.draw_colored_polygon(Squircle.points(at, Vector2(4.5, 4.5), 4.0, 24), Palette.MOSS))
-	if nearby.is_empty():
-		var none := Hud._label(14)
-		none.text = "No parks on your network yet"
-		none.modulate.a = 0.6
-		_choices.add_child(none)
+	_choices.add_child(_status)
+	_list.add_theme_constant_override("separation", 10)
+	_choices.add_child(_list)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)
-	var field := LineEdit.new()
-	field.placeholder_text = "Join by address"
-	field.text = last_address
-	field.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	field.add_theme_font_size_override("font_size", 14)
+	_field.placeholder_text = "Join by address"
+	_field.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_field.add_theme_font_size_override("font_size", 14)
 	for k in ["font_color", "font_placeholder_color", "caret_color"]:
-		field.add_theme_color_override(k, Palette.INK if k != "font_placeholder_color" else Palette.shade(Palette.STONE, 0.3))
+		_field.add_theme_color_override(k, Palette.INK if k != "font_placeholder_color" else Palette.shade(Palette.STONE, 0.3))
 	for k in ["normal", "focus"]:
-		field.add_theme_stylebox_override(k, BuildBar.box(Palette.STONE if k == "normal" else Palette.SKY))
+		_field.add_theme_stylebox_override(k, BuildBar.box(Palette.STONE if k == "normal" else Palette.SKY))
 	var go := func() -> void:
-		last_address = field.text.strip_edges()
+		last_address = _field.text.strip_edges()
 		_picker.hide()
 		join_address.emit(last_address)
-	field.text_submitted.connect(func(_t: String) -> void: go.call())
-	row.add_child(field)
+	_field.text_submitted.connect(func(_t: String) -> void: go.call())
+	row.add_child(_field)
 	row.add_child(Hud._button("Join", go))
 	_choices.add_child(row)
-	var mine := Hud._label(13)
-	mine.text = "Your park: %s" % (own if own != "" else "not on a network")
-	mine.modulate.a = 0.7
-	_choices.add_child(mine)
-	_choices.add_child(_section("Bot parks"))
-	for o in offers:
-		_choice(o, "%s\n%s · %d guards" % [o["name"], o["theme"], o["guards"]])
+	_mine.modulate.a = 0.7
+	_choices.add_child(_mine)
 	_choices.add_child(Hud._button("Cancel", _picker.hide))
-	_picker.show()
+
+func _process(delta: float) -> void:
+	if not _picker.visible:
+		return
+	_time += delta
+	_status.modulate.a = 0.55 + 0.25 * sin(_time * 3.0)  # a slow pulse: still searching
+	_refresh_in -= delta
+	if _refresh_in <= 0.0:
+		_refresh()
+
+func _refresh() -> void:
+	_refresh_in = REFRESH
+	var d: Dictionary = source.call() if source.is_valid() else {}
+	var nearby: Array = d.get("nearby", [])
+	for c in _list.get_children():
+		_list.remove_child(c)
+		c.queue_free()
+	for o in merge(nearby, d.get("bots", [])):
+		if o.get("live", false):
+			_live_choice(o)
+		else:
+			_choice(o, "%s\nbot park · %s · %d guards" % [o["name"], o["theme"], o["guards"]])
+	var found := nearby.size()
+	if int(d.get("listening", 0)) == 0:
+		_status.text = "Can't look for friends: the network port is busy"
+	elif found == 0:
+		_status.text = "● Looking for friends on your network…"
+	else:
+		_status.text = "● Found %d friend%s · still looking" % [found, "" if found == 1 else "s"]
+	var own: String = d.get("own", "")
+	_mine.text = "Your park: %s%s" % [own if own != "" else "not on a network",
+		"  ·  you are %s" % d["player"] if d.get("player", "") != "" else ""]
 	_picker.reset_size()
+	_picker.size.y = minf(_picker.size.y, get_viewport().get_visible_rect().size.y - 40)
 	_picker.set_anchors_and_offsets_preset(Control.PRESET_CENTER, Control.PRESET_MODE_MINSIZE)
+
+func _live_choice(o: Dictionary) -> void:
+	var b := _choice(o, "%s\n%s · %s" % [o["name"], o["player"], o["theme"]])
+	b.draw.connect(func() -> void:  # live dot just left of the park name
+		var f := b.get_theme_font("font")
+		var fs := b.get_theme_font_size("font_size")
+		var w := f.get_string_size(o["name"], HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+		var at := Vector2((b.size.x - w) / 2 - 12, b.size.y / 2 - f.get_height(fs) / 2)
+		b.draw_colored_polygon(Squircle.points(at, Vector2(7, 7), 4.0, 24), Palette.GRASS)
+		b.draw_colored_polygon(Squircle.points(at, Vector2(4.5, 4.5), 4.0, 24), Palette.MOSS))
 
 func _choice(o: Dictionary, text: String) -> Button:
 	var b := Hud._button(text, func() -> void:
 		_picker.hide()
 		picked.emit(o))
-	b.custom_minimum_size = Vector2(220, 0)
-	_choices.add_child(b)
+	b.custom_minimum_size = Vector2(260, 0)
+	_list.add_child(b)
 	return b
 
 func _section(text: String) -> Label:

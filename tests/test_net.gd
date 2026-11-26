@@ -19,6 +19,13 @@ func pump(a: Net, b: Net, cond: Callable) -> bool:
 	return false
 
 func _init() -> void:
+	ok(Net.broadcasts(PackedStringArray(["192.168.0.177", "127.0.0.1", "10.27.42.112", "172.17.0.1", "8.8.8.8", "fe80::1",
+		"192.168.0.5"])) == (["192.168.0.255", "10.27.42.255", "172.17.0.255"] as Array[String]), "directed broadcasts: private only, deduped")
+	var live := [{"name": "A", "live": true}, {"name": "B", "live": true}]
+	var bots := [{"name": "x"}, {"name": "y"}, {"name": "z"}]
+	ok(VisitPanel.merge([], bots).size() == 3, "no friends: three bot parks")
+	ok(VisitPanel.merge(live, bots).map(func(o: Dictionary) -> String: return o["name"]) == ["A", "B", "x"], "friends first, bots top up to 3")
+	ok(VisitPanel.merge(live + live, bots).size() == 4, "four friends: no bots")
 	var map := BotPark.generate("zoo", 5)
 	var sim := ParkSim.new(map, 5)
 	sim.send("guest", "Mia")
