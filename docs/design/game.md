@@ -47,10 +47,24 @@ A bad actor's life:
 2. **Strike.** It does its crime. It's exposed only for those few seconds.
 3. **Hide again.** It blends back in. Then it either **leaves** (and the loot reaches the sender) or
    **stays for another round**. Its urge to stay shrinks with every crime (stay chance about 80% → 55% → 30% → 10%).
-4. **Caught** (by a guard, or by the host; see Open):
-   - before any crime: the sender pays the host a **base fine**;
-   - after crimes: the fine grows with every crime committed (base × (1 + crimes)), and any loot it
-     carries goes back to the host (Default: loot is delivered only when the actor leaves).
+4. **Caught.** Arrests need evidence:
+   - an actor caught **during or after a crime**: the sender pays the host a fine that grows with every
+     crime (base × crimes), and any loot it carries goes back to the host (loot is delivered only when the actor leaves);
+   - a **wrongful arrest** (an honest guest, or an actor with no crime yet): the **host pays the sender**.
+     A risk the host has to take. (Decided by owner 2026-11-26.)
+   - **Guards** only arrest on evidence: they catch an actor mid-crime, or one they saw commit a crime
+     (it's marked *wanted* and they chase it). So guards never cause wrongful arrests.
+   - **The host** can click any guest to accuse it. That's the gamble.
+
+Honest guests you send pay you **20% of what they spend** (Default).
+
+**Crime reports (UI).** Every crime is reported to the host as it happens: a toast ("Snack Stand was
+robbed: −$24"), and clicking it pans the camera there. The report says *what* and *where*, never *who*,
+unless a guard saw it. Working out who it was is the host's job.
+
+**Building pins (UI).** A small map-pin-style bubble with an icon floats above a building that needs
+something: *wrecked, needs rebuilding* (click: pay to repair now, or it reopens by itself after a while),
+*littered, needs cleaning* (janitors), *robbed* (info, fades). Future: damaged building models (see Roadmap).
 
 So every bad actor is a push-your-luck bet. Damage is temporary: wrecked buildings reopen after a
 while, and janitors clean the litter.
@@ -66,6 +80,7 @@ Only the next milestone gets detailed tickets. Later ones stay one-liners until 
 - Expandable map: start smaller (about 12×12), buy a few adjacent plots up to about 20×20. "Not by too much."
 - Cinema theme (third pack): ticket booth entrance, screens (attractions), popcorn stand (shop), posters/plants (decor).
 - Staff levels also make guards better at spotting hidden bad actors.
+- Damaged building models: a wrecked or vandalised variant of each building, shown while it needs repair.
 
 **M4 Local network foundation.** See Decided: networking, below.
 - Each game hosts its own park on the local network; a "Parks nearby" list (UDP broadcast discovery).
@@ -94,7 +109,3 @@ Would reverse it: the game is meant for players who don't know each other.
 ## Parked
 Roguelike run structure. Meta progression. Saving your own park to disk (small; becomes needed in M4, since your park must survive a restart).
 Sound. Leagues and likes.
-
-## Open (sending people)
-- What does the sender get for sending honest guests? (They're cover for bad actors, but is there a direct reward?)
-- How does the host catch a hidden actor: only guards, or can the host also accuse a suspect by hand, and what does a wrong accusation cost?
