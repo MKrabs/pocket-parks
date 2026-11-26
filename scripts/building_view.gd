@@ -4,7 +4,7 @@ extends Node2D
 
 var id: String
 var origin := Vector2i.ZERO
-var level := 1:  # 2-3 add flags (attractions, shops) or a bigger canopy (decor), plus level dots
+var level := 1:  # 2-3 add flags (attractions, shops) or a bigger canopy (decor)
 	set(l):
 		level = l
 		queue_redraw()
@@ -53,12 +53,6 @@ func _draw() -> void:
 	for p in b["parts"]:
 		var foot := Squircle.iso_points(IsoGrid.project(mid + p["at"] * grow), p["half"] * grow, 4.0, 48)
 		block(self, foot, p["h"] * grow, p["z"] * grow, _tint(p["color"]))
-	if Buildings.upgradable(id):
-		var front := IsoGrid.project(mid + Vector2(fp) * 0.5) + Vector2(0, 3)  # front tip of the footprint
-		for i in level:
-			var at := front + Vector2((i - (level - 1) * 0.5) * 8.0, 0)
-			draw_colored_polygon(Squircle.points(at, Vector2(3.6, 2.6)), Palette.shade(Palette.BUTTER, 0.22))
-			draw_colored_polygon(Squircle.points(at + Vector2(0, -0.6), Vector2(2.6, 1.8)), Palette.BUTTER)
 	if label != "":
 		var f := ThemeDB.fallback_font
 		var at := IsoGrid.project(mid) + Vector2(0, -maxf(top, 10.0) * grow - 38)  # clear of the flags

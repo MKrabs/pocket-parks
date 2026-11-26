@@ -10,6 +10,9 @@ const MARKS := {"guest": Palette.MOSS, "hooligan": Palette.CLAY, "litterbug": Pa
 
 var sim: ParkSim
 var me := ""  # sender whose people get a dot above the bean (only we can see them)
+var hovered := -1  # guest id lifted under the mouse (Select mode)
+var hovered_staff := -1  # staff index lifted under the mouse
+const HOVER_LIFT := 4.0
 var _layers: Array[Node2D] = []
 var _rows: Array = []  # per depth: [[kind, item], ...]
 var _time := 0.0
@@ -38,7 +41,7 @@ func _process(delta: float) -> void:
 	for i in sim.staff.size():
 		var t: float = _time - _hops.get(i, -INF)
 		var lift := sin(t / Motion.HOP_TIME * PI) * Motion.HOP if t < Motion.HOP_TIME else 0.0
-		_row(sim.staff[i]["pos"]).append(["staff", sim.staff[i], lift])
+		_row(sim.staff[i]["pos"]).append(["staff", sim.staff[i], lift + (HOVER_LIFT if i == hovered_staff else 0.0)])
 	for g in sim.guests:
 		if g["state"] != "visit":  # inside the building
 			_row(g["pos"]).append(["guest", g])
@@ -70,7 +73,7 @@ func _draw_row(ci: Node2D, d: int) -> void:
 				var base: Color = GUEST_COLORS[id % GUEST_COLORS.size()]
 				var col := base.lerp(Palette.CORAL, clampf((60.0 - g["mood"]) / 40.0, 0.0, 1.0))
 				var p := spot(g)
-				_bean(ci, p, id, Vector2(4.0, 4.8), col, Color(Palette.INK, 0.0), g["state"] != "queue")
+				_bean(ci, p, id, Vector2(4.0, 4.8), col, Color(Palette.INK, 0.0), g["state"] != "queue", Color(Palette.INK, 0.0), HOVER_LIFT if id == hovered else 0.0)
 				var head := IsoGrid.project(p) - Vector2(0, LIFT + 15.0)
 				if me != "" and g["sender"] == me:
 					ci.draw_colored_polygon(Squircle.points(head, Vector2(4.4, 4.4), 4.0, 16), Palette.CREAM)

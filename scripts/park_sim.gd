@@ -40,6 +40,7 @@ var guests: Array[Dictionary] = []  # walker + mood (0-100), state: walk|queue|v
 var staff: Array[Dictionary] = []   # walker + kind
 var litter: Dictionary = {}         # path cell -> true
 var closed: Dictionary = {}         # wrecked building origin -> tick it reopens
+var today: Dictionary = {}          # attraction/shop origin -> {guests, income} finished visits today (info card)
 var income := 0
 var served := 0   # guests who finished at least one visit
 var spawned := 0
@@ -101,6 +102,7 @@ func load_map(map: ParkMap) -> void:
 func new_day() -> void:
 	tick = 0
 	income = 0
+	today.clear()
 	served = 0
 	spawned = 0
 	_gone = 0
@@ -374,6 +376,9 @@ func _finish(g: Dictionary) -> void:
 			g["litter_in"] = _rng.randi_range(5, 40)  # dropped a few steps down the path
 	else:
 		g["mood"] += t["appeal"] * 1.5
+	var d: Dictionary = today.get_or_add(t["origin"], {"guests": 0, "income": 0})
+	d["guests"] += 1
+	d["income"] += t["price"] if t["role"] == "shop" else 0
 	g["mood"] = minf(g["mood"], 100.0)
 	if g["kind"] != "guest" and (g["kind"] != "thief" or t["role"] == "shop"):
 		_strike(g, t)
@@ -432,14 +437,14 @@ func _hide(g: Dictionary) -> void:
 func repair(origin: Vector2i) -> bool:
 	if not closed.has(origin):
 		return false
-	var cost := _repair_cost(origin)
+	var cost := repair_cost(origin)
 	if money < cost:
 		return false
 	money -= cost
 	closed.erase(origin)
 	return true
 
-func _repair_cost(origin: Vector2i) -> int:
+func repair_cost(origin: Vector2i) -> int:
 	for t in _targets:
 		if t["origin"] == origin:
 			return int(Buildings.get_def(t["id"])["cost"] * REPAIR_SHARE)

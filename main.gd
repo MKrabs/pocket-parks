@@ -10,7 +10,8 @@ const SEED := [
 # Bot "friends" stand in for real ones: every SEND_EVERY ticks one sends a mixed group into your park.
 const BOTS := ["Mia", "Theo"]
 const SEND_EVERY := 30 * ParkSim.TPS
-const PICK_RADIUS := 12.0  # screen px around a person for the accuse tool
+const PICK_RADIUS := 12.0  # screen px around a person for hover and click in Select mode
+const PAINT_ROLES := ["path", "decor"]  # stay in place mode after placing (paths, trees); others go back to Select
 
 var bar := BuildBar.new()
 var zoo := ZooView.new()
@@ -29,18 +30,35 @@ var fx := Feedback.new()
 var toasts := CrimeToasts.new()
 var cam := IsoCamera.new()
 var transition := CloudTransition.new()
-var accusing := false
+var card := InfoCard.new()
 var bots := true  # bot friends send groups into your park (tests switch them off)
 var _acc := 0.0  # sim ticks owed
 var _reported := 0  # sim.events already toasted
 var _rng := RandomNumberGenerator.new()
 
 ## T swaps the active theme; the build bar follows, placed buildings stay.
+## Esc leaves place mode, or closes the card in Select mode.
 func _unhandled_key_input(event: InputEvent) -> void:
 	var k := event as InputEventKey
-	if k.pressed and not k.echo and k.physical_keycode == KEY_T:
+	if not k.pressed or k.echo:
+		return
+	if k.physical_keycode == KEY_T:
 		Buildings.use("festival" if Buildings.active == "zoo" else "zoo")
 		bar.fill()
+	elif k.physical_keycode == KEY_ESCAPE:
+		escape()
+
+func escape() -> void:
+	if zoo.selected != "":
+		bar.clear()
+	else:
+		card.close()
+
+## Right-click anywhere on the world cancels place mode.
+func _unhandled_input(event: InputEvent) -> void:
+	var mb := event as InputEventMouseButton
+	if mb and mb.pressed and mb.button_index == MOUSE_BUTTON_RIGHT:
+		bar.clear()
 
 func _ready() -> void:
 	var grid := GridView.new()
@@ -73,9 +91,15 @@ func _ready() -> void:
 	add_child(fx)
 
 	bar.picked.connect(func(id: String) -> void:
-		accusing = id == "accuse"
-		zoo.select("" if accusing else id))
+		zoo.select(id)
+		grid.tile_hover = id != ""
+		if id != "":
+			card.close())
 	add_child(bar)
+	card.sim = sim
+	card.map = zoo.map
+	card.action.connect(_on_card_action)
+	add_child(card)
 	hud.sim = sim
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7
@@ -110,6 +134,33 @@ func _process(delta: float) -> void:
 	if visiting:
 		_visit_zoo.show_wrecked(visits[0]["sim"].closed)
 		visit_panel.show_ledger(visits[0]["sim"].sent_by(Visit.ME), sim.money)
+	else:
+		_hover(get_global_mouse_position(), get_viewport().get_mouse_position())
+
+## Select mode: lift the person or building under the mouse and name it in the tooltip.
+func _hover(world: Vector2, screen: Vector2) -> void:
+	var g := person_at(world) if zoo.selected == "" else -1
+	var s := staff_at(world) if zoo.selected == "" and g < 0 else -1
+	var cell := IsoGrid.to_cell(world)
+	var o: Vector2i = zoo.map.occupied.get(cell, GridView.NONE) if zoo.selected == "" and g < 0 and s < 0 else GridView.NONE
+	walkers.hovered = g
+	walkers.hovered_staff = s
+	if o != zoo.lifted:
+		zoo.highlight(o)
+	var text := ""
+	if g >= 0:
+		text = InfoCard.guest_title(_guest(g))
+	elif s >= 0:
+		text = (sim.staff[s]["kind"] as String).capitalize()
+	elif o != GridView.NONE:
+		text = InfoCard.building_name(zoo.map, o)
+	card.hover(text, screen)
+
+func _guest(id: int) -> Dictionary:
+	for g in sim.guests:
+		if g["id"] == id:
+			return g
+	return {}
 
 ## One world tick: your park (at the HUD speed at home, 1× while away) and every visited park at 1×.
 ## Money the visited parks owe us (or we owe them) moves into our sim; stolen blueprints join the build bar.
@@ -159,6 +210,9 @@ func visit(offer: Dictionary) -> void:
 	_visit_walkers = WalkerView.new()
 	_visit_walkers.sim = v["sim"]
 	_visit_walkers.me = Visit.ME
+	card.close()
+	card.hover("", Vector2.ZERO)
+	bar.clear()
 	for n in [zoo, walkers, pins, fx, bar, hud]:
 		n.hide()
 	add_child(_visit_zoo)
@@ -236,34 +290,68 @@ func accuse(person_id: int) -> Dictionary:
 	zoo.map.money = sim.money
 	return r
 
-## Nearest person drawn within PICK_RADIUS screen px of a world point, or -1.
+## Id of the nearest guest drawn within PICK_RADIUS screen px of a world point, or -1.
 func person_at(world: Vector2) -> int:
+	var drawn := sim.guests.filter(func(g: Dictionary) -> bool: return g["state"] != "visit")  # inside = not drawn
+	var i := _nearest(world, drawn.map(func(g: Dictionary) -> Vector2: return WalkerView.spot(g)))
+	return drawn[i]["id"] if i >= 0 else -1
+
+## Index of the nearest staff member within PICK_RADIUS screen px, or -1.
+func staff_at(world: Vector2) -> int:
+	return _nearest(world, sim.staff.map(func(s: Dictionary) -> Vector2: return s["pos"]))
+
+func _nearest(world: Vector2, cells: Array) -> int:
 	var best := -1
 	var best_d := PICK_RADIUS / cam.zoom.x
-	for g in sim.guests:
-		if g["state"] == "visit":
-			continue  # inside, not drawn
-		var d := world.distance_to(IsoGrid.project(WalkerView.spot(g)) - Vector2(0, WalkerView.LIFT + 5))
+	for i in cells.size():
+		var d := world.distance_to(IsoGrid.project(cells[i]) - Vector2(0, WalkerView.LIFT + 5))
 		if d < best_d:
-			best = g["id"]
+			best = i
 			best_d = d
 	return best
 
-func _on_cell_clicked(cell: Vector2i, button: MouseButton) -> void:
-	if visiting:
+## Left-click on the ground: place in place mode (back to Select unless painting or Shift), else select.
+func _on_cell_clicked(cell: Vector2i, button: MouseButton, shift := false) -> void:
+	if visiting or button != MOUSE_BUTTON_LEFT:
 		return  # someone else's park: you send people, you don't build or accuse
-	if accusing and button == MOUSE_BUTTON_LEFT:
-		var id := person_at(get_global_mouse_position())
-		if id >= 0:
-			accuse(id)
-	else:
-		zoo.on_click(cell, button)
+	var id := zoo.selected
+	if id == "":
+		select_at(cell, get_global_mouse_position())
+	elif zoo.on_click(cell) and not Buildings.get_def(id)["role"] in PAINT_ROLES and not (shift or Input.is_key_pressed(KEY_SHIFT)):
+		bar.clear()
 
-func _on_pin_clicked(origin: Vector2i, kind: String) -> void:
-	var before := sim.money
-	if kind == "wrecked" and sim.repair(origin):
-		toasts.add("repaired", "Repaired %s: −$%d" % [_name(origin), before - sim.money], origin)
-		zoo.map.money = sim.money
+## Select mode click: a person near `world` gets the card, else the building on `cell`, else the card closes.
+func select_at(cell: Vector2i, world: Vector2) -> void:
+	var g := person_at(world)
+	var s := staff_at(world)
+	if g >= 0:
+		card.show_person(g)
+	elif s >= 0:
+		card.show_staff(s)
+	elif zoo.map.occupied.has(cell):
+		card.show_building(zoo.map.occupied[cell])
+	else:
+		card.close()
+
+func _on_pin_clicked(origin: Vector2i, _kind: String) -> void:
+	card.show_building(origin)
+
+func _on_card_action(what: String) -> void:
+	var o := card.origin
+	match what:
+		"upgrade":
+			zoo.upgrade(o)
+		"demolish":
+			if zoo.demolish(o):
+				card.close()
+		"repair":
+			var before := sim.money
+			if sim.repair(o):
+				toasts.add("repaired", "Repaired %s: −$%d" % [_name(o), before - sim.money], o)
+				zoo.map.money = sim.money
+		"accuse":
+			accuse(card.person)
+			card.close()
 
 ## ZooView rebuilt after a place/remove: the map paid for it, hand money and layout back to the sim.
 func _on_map_changed(money: int) -> void:
