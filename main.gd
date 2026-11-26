@@ -95,6 +95,7 @@ func _ready() -> void:
 		grid.tile_hover = id != ""
 		if id != "":
 			card.close())
+	bar.hire.connect(func(kind: String) -> void: sim.hire(kind))
 	add_child(bar)
 	card.sim = sim
 	card.map = zoo.map
@@ -130,6 +131,7 @@ func _process(delta: float) -> void:
 		step_world()
 		_acc -= 1.0
 	zoo.show_wrecked(sim.closed)
+	toasts.floor_y = card.top() if card.is_open() else INF
 	zoo.map.money = sim.money  # the sim owns money while the day runs; building spends from the map
 	if visiting:
 		_visit_zoo.show_wrecked(visits[0]["sim"].closed)

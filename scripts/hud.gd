@@ -1,73 +1,132 @@
 class_name Hud
 extends CanvasLayer
-# Top bar over the running day: clock, money, guests, happiness, speed, hiring. End-of-day card.
+# Screen corners over the running day. Top-left: park name, level badge, day bar. Top-right: money,
+# guests, mood face. Bottom-left: pause / play / fast. Bottom-right: Visit. Plus the end-of-day card.
 
 signal visit_pressed
+
+const MARGIN := 16
+const SPEEDS := [0, 1, 3]
+const VISIT_SIZE := 96.0
 
 var sim: ParkSim
 var speed := 1  # sim steps per tick of game time; 0 = paused
 var day := 1
+var level := 1
+var progress := 0.0  # 0..1 of the way to the next level (park level comes in L1)
 
+var park_name := _label(20)
+var guests := _label(18)
+var money := _label(20)
+var mood := 0  # 1 happy, 0 neutral, -1 sad (drawn as a face)
+var speed_buttons: Array[Button] = []
+var visit: Button
 var _clock := ProgressBar.new()
-var _day_label := _label(16)
-var _money := _label(20)
+var _day_label := _label(13)
+var _badge := Control.new()
+var _face := Control.new()
 var _chip: PanelContainer  # the money chip
 var _shown := 0.0  # money the chip shows while it counts to sim.money
 var _target := 0
 var _count: Tween
 var _bounced := -INF
 var _time := 0.0
-var _guests := _label(16)
-var _mood := _label(16)
 var _card := PanelContainer.new()
 var _card_text := _label(18)
+
+## Mood face for an average happiness (0..100).
+static func face_for(happiness: float) -> int:
+	return 1 if happiness >= 60.0 else (0 if happiness >= 35.0 else -1)
+
+## Park level on the badge; `p` fills its ring (0..1).
+func set_level(lv: int, p: float) -> void:
+	level = lv
+	progress = clampf(p, 0.0, 1.0)
+	_badge.queue_redraw()
 
 func _ready() -> void:
 	_target = sim.money
 	_shown = sim.money
-	var bar := PanelContainer.new()
-	bar.add_theme_stylebox_override("panel", BuildBar.box(Palette.STONE, 20))
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 10)
-	bar.add_child(row)
+	park_name.text = "Pocket Zoo"
 
-	var clock := VBoxContainer.new()
-	clock.add_theme_constant_override("separation", 4)
-	clock.alignment = BoxContainer.ALIGNMENT_CENTER
-	clock.add_child(_day_label)
-	_clock.custom_minimum_size = Vector2(120, 8)
+	# top-left: badge, name, day bar
+	var left := _panel()
+	var lrow := HBoxContainer.new()
+	lrow.add_theme_constant_override("separation", 12)
+	_badge.custom_minimum_size = Vector2(48, 48)
+	_badge.draw.connect(_draw_badge)
+	lrow.add_child(_badge)
+	var lcol := VBoxContainer.new()
+	lcol.add_theme_constant_override("separation", 4)
+	lcol.alignment = BoxContainer.ALIGNMENT_CENTER
+	lcol.add_child(park_name)
+	var drow := HBoxContainer.new()
+	drow.add_theme_constant_override("separation", 8)
+	_clock.custom_minimum_size = Vector2(110, 6)
+	_clock.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_clock.show_percentage = false
 	_clock.max_value = ParkSim.DAY_TICKS
 	_clock.add_theme_stylebox_override("background", _flat(Palette.CREAM))
 	_clock.add_theme_stylebox_override("fill", _flat(Palette.BUTTER))
-	clock.add_child(_clock)
-	row.add_child(clock)
-	for l in [_money, _guests, _mood]:
-		var chip := PanelContainer.new()
-		chip.add_theme_stylebox_override("panel", BuildBar.box(Palette.BUTTER if l == _money else Palette.CREAM))
-		chip.add_child(l)
-		if l == _money:
-			_chip = chip
-		row.add_child(chip)
+	drow.add_child(_clock)
+	_day_label.modulate.a = 0.7
+	drow.add_child(_day_label)
+	lcol.add_child(drow)
+	lrow.add_child(lcol)
+	left.add_child(lrow)
+	add_child(left)
+	left.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT, Control.PRESET_MODE_MINSIZE, MARGIN)
 
+	# top-right: money, guests, mood
+	var right := _panel()
+	var rrow := HBoxContainer.new()
+	rrow.add_theme_constant_override("separation", 8)
+	_chip = _chip_of(Palette.BUTTER, [money])
+	rrow.add_child(_chip)
+	rrow.add_child(_chip_of(Palette.CREAM, [_icon(Vector2(18, 26), _draw_person), guests]))
+	_face.custom_minimum_size = Vector2(28, 28)
+	_face.draw.connect(_draw_face)
+	rrow.add_child(_chip_of(Palette.CREAM, [_face]))
+	right.add_child(rrow)
+	add_child(right)
+	right.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT, Control.PRESET_MODE_MINSIZE, MARGIN)
+	right.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+
+	# bottom-left: speed
+	var speeds := _panel()
+	var srow := HBoxContainer.new()
+	srow.add_theme_constant_override("separation", 6)
 	var group := ButtonGroup.new()
-	for s in [[0, "Pause"], [1, "1×"], [3, "3×"]]:
-		var b := _button(s[1], func() -> void: speed = s[0])
+	for s: int in SPEEDS:
+		var b := _button("", func() -> void: speed = s)
 		b.toggle_mode = true
 		b.button_group = group
-		b.button_pressed = s[0] == speed
-		b.custom_minimum_size = Vector2(44, 0)
-		row.add_child(b)
-	for kind: String in ParkSim.STAFF:
-		row.add_child(_button("Hire %s\n$%d" % [kind, ParkSim.STAFF[kind]["hire"]], func() -> void: sim.hire(kind)))
-	var visit := _button("Visit", visit_pressed.emit)
-	visit.add_theme_stylebox_override("normal", BuildBar.box(Palette.BUTTER))
-	visit.add_theme_stylebox_override("hover", BuildBar.box(Palette.shade(Palette.BUTTER, 0.04)))
-	visit.custom_minimum_size = Vector2(64, 0)
-	row.add_child(visit)
-	add_child(bar)
-	bar.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP, Control.PRESET_MODE_MINSIZE, 16)
-	bar.grow_horizontal = Control.GROW_DIRECTION_BOTH
+		b.button_pressed = s == speed
+		b.custom_minimum_size = Vector2(40, 36)
+		b.draw.connect(_draw_speed.bind(b, s))
+		speed_buttons.append(b)
+		srow.add_child(b)
+	speeds.add_child(srow)
+	add_child(speeds)
+	speeds.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT, Control.PRESET_MODE_MINSIZE, MARGIN)
+	speeds.grow_vertical = Control.GROW_DIRECTION_BEGIN
+
+	# bottom-right: Visit, a big round button with a cloud
+	visit = _button("Visit", visit_pressed.emit)
+	for k in ["normal", "hover", "pressed", "hover_pressed"]:
+		var st := BuildBar.box(Palette.shade(Palette.BUTTER, 0.04) if k == "hover" else Palette.BUTTER, int(VISIT_SIZE * 0.42))
+		st.content_margin_top = 46
+		visit.add_theme_stylebox_override(k, st)
+	visit.add_theme_font_size_override("font_size", 18)
+	visit.custom_minimum_size = Vector2.ONE * VISIT_SIZE
+	var cloud := Puff.new()
+	cloud.size = 44
+	cloud.position = Vector2(VISIT_SIZE * 0.5, 30)
+	visit.add_child(cloud)
+	add_child(visit)
+	visit.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT, Control.PRESET_MODE_MINSIZE, MARGIN)
+	visit.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	visit.grow_vertical = Control.GROW_DIRECTION_BEGIN
 
 	var card_box := BuildBar.box(Palette.CREAM, 20)
 	card_box.set_content_margin_all(22)
@@ -96,11 +155,14 @@ func _process(delta: float) -> void:
 			_chip.pivot_offset = _chip.size * 0.5
 			Motion.bounce(_chip)
 	var r := sim.day_report()
-	_day_label.text = "Day %d   %d s" % [day, ceili(ParkSim.DAY_TICKS / float(ParkSim.TPS) - sim.day_time())]
+	_day_label.text = "Day %d" % day
 	_clock.value = sim.tick
-	_money.text = "$ %d" % roundi(_shown)
-	_guests.text = "Guests %d" % sim.guests.size()
-	_mood.text = "Happy %d%%" % roundi(r["happiness"])
+	money.text = "$ %d" % roundi(_shown)
+	guests.text = str(sim.guests.size())
+	var m := face_for(r["happiness"]) if sim.guests.size() > 0 else 1
+	if m != mood:
+		mood = m
+		_face.queue_redraw()
 	var over := sim.tick >= ParkSim.DAY_TICKS
 	if over and not _card.visible:
 		_card_text.text = "Day %d is over\nIncome   $ %d\nGuests   %d\nHappiness   %d%%\nWages   $ %d" % [
@@ -118,6 +180,91 @@ func coin_fly(screen: Vector2, amount: int) -> void:
 	Motion.pop(c)
 	Motion.fly_to(c, chip if amount > 0 else screen, func() -> void: Motion.vanish(c))
 
+func _draw_badge() -> void:
+	var c := _badge.size * 0.5
+	var ring := Squircle.points(c, c - Vector2(2, 2), 4.0, 48)
+	_badge.draw_colored_polygon(ring, Palette.CREAM)
+	ring.append(ring[0])
+	_badge.draw_polyline(ring, Palette.shade(Palette.STONE, 0.12), 4.0, true)
+	if progress > 0.0:  # clockwise from the top
+		var steps := 48
+		var part := ring.slice(0, 0)
+		for i in roundi(steps * progress) + 1:
+			part.append(ring[(i + steps * 3 / 4) % steps])
+		_badge.draw_polyline(part, Palette.shade(Palette.BUTTER, 0.22), 4.0, true)
+	var font := ThemeDB.fallback_font
+	var t := "Lv %d" % level
+	var w := font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x
+	_badge.draw_string(font, c + Vector2(-w * 0.5, 5), t, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Palette.INK)
+
+func _draw_face() -> void:
+	var c := _face.size * 0.5
+	var col: Color = [Palette.CORAL, Palette.STONE, Palette.BUTTER][mood + 1]
+	_face.draw_colored_polygon(Squircle.points(c, Vector2(13, 13), 3.2, 40), Palette.shade(col, 0.12))
+	_face.draw_colored_polygon(Squircle.points(c, Vector2(11.5, 11.5), 3.2, 40), col)
+	var ink := Color(Palette.INK, 0.85)
+	for x in [-4.5, 4.5]:
+		_face.draw_colored_polygon(Squircle.points(c + Vector2(x, -3), Vector2(1.6, 2.0), 3.0, 12), ink)
+	var mouth := PackedVector2Array()
+	for i in 9:
+		var x := (i / 8.0 - 0.5) * 10.0
+		mouth.append(c + Vector2(x, 4.0 + mood * (2.5 - x * x / 10.0)))
+	_face.draw_polyline(mouth, ink, 1.8, true)
+
+func _draw_person(ci: Control) -> void:
+	var c := ci.size * 0.5
+	var ink := Palette.shade(Palette.SKY, 0.3)
+	ci.draw_colored_polygon(Squircle.points(c + Vector2(0, -5), Vector2(4.5, 4.5), 3.0, 24), ink)
+	ci.draw_colored_polygon(Squircle.points(c + Vector2(0, 8), Vector2(7.5, 5), 3.0, 24), ink)
+
+func _draw_speed(b: Button, s: int) -> void:
+	var c := b.size * 0.5
+	var ink := Color(Palette.INK, 0.85)
+	match s:
+		0:
+			for x in [-3.5, 3.5]:
+				b.draw_colored_polygon(Squircle.points(c + Vector2(x, 0), Vector2(2.2, 7), 4.0, 20), ink)
+		1:
+			b.draw_colored_polygon(_tri(c + Vector2(1.5, 0), 7.0), ink)
+		_:
+			for x in [-4.0, 4.0]:
+				b.draw_colored_polygon(_tri(c + Vector2(x, 0), 6.0), ink)
+
+## A play triangle pointing right with softened corners, centred on `at`, about 2r tall.
+static func _tri(at: Vector2, r: float) -> PackedVector2Array:
+	var out := PackedVector2Array()
+	var k := r * 0.25
+	for p: Vector2 in [Vector2(-0.6, -1), Vector2(0.9, 0), Vector2(-0.6, 1)]:
+		out.append(at + p * r + (-p.normalized()) * k)
+	return out
+
+static func _icon(min_size: Vector2, f: Callable) -> Control:
+	var c := Control.new()
+	c.custom_minimum_size = min_size
+	c.draw.connect(func() -> void: f.call(c))
+	return c
+
+static func _panel() -> PanelContainer:
+	var p := PanelContainer.new()
+	var st := BuildBar.box(Palette.STONE, 20)
+	st.set_content_margin_all(8)
+	p.add_theme_stylebox_override("panel", st)
+	return p
+
+static func _chip_of(c: Color, kids: Array) -> PanelContainer:
+	var chip := PanelContainer.new()
+	var st := BuildBar.box(c)
+	st.content_margin_top = 6
+	st.content_margin_bottom = 6
+	chip.add_theme_stylebox_override("panel", st)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+	for k: Control in kids:
+		k.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(k)
+	chip.add_child(row)
+	return chip
+
 static func _label(size: int) -> Label:
 	var l := Label.new()
 	l.add_theme_color_override("font_color", Palette.INK)
@@ -127,7 +274,7 @@ static func _label(size: int) -> Label:
 static func _flat(c: Color) -> StyleBoxFlat:
 	var s := StyleBoxFlat.new()
 	s.bg_color = c
-	s.set_corner_radius_all(4)
+	s.set_corner_radius_all(3)
 	s.corner_detail = 6
 	return s
 
