@@ -5,6 +5,7 @@
 #                           render offscreen (xvfb), save the frame after `sec` seconds (default 1)
 #                           to out (default shots/main.png). Renders the main scene, or with `script`
 #                           a SceneTree script (e.g. res://tests/show_buildings.gd) that builds its own view
+#   ./gd export             build builds/PocketParks-macos.zip (universal, ad-hoc signed) and builds/PocketParks.x86_64
 #   ./gd run                open the game in a window (humans)
 #   ./gd edit               open the editor (humans)
 set -uo pipefail
@@ -37,7 +38,14 @@ case "${1:-}" in
       echo "gd shot failed:"; grep -E 'ERROR|Error' "$tmp/log" | head -20; rm -rf "$tmp"; exit 1
     fi
     mv "$last" "$out"; rm -rf "$tmp"; echo "$out" ;;
+  export)
+    mkdir -p builds; rc=0
+    for p in "macOS:builds/PocketParks-macos.zip" "Linux:builds/PocketParks.x86_64"; do
+      out="$(timeout 300 "$G" --headless --path . --export-release "${p%%:*}" "${p#*:}" 2>&1)"
+      if grep -q 'ERROR' <<<"$out" || [ ! -s "${p#*:}" ]; then echo "FAIL ${p%%:*}"; grep -A1 ERROR <<<"$out" | head; rc=1; else echo "ok   ${p#*:}"; fi
+    done
+    exit $rc ;;
   run)  exec "$G" --path . ;;
   edit) exec "$G" --path . -e ;;
-  *) sed -n '2,9p' "$0"; exit 1 ;;
+  *) sed -n '2,10p' "$0"; exit 1 ;;
 esac

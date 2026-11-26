@@ -6,3 +6,4 @@ tickets/.lock
 tickets/log.txt
 .godot/
 shots/
+builds/

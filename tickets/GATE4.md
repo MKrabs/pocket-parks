@@ -2,7 +2,7 @@
 id: GATE4
 title: Owner: two-window network test + play the new content
 status: todo
-deps: NET1, CIN, DMG
+deps: NET1, IP, CIN, DMG
 area: decision
 parent: M4
 human: true

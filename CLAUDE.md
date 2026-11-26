@@ -31,6 +31,7 @@ Parked stays parked.
 ./gd shot out.png   # offscreen render of the main scene (xvfb), then look at the PNG
 ./gd run            # play it in a window (humans)
 ./gd edit           # Godot editor (humans)
+./gd export         # builds/PocketParks-macos.zip (universal, ad-hoc signed) + builds/PocketParks.x86_64
 python3 test_tix.py # self-check for the ticket queue
 ```
 Godot binary: `$GODOT`, default `~/Downloads/Godot_v4.6.2-stable_linux.x86_64`.
