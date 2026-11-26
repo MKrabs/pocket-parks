@@ -1,12 +1,11 @@
 class_name BuildBar
 extends CanvasLayer
-# Bottom bar: one button per catalog building plus an eraser. Money chip top-left.
+# Bottom bar: one button per catalog building plus an eraser. Money lives in the Hud.
 
 signal picked(id: String)  # "" = eraser
 
 const RADIUS := 14
 
-var money_label := Label.new()
 var row := HBoxContainer.new()
 
 static func box(c: Color, radius: int = RADIUS) -> StyleBoxFlat:
@@ -20,14 +19,6 @@ static func box(c: Color, radius: int = RADIUS) -> StyleBoxFlat:
 	return s
 
 func _ready() -> void:
-	var chip := PanelContainer.new()
-	chip.add_theme_stylebox_override("panel", box(Palette.BUTTER))
-	chip.position = Vector2(16, 16)
-	money_label.add_theme_color_override("font_color", Palette.INK)
-	money_label.add_theme_font_size_override("font_size", 20)
-	chip.add_child(money_label)
-	add_child(chip)
-
 	var bar := PanelContainer.new()
 	bar.add_theme_stylebox_override("panel", box(Palette.STONE, 20))
 	row.add_theme_constant_override("separation", 8)
@@ -69,6 +60,3 @@ func button(text: String, id: String, group: ButtonGroup) -> Button:
 		if on:
 			picked.emit(id))
 	return b
-
-func set_money(m: int) -> void:
-	money_label.text = "$ %d" % m

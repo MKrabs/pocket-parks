@@ -24,6 +24,7 @@ func rebuild() -> void:
 	for o: Vector2i in origins:
 		var v := BuildingView.new(map.buildings[o])
 		v.position = IsoGrid.to_screen(o)
+		v.z_index = 2 * ParkMap.depth(map.buildings[o], o)  # WalkerView rows sit at the odd values
 		add_child(v)
 	ghost = null
 	update_ghost()
@@ -37,7 +38,8 @@ func update_ghost() -> void:
 		return
 	if not ghost:
 		ghost = BuildingView.new(selected)
-		add_child(ghost)  # last child = drawn on top
+		ghost.z_index = 1000  # above every building and walker
+		add_child(ghost)
 	ghost.position = IsoGrid.to_screen(hovered)
 	var tint := Palette.CORAL if not map.can_place(selected, hovered) else Palette.CREAM
 	ghost.modulate = Color(tint, 0.6)

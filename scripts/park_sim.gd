@@ -60,6 +60,58 @@ func _init(map: ParkMap, seed_value: int) -> void:
 	_astar.region = Rect2i(Vector2i.ZERO, IsoGrid.SIZE)
 	_astar.diagonal_mode = AStarGrid2D.DIAGONAL_MODE_NEVER
 	_astar.update()
+	_load(map)
+
+## Pick up map changes mid-day: rebuild the path graph and targets, re-route everyone already walking.
+func load_map(map: ParkMap) -> void:
+	var old_origins: Array = _targets.map(func(t: Dictionary) -> Vector2i: return t["origin"])
+	_load(map)
+	if _entrance.x < 0:
+		guests.clear()  # ponytail: gate removed mid-day, guests just vanish
+		return
+	var index := {}
+	for i in _targets.size():
+		index[_targets[i]["origin"]] = i
+	for w in guests + staff:
+		w["path"] = []
+		if _astar.is_point_solid(w["cell"]):  # path under them was erased
+			w["cell"] = _entrance
+			w["pos"] = Vector2(_entrance)
+	for g in guests:
+		var t: int = index.get(old_origins[g["target"]], -1) if g["target"] >= 0 else -1
+		g["target"] = t
+		if g["state"] == "leave":
+			_go(g, _entrance)
+		elif t < 0:
+			_pick(g)  # its building is gone
+		elif g["state"] == "visit":
+			_targets[t]["inside"] += 1
+		elif g["state"] == "walk":
+			_go(g, _targets[t]["door"])
+
+## Morning: clock, counters, guests and litter reset; staff stay on the payroll and start at the gate.
+func new_day() -> void:
+	tick = 0
+	income = 0
+	served = 0
+	spawned = 0
+	_gone = 0
+	_gone_mood = 0.0
+	_wages = 0
+	guests.clear()
+	litter.clear()
+	for t in _targets:
+		t["inside"] = 0
+	if _entrance.x >= 0:
+		for s in staff:
+			s.merge(_walker(s["kind"]), true)
+
+func _load(map: ParkMap) -> void:
+	_entrance = Vector2i(-1, -1)
+	_paths.clear()
+	_targets.clear()
+	_decor.clear()
+	_appeal = 0.0
 	_astar.fill_solid_region(_astar.region)
 	for origin: Vector2i in map.buildings:
 		var role: String = Buildings.get_def(map.buildings[origin])["role"]
@@ -156,7 +208,7 @@ func _walker(kind: String) -> Dictionary:
 
 func _spawn() -> void:
 	var g := _walker("guest")
-	g.merge({"mood": 50.0, "state": "walk", "target": -1, "visits": 0, "wants": _rng.randi_range(2, 4), "wait": 0, "litter_in": 0})
+	g.merge({"id": spawned, "mood": 50.0, "state": "walk", "target": -1, "visits": 0, "wants": _rng.randi_range(2, 4), "wait": 0, "litter_in": 0})
 	guests.append(g)
 	spawned += 1
 	money += ENTRY_FEE
