@@ -1,13 +1,13 @@
 ---
 id: NET1
 title: Send people into a friend's real park
-status: todo
+status: doing
 deps: NET0, SAVE
 area: net
 parent: M4
 human: false
-owner: 
-since: 
+owner: worker-NET1
+since: 2026-11-26T23:26:39
 ---
 ## Goal
 The send mechanic over the network (`docs/design/game.md` → Sending people, networking). The **host's game is the
