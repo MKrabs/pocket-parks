@@ -11,12 +11,20 @@ var day := 1
 var _clock := ProgressBar.new()
 var _day_label := _label(16)
 var _money := _label(20)
+var _chip: PanelContainer  # the money chip
+var _shown := 0.0  # money the chip shows while it counts to sim.money
+var _target := 0
+var _count: Tween
+var _bounced := -INF
+var _time := 0.0
 var _guests := _label(16)
 var _mood := _label(16)
 var _card := PanelContainer.new()
 var _card_text := _label(18)
 
 func _ready() -> void:
+	_target = sim.money
+	_shown = sim.money
 	var bar := PanelContainer.new()
 	bar.add_theme_stylebox_override("panel", BuildBar.box(Palette.STONE, 20))
 	var row := HBoxContainer.new()
@@ -38,6 +46,8 @@ func _ready() -> void:
 		var chip := PanelContainer.new()
 		chip.add_theme_stylebox_override("panel", BuildBar.box(Palette.BUTTER if l == _money else Palette.CREAM))
 		chip.add_child(l)
+		if l == _money:
+			_chip = chip
 		row.add_child(chip)
 
 	var group := ButtonGroup.new()
@@ -73,11 +83,22 @@ func _ready() -> void:
 	add_child(_card)
 	_card.hide()
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+	_time += delta
+	if sim.money != _target:  # count to the new value; bounce at most once per MONEY_EVERY
+		_target = sim.money
+		if _count:
+			_count.kill()
+		_count = create_tween()
+		_count.tween_property(self, "_shown", float(_target), Motion.COUNT_TIME).set_ease(Tween.EASE_OUT)
+		if _time - _bounced >= Motion.MONEY_EVERY:
+			_bounced = _time
+			_chip.pivot_offset = _chip.size * 0.5
+			Motion.bounce(_chip)
 	var r := sim.day_report()
 	_day_label.text = "Day %d   %d s" % [day, ceili(ParkSim.DAY_TICKS / float(ParkSim.TPS) - sim.day_time())]
 	_clock.value = sim.tick
-	_money.text = "$ %d" % sim.money
+	_money.text = "$ %d" % roundi(_shown)
 	_guests.text = "Guests %d" % sim.guests.size()
 	_mood.text = "Happy %d%%" % roundi(r["happiness"])
 	var over := sim.tick >= ParkSim.DAY_TICKS
@@ -87,6 +108,15 @@ func _process(_delta: float) -> void:
 		_card.reset_size()
 		_card.set_anchors_and_offsets_preset(Control.PRESET_CENTER, Control.PRESET_MODE_MINSIZE)
 	_card.visible = over
+
+## Money in (amount > 0): a BUTTER coin flies from `screen` to the chip. Out: a CORAL coin flies from it to `screen`.
+func coin_fly(screen: Vector2, amount: int) -> void:
+	var chip := _chip.get_global_rect().get_center()
+	var c := Feedback.coin(Palette.BUTTER if amount > 0 else Palette.CORAL)
+	c.position = screen if amount > 0 else chip
+	add_child(c)
+	Motion.pop(c)
+	Motion.fly_to(c, chip if amount > 0 else screen, func() -> void: Motion.vanish(c))
 
 static func _label(size: int) -> Label:
 	var l := Label.new()

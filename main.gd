@@ -25,6 +25,7 @@ var _visit_zoo: ZooView
 var _visit_walkers: WalkerView
 var debug_visit := false  # tests/show_visit.gd: start inside a visit with a few people sent
 var pins := PinView.new()
+var fx := Feedback.new()
 var toasts := CrimeToasts.new()
 var cam := IsoCamera.new()
 var transition := CloudTransition.new()
@@ -64,6 +65,12 @@ func _ready() -> void:
 	pins.cam = cam
 	pins.clicked.connect(_on_pin_clicked)
 	add_child(pins)
+	fx.sim = sim
+	fx.zoo = zoo
+	fx.walkers = walkers
+	fx.hud = hud
+	zoo.fx = fx
+	add_child(fx)
 
 	bar.picked.connect(func(id: String) -> void:
 		accusing = id == "accuse"
@@ -152,7 +159,7 @@ func visit(offer: Dictionary) -> void:
 	_visit_walkers = WalkerView.new()
 	_visit_walkers.sim = v["sim"]
 	_visit_walkers.me = Visit.ME
-	for n in [zoo, walkers, pins, bar, hud]:
+	for n in [zoo, walkers, pins, fx, bar, hud]:
 		n.hide()
 	add_child(_visit_zoo)
 	add_child(_visit_walkers)
@@ -175,7 +182,7 @@ func go_home() -> void:
 	_visit_zoo.queue_free()
 	_visit_walkers.queue_free()
 	visit_panel.close()
-	for n in [zoo, walkers, pins, bar, hud]:
+	for n in [zoo, walkers, pins, fx, bar, hud]:
 		n.show()
 
 ## Run `ticks` sim steps: bots send their groups on schedule, new crimes become toasts.

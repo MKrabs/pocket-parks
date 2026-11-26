@@ -152,6 +152,9 @@ func _init() -> void:
 					bad += 1
 			last = now
 		ok(sim.ledger.get("g", 0) >= 0, "honest senders never fined")
+		for a: Dictionary in sim.arrests:
+			if a["guard"] < 0 or a["wrongful"] or a["amount"] <= 0:
+				bad += 1  # every guard catch is recorded with its guard and the money in
 	print("guard catches %d, bad %d" % [caught, bad])
 	ok(caught > 0 and bad == 0, "guards catch only witnessed actors")
 
@@ -164,6 +167,8 @@ func _init() -> void:
 		var r := sim.accuse(find(sim, kind)["id"])
 		ok(r["wrongful"] and sim.money == before - ParkSim.WRONGFUL_FINE and sim.ledger["a"] == ParkSim.WRONGFUL_FINE, "wrongful arrest of a %s: host pays" % kind)
 		ok(find(sim, kind)["state"] == "leave", "the wrongly accused %s leaves" % kind)
+		ok(sim.arrests.size() == 1 and sim.arrests[0]["wrongful"] and sim.arrests[0]["guard"] == -1
+			and sim.arrests[0]["amount"] == -ParkSim.WRONGFUL_FINE, "wrongful arrest recorded")
 	ok(quiet(6).accuse(99).is_empty(), "unknown id")
 
 	# accuse after 2 crimes: base × 2 plus the loot back.
@@ -180,6 +185,7 @@ func _init() -> void:
 		ok(not r["wrongful"] and r["fine"] == fine and r["loot"] == t["loot"] and t["loot"] > 0, "fine is base x 2")
 		ok(sim.money == before + fine + t["loot"] and sim.ledger["a"] == -fine, "fine and loot go to the host")
 		ok(find(sim, "thief").is_empty(), "arrested thief is gone")
+		ok(sim.arrests[-1]["amount"] == fine + t["loot"] and not sim.arrests[-1]["wrongful"], "accuse recorded with money in")
 		fined = true
 		break
 	ok(fined, "some thief got to 2 crimes")
