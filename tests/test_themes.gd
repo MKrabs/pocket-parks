@@ -30,7 +30,7 @@ func _init() -> void:
 	ok(not Buildings.ids().has("fest_stage"), "ids() is the active theme only")
 	ok(Buildings.get_def("nope").is_empty(), "unknown id -> {}")
 	# placed buildings survive a theme swap
-	var map := ZooMap.new()
+	var map := ParkMap.new()
 	ok(map.place("zoo_gate", Vector2i(0, 0)), "place zoo gate")
 	Buildings.use("festival")
 	ok(map.place("fest_stage", Vector2i(4, 4)), "place stage after swap")

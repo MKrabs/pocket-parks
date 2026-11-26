@@ -4,7 +4,7 @@ extends Node2D
 
 signal money_changed(money: int)
 
-var map := ZooMap.new()
+var map := ParkMap.new()
 var selected := ""  # catalog id, or "" for the eraser
 var hovered := GridView.NONE
 var ghost: BuildingView
@@ -18,8 +18,8 @@ func rebuild() -> void:
 		c.queue_free()
 	var origins: Array = map.buildings.keys()
 	origins.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
-		var da := ZooMap.depth(map.buildings[a], a)
-		var db := ZooMap.depth(map.buildings[b], b)
+		var da := ParkMap.depth(map.buildings[a], a)
+		var db := ParkMap.depth(map.buildings[b], b)
 		return da < db if da != db else a.x < b.x)
 	for o: Vector2i in origins:
 		var v := BuildingView.new(map.buildings[o])
