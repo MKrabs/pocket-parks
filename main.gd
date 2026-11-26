@@ -32,6 +32,8 @@ var toasts := CrimeToasts.new()
 var cam := IsoCamera.new()
 var transition := CloudTransition.new()
 var card := InfoCard.new()
+var net := Net.new()
+var live := false  # the park on screen is a real one over the network (net.visit_sim), not a bot park
 var bots := true  # bot friends send groups into your park (tests switch them off)
 var _acc := 0.0  # sim ticks owed
 var _reported := 0  # sim.events already toasted
@@ -46,6 +48,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	if k.physical_keycode == KEY_T:
 		var ts: Array = Buildings.themes().keys()
 		Buildings.use(ts[(ts.find(Buildings.active) + 1) % ts.size()])
+		net.theme = Buildings.active
 		bar.fill()
 	elif k.physical_keycode == KEY_R:
 		zoo.rotate_ghost(-1 if k.shift_pressed else 1)
@@ -112,8 +115,20 @@ func _ready() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7
 	offers = Visit.offers(rng)
-	hud.visit_pressed.connect(func() -> void: visit_panel.open(offers))
+	hud.visit_pressed.connect(func() -> void: visit_panel.open(offers, net.offers()))
 	add_child(hud)
+	net.sim = sim
+	net.map = zoo.map
+	net.park_name = hud.park_name.text
+	net.theme = Buildings.active
+	net.map_changed.connect(func() -> void:
+		if live:
+			_visit_zoo.rebuild())
+	net.lost.connect(func() -> void:
+		if live:
+			toasts.add("wrecked", "Lost the connection: back home")
+			travel_home())
+	add_child(net)
 	visit_panel.picked.connect(travel_to)
 	visit_panel.sent.connect(send)
 	visit_panel.home.connect(travel_home)
@@ -141,7 +156,9 @@ func _process(delta: float) -> void:
 	toasts.floor_y = card.top() if card.is_open() else INF
 	zoo.map.money = sim.money  # the sim owns money while the day runs; building spends from the map
 	zoo.map.xp = sim.xp
-	if visiting:
+	if live:
+		_visit_zoo.show_wrecked(net.visit_sim.closed if net.visit_sim else {})
+	elif visiting:
 		_visit_zoo.show_wrecked(visits[0]["sim"].closed)
 		visit_panel.show_ledger(visits[0]["sim"].sent_by(Visit.ME), sim.money)
 	else:
@@ -192,7 +209,7 @@ func step_world() -> void:
 		if got:
 			bar.fill()
 		var t := vs.sent_by(Visit.ME)
-		if not (visiting and v == visits[0]) and t["guests"] + t["hidden"] + t["wanted"] == 0:
+		if not (visiting and not live and v == visits[0]) and t["guests"] + t["hidden"] + t["wanted"] == 0:
 			visits.erase(v)  # left behind and nobody of ours is inside any more
 
 ## visit() behind the cloud transition (the swap happens at full cover).
@@ -203,8 +220,11 @@ func travel_to(offer: Dictionary) -> Tween:
 func travel_home() -> Tween:
 	return transition.play(cam, "Home", go_home, false)
 
-## Swap the view to the offer's park (reusing its sim if we were already there).
+## Swap the view to the offer's park (reusing its sim if we were already there). A live offer connects to its game.
 func visit(offer: Dictionary) -> void:
+	if offer.get("live", false):
+		_visit_live(offer)
+		return
 	var v: Dictionary = {}
 	for w in visits:
 		if w["offer"]["name"] == offer["name"]:
@@ -220,6 +240,22 @@ func visit(offer: Dictionary) -> void:
 	_visit_walkers = WalkerView.new()
 	_visit_walkers.sim = v["sim"]
 	_visit_walkers.me = Visit.ME
+	_enter_visit(offer["name"])
+
+## A real nearby park: an empty mirror now, the views fill as its map and live state arrive.
+func _visit_live(offer: Dictionary) -> void:
+	if not net.join(offer["ip"], offer["port"]):
+		toasts.add("wrecked", "Couldn't reach %s" % offer["name"])
+		return
+	live = true
+	_visit_zoo = ZooView.new()
+	_visit_zoo.map = net.visit_map
+	_visit_zoo.sim = net.visit_sim  # construction sites show their scaffold
+	_visit_walkers = WalkerView.new()
+	_visit_walkers.sim = net.visit_sim
+	_enter_visit("%s · %s" % [offer["name"], offer["player"]], false)
+
+func _enter_visit(title: String, sending := true) -> void:
 	card.close()
 	card.hover("", Vector2.ZERO)
 	bar.clear()
@@ -229,11 +265,11 @@ func visit(offer: Dictionary) -> void:
 	add_child(_visit_zoo)
 	add_child(_visit_walkers)
 	visiting = true
-	visit_panel.watch(offer["name"])
+	visit_panel.watch(title, sending)
 
 ## Send one person of `kind` into the park on screen, paid now. False if not visiting or too poor.
 func send(kind: String) -> bool:
-	if not visiting or sim.money < Visit.PRICES[kind]:
+	if not visiting or live or sim.money < Visit.PRICES[kind]:
 		return false
 	sim.money -= Visit.PRICES[kind]
 	visits[0]["sim"].send(kind, Visit.ME)
@@ -245,6 +281,8 @@ func go_home() -> void:
 		return
 	visiting = false
 	grid.map = zoo.map
+	live = false
+	net.leave()
 	_visit_zoo.queue_free()
 	_visit_walkers.queue_free()
 	visit_panel.close()
