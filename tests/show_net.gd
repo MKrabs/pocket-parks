@@ -24,7 +24,14 @@ func _init() -> void:
 	main.bots = false
 	root.add_child.call_deferred(main)
 	await create_timer(1.0).timeout
-	main.visit_panel.open(main.offers, main.net.offers())
+	main.visit_panel.last_address = "192.168.1.23"  # IP: the field remembers the last typed address
+	main.open_picker()
+	if OS.get_environment("NET_JOIN") == "1":  # IP: join the friend by typed address (127.0.0.1), not via Nearby
+		main.visit_panel._picker.hide()
+		main.join_address("127.0.0.1:%d" % friend.port)
+	if OS.get_environment("NET_JOIN") == "bad":  # nothing listens there: a toast, and we stay home
+		main.visit_panel._picker.hide()
+		main.join_address("127.0.0.1:24629")
 	if OS.get_environment("NET_VISIT") == "1":
 		await create_timer(0.5).timeout
 		var o: Dictionary = main.net.offers().filter(func(x: Dictionary) -> bool: return x["player"] == "sam42")[0]

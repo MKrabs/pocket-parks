@@ -12,6 +12,7 @@ extends Node
 
 signal map_changed  # the visited park's layout arrived or changed: rebuild its ZooView
 signal lost         # the visited park went away (host closed, or never answered)
+signal joined       # the park we join() answered (we sent our hello)
 signal stolen(ids: Array)  # blueprints our spies brought home from the visited park (running list, may repeat)
 
 const GAME_PORT := 24610   # ENet: first free of GAME_PORT .. +19
@@ -20,6 +21,7 @@ const DISCO_PORTS := 10
 const ANNOUNCE_EVERY := 2.0
 const FORGET_AFTER := 6.0
 const LIVE_EVERY := 0.1
+const CONNECT_TIMEOUT_MS := 4000  # join(): an address that never answers is dropped (lost) after about this long
 
 var park_name := "Pocket Zoo"
 var player := ""
@@ -141,6 +143,26 @@ func offers() -> Array[Dictionary]:
 	out.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a["player"] < b["player"])
 	return out
 
+## "192.168.1.23" or "192.168.1.23:24611" -> {ip, port} (default GAME_PORT); {} if it isn't an IPv4 address.
+static func parse_address(text: String) -> Dictionary:
+	var parts := text.strip_edges().split(":")
+	var ip := parts[0]
+	if parts.size() > 2 or not ip.is_valid_ip_address() or ip.count(".") != 3:
+		return {}
+	if parts.size() == 1:
+		return {"ip": ip, "port": GAME_PORT}
+	if not parts[1].is_valid_int() or int(parts[1]) < 1 or int(parts[1]) > 65535:
+		return {}
+	return {"ip": ip, "port": int(parts[1])}
+
+## The address a friend types to reach us: first private IPv4 (192.168.*, then 10.*, then 172.16–31.*), "" if none.
+static func local_address(addrs: PackedStringArray) -> String:
+	for prefix: String in ["192.168.", "10.", "172."]:
+		for a in addrs:
+			if a.begins_with(prefix) and (prefix != "172." or int(a.split(".")[1]) in range(16, 32)):
+				return a
+	return ""
+
 ## Connect to a park; visit_map / visit_sim fill in as its state arrives. False if the socket can't open.
 func join(ip: String, game_port: int) -> bool:
 	leave()
@@ -148,6 +170,7 @@ func join(ip: String, game_port: int) -> bool:
 	if _client.create_client(ip, game_port) != OK:
 		_client = null
 		return false
+	_client.host.get_peers()[0].set_timeout(0, CONNECT_TIMEOUT_MS, CONNECT_TIMEOUT_MS)  # give up on a dead address fast
 	visit_map = ParkMap.new()
 	visit_sim = ParkSim.new(visit_map, 0)
 	visit_ledger = {"guests": 0, "hidden": 0, "wanted": 0, "earned": 0, "fines": 0}
@@ -190,6 +213,8 @@ func _poll_client() -> void:
 	if status == MultiplayerPeer.CONNECTION_CONNECTED and not _hello:
 		_hello = true
 		_send(_client, 1, {"t": "hello", "player": player})
+		_client.get_peer(1).set_timeout(0, 5000, 30000)  # ENet's defaults again, once connected
+		joined.emit()
 	while _client and _client.get_available_packet_count() > 0:
 		var m: Variant = bytes_to_var(_client.get_packet())
 		if m is Dictionary:
