@@ -132,7 +132,7 @@ func _load(map: ParkMap) -> void:
 	var decor_appeal := 0.0
 	for origin: Vector2i in map.buildings:
 		var id: String = map.buildings[origin]
-		var d: Dictionary = Buildings.get_def(id)
+		var d: Dictionary = Buildings.leveled(id, map.level(origin))
 		if d["role"] == "decor":
 			decor_appeal += d["appeal"]
 			for c in ParkMap.footprint(id, origin):

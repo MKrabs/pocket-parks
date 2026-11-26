@@ -2,9 +2,10 @@ class_name BuildBar
 extends CanvasLayer
 # Bottom bar: one button per catalog building plus an eraser. Money lives in the Hud.
 
-signal picked(id: String)  # "" = eraser
+signal picked(id: String)  # "" = eraser, UPGRADE = upgrade tool
 
 const RADIUS := 14
+const UPGRADE := "@upgrade"
 
 var row := HBoxContainer.new()
 var stolen: Array[String] = []  # blueprints spies brought home, offered in every theme
@@ -39,6 +40,7 @@ func fill() -> void:
 		var b: Dictionary = Buildings.get_def(id)
 		row.add_child(button("%s\n$%d" % [b["name"], b["cost"]], id, group))
 	row.add_child(button("Eraser\n ", "", group))
+	row.add_child(button("Upgrade\n ", UPGRADE, group))
 	var bar := row.get_parent() as Control
 	bar.reset_size()
 	bar.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM, Control.PRESET_MODE_MINSIZE, 16)
