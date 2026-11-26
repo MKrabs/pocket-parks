@@ -1,7 +1,7 @@
 extends SceneTree
 # ./gd shot shots/NET0.png 3 res://tests/show_net.gd: the main scene plus a second "game" (a Net hosting a bot
 # festival park) in the same process; the Visit picker lists it under Nearby.
-# NET_VISIT=1 ./gd shot shots/NET0-visit.png 6 res://tests/show_net.gd: travels there and watches it live.
+# NET_VISIT=1 ./gd shot shots/NET0-visit.png 6 res://tests/show_net.gd: travels there, watches it live, sends four people.
 
 func _init() -> void:
 	var map := BotPark.generate("festival", 9, "large")
@@ -30,3 +30,6 @@ func _init() -> void:
 		var o: Dictionary = main.net.offers().filter(func(x: Dictionary) -> bool: return x["player"] == "sam42")[0]
 		main.visit_panel._picker.hide()
 		main.travel_to(o)
+		await create_timer(2.0).timeout
+		for k: String in ["guest", "guest", "thief", "guest"]:  # NET1: sent over the wire, judged by the friend's sim
+			main.send(k)
