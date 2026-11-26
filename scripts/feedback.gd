@@ -40,8 +40,8 @@ func _crime(e: Dictionary) -> void:
 	if v == null:
 		return
 	Motion.shake(v, Motion.CRIME_SHAKE)
-	var base := base_of(v.id, o)
-	var top := PinView.top(v.id, o)
+	var base := base_of(v.id, o, v.turn)
+	var top := PinView.top(v.id, o, v.turn)
 	match e["kind"]:
 		"wrecked":
 			for i in Motion.DEBRIS:
@@ -75,7 +75,7 @@ func _float(o: Vector2i, amount: int) -> void:
 		var w := f.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 12).x
 		ci.draw_colored_polygon(Squircle.points(Vector2.ZERO, Vector2(w * 0.5 + 7, 9), 4.0, 32), Palette.BUTTER)
 		ci.draw_string(f, Vector2(-w * 0.5, 4), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Palette.INK))
-	l.position = PinView.top(zoo.map.buildings[o], o) - Vector2(0, 6)
+	l.position = PinView.top(zoo.map.buildings[o], o, zoo.map.rotation(o)) - Vector2(0, 6)
 	l.z_index = 200  # over the pins: it is small and gone in a second
 	add_child(l)
 	var t := Motion.pop(l).set_parallel()
@@ -93,8 +93,8 @@ func _arrest(a: Dictionary) -> void:
 	hud.coin_fly(get_viewport().get_canvas_transform() * at, a["amount"])
 
 ## Centre of a building's footprint on the ground.
-static func base_of(id: String, o: Vector2i) -> Vector2:
-	var fp: Vector2i = Buildings.get_def(id)["footprint"]
+static func base_of(id: String, o: Vector2i, rot := 0) -> Vector2:
+	var fp := ParkMap.size(id, rot)
 	return IsoGrid.project(Vector2(o) + Vector2(fp - Vector2i.ONE) * 0.5)
 
 ## A node that draws with `f(node)`.

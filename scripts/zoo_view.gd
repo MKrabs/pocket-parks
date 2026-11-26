@@ -8,6 +8,7 @@ var map := ParkMap.new()
 const LIFT := 4.0  # px a hovered building rises in Select mode
 
 var selected := ""  # catalog id being placed, or "" in Select mode
+var turn := 0  # quarter turns of the placement ghost (R / Shift+R)
 var hovered := GridView.NONE
 var lifted := GridView.NONE  # origin of the hovered building in Select mode
 var ghost: BuildingView
@@ -22,15 +23,16 @@ func rebuild() -> void:
 		c.queue_free()
 	var origins: Array = map.buildings.keys()
 	origins.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
-		var da := ParkMap.depth(map.buildings[a], a)
-		var db := ParkMap.depth(map.buildings[b], b)
+		var da := ParkMap.depth(map.buildings[a], a, map.rotation(a))
+		var db := ParkMap.depth(map.buildings[b], b, map.rotation(b))
 		return da < db if da != db else a.x < b.x)
 	for o: Vector2i in origins:
 		var v := BuildingView.new(map.buildings[o])
 		v.origin = o
 		v.level = map.level(o)
+		v.turn = map.rotation(o)
 		v.position = IsoGrid.to_screen(o)
-		v.z_index = 2 * ParkMap.depth(map.buildings[o], o)  # WalkerView rows sit at the odd values
+		v.z_index = 2 * ParkMap.depth(map.buildings[o], o, v.turn)  # WalkerView rows sit at the odd values
 		add_child(v)
 	ghost = null
 	highlight(lifted)
@@ -50,10 +52,16 @@ func update_ghost() -> void:
 	if selected == "" or hovered == GridView.NONE:
 		return
 	ghost = BuildingView.new(selected)
+	ghost.turn = turn
 	ghost.z_index = 1000  # above every building and walker
 	ghost.position = IsoGrid.to_screen(hovered)
-	ghost.modulate = Color(Palette.CREAM if map.can_place(selected, hovered) else Palette.CORAL, 0.6)
+	ghost.modulate = Color(Palette.CREAM if map.can_place(selected, hovered, turn) else Palette.CORAL, 0.6)
 	add_child(ghost)
+
+## Turn the placement ghost a quarter turn (dir 1 = clockwise, -1 = back).
+func rotate_ghost(dir: int) -> void:
+	turn = posmod(turn + dir, 4)
+	update_ghost()
 
 func select(id: String) -> void:
 	selected = id
@@ -72,12 +80,12 @@ func highlight(origin: Vector2i) -> void:
 
 ## Place the selected building at `cell`. True if it was placed.
 func on_click(cell: Vector2i) -> bool:
-	if selected == "" or not map.place(selected, cell):
+	if selected == "" or not map.place(selected, cell, turn):
 		return false
 	rebuild()
 	Motion.squish(view_at(cell))
 	if fx:
-		Motion.puff_at(fx, Feedback.base_of(selected, cell), Motion.DUST_SIZE)
+		Motion.puff_at(fx, Feedback.base_of(selected, cell, turn), Motion.DUST_SIZE)
 	return true
 
 func upgrade(origin: Vector2i) -> bool:
@@ -99,10 +107,11 @@ func demolish(origin: Vector2i) -> bool:
 	if fx and gone:
 		var v := BuildingView.new(gone.id)
 		v.level = gone.level
+		v.turn = gone.turn
 		v.position = gone.position
 		fx.add_child(v)
 		Motion.vanish(v)
-		Motion.puff_at(fx, Feedback.base_of(v.id, origin), Motion.DUST_SIZE)
+		Motion.puff_at(fx, Feedback.base_of(v.id, origin, v.turn), Motion.DUST_SIZE)
 	return true
 
 ## The building view at a building origin, or null.

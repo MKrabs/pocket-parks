@@ -28,15 +28,66 @@ var fresh := 1.0:  # scale of the flags this level added (pops 0 -> 1 after an u
 		fresh = f
 		queue_redraw()
 
+var turn := 0:  # quarter turns clockwise (0-3), as stored in ParkMap.rotations
+	set(t):
+		turn = t
+		queue_redraw()
+
+static var _turned: Dictionary = {}  # "id turn" -> parts, rotated and re-sorted back to front
+
 func _init(building_id: String) -> void:
 	id = building_id
 
+## The building's parts turned `turn` quarter turns around the footprint centre, back to front.
+## Parts that overlap in plan keep their catalog order (stacking); side-by-side parts go by depth.
+static func turned(building_id: String, turn: int) -> Array:
+	var key := "%s %d" % [building_id, turn]
+	if _turned.has(key):
+		return _turned[key]
+	var parts: Array = Buildings.get_def(building_id)["parts"]
+	if turn % 4 == 0:
+		return parts
+	var rest: Array = []
+	for p: Dictionary in parts:
+		var q := p.duplicate()
+		for i in turn % 4:
+			q["at"] = Vector2(-q["at"].y, q["at"].x)
+			q["half"] = Vector2(q["half"].y, q["half"].x)
+		rest.append(q)
+	var left: Array = range(rest.size())  # catalog indices still to draw
+	var out: Array = []
+	while not left.is_empty():  # ponytail: O(n³) topological pick, fine for ~40 parts and cached
+		var pick := 0  # on a cycle, fall back to catalog order
+		for i: int in left:
+			if not left.any(func(j: int) -> bool: return j != i and _before(rest[j], rest[i], j < i)):
+				pick = left.find(i)
+				break
+		out.append(rest[left.pop_at(pick)])
+	_turned[key] = out
+	return out
+
+## True if part a must be drawn before part b (a_first: a comes first in the catalog).
+static func _before(a: Dictionary, b: Dictionary, a_first: bool) -> bool:
+	var gap: Vector2 = (b["at"] - a["at"]).abs() - a["half"] - b["half"]
+	if gap.x < 0.0 and gap.y < 0.0:  # overlap in plan
+		if a["z"] + a["h"] <= b["z"] or b["z"] + b["h"] <= a["z"]:
+			return a["z"] < b["z"]  # stacked: lower first
+		if _holds(a, b["at"]) or _holds(b, a["at"]):
+			return a_first  # one stands on/in the other (fence posts on a slab): catalog order
+		return a["at"].x + a["at"].y < b["at"].x + b["at"].y  # sticks out the side (a hatch): by depth
+	return a["at"].x < b["at"].x if gap.x >= gap.y else a["at"].y < b["at"].y
+
+static func _holds(p: Dictionary, at: Vector2) -> bool:
+	var d: Vector2 = (at - p["at"]).abs()
+	return d.x < p["half"].x and d.y < p["half"].y
+
 func _draw() -> void:
 	var b: Dictionary = Buildings.get_def(id)
-	var fp: Vector2i = b["footprint"]
+	var fp := ParkMap.size(id, turn)
 	var mid := Vector2(fp.x - 1, fp.y - 1) * 0.5  # footprint centre in grid coords
+	var parts := turned(id, turn)
 	var top := 0.0
-	for p in b["parts"]:
+	for p in parts:
 		top = maxf(top, p["z"] + p["h"])
 	var grow := 1.0
 	if Buildings.upgradable(id) and b["role"] != "decor" and level >= 2:
@@ -50,7 +101,7 @@ func _draw() -> void:
 				_flag(IsoGrid.project(mid + spots[i]), (maxf(top, 10.0) + 14.0) * k, k)
 	elif b["role"] == "decor":
 		grow = 1.0 + 0.14 * (level - 1)  # decor: a bigger canopy
-	for p in b["parts"]:
+	for p in parts:
 		var foot := Squircle.iso_points(IsoGrid.project(mid + p["at"] * grow), p["half"] * grow, 4.0, 48)
 		block(self, foot, p["h"] * grow, p["z"] * grow, _tint(p["color"]))
 	if label != "":

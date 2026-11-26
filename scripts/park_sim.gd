@@ -140,17 +140,18 @@ func _load(map: ParkMap) -> void:
 		var d: Dictionary = Buildings.leveled(id, map.level(origin))
 		if d["role"] == "decor":
 			decor_appeal += d["appeal"]
-			for c in ParkMap.footprint(id, origin):
+			for c in map.cells(origin):
 				for dx in range(-2, 3):
 					for dy in range(-2, 3):
 						var k := c + Vector2i(dx, dy)
 						_decor[k] = _decor.get(k, 0.0) + d["appeal"] * 0.01
 		elif d["role"] == "attraction" or d["role"] == "shop":
-			var door := _door(id, origin)
+			var cells := map.cells(origin)
+			var door := _door(cells)
 			if door.x < 0:
 				continue
 			var shop: bool = d["role"] == "shop"
-			_targets.append({"id": id, "origin": origin, "role": d["role"], "door": door, "inside": 0,
+			_targets.append({"id": id, "origin": origin, "cells": cells, "role": d["role"], "door": door, "inside": 0,
 				"appeal": SHOP_APPEAL if shop else d["appeal"], "capacity": SHOP_CAPACITY if shop else d["capacity"],
 				"price": d.get("price", 0)})
 			_appeal += _targets[-1]["appeal"]
@@ -158,8 +159,7 @@ func _load(map: ParkMap) -> void:
 		_appeal += decor_appeal
 
 ## The path tile next to the footprint with the shortest walk from the entrance, or (-1,-1).
-func _door(id: String, origin: Vector2i) -> Vector2i:
-	var fp := ParkMap.footprint(id, origin)
+func _door(fp: Array[Vector2i]) -> Vector2i:
 	var best := Vector2i(-1, -1)
 	var best_len := 1 << 30
 	for c in fp:
@@ -405,7 +405,7 @@ func _strike(g: Dictionary, t: Dictionary) -> void:
 		"litterbug":
 			e["kind"] = "littered"
 			var spots: Array[Vector2i] = []
-			for c in ParkMap.footprint(t["id"], origin):
+			for c: Vector2i in t["cells"]:
 				for dx in range(-1, 2):
 					for dy in range(-1, 2):
 						var n := c + Vector2i(dx, dy)
@@ -458,7 +458,7 @@ func building_status(origin: Vector2i) -> Array[String]:
 	for t in _targets:
 		if t["origin"] != origin:
 			continue
-		for c in ParkMap.footprint(t["id"], origin):
+		for c: Vector2i in t["cells"]:
 			for dx in range(-1, 2):
 				for dy in range(-1, 2):
 					if litter.has(c + Vector2i(dx, dy)) and not "littered" in out:

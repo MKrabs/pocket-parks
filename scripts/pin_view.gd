@@ -34,7 +34,7 @@ func _process(delta: float) -> void:
 			var key := "%s %s" % [o, st[i]]
 			if not _born.has(key):
 				_born[key] = _time
-			pins.append({"origin": o, "kind": st[i], "at": top(map.buildings[o], o), "i": i, "n": st.size(), "key": key,
+			pins.append({"origin": o, "kind": st[i], "at": top(map.buildings[o], o, map.rotation(o)), "i": i, "n": st.size(), "key": key,
 				"alpha": _robbed_alpha(o) if st[i] == "robbed" else 1.0,
 				"scale": Tween.interpolate_value(0.0, 1.0, minf(_time - _born[key], Motion.POP_TIME), Motion.POP_TIME,
 					Tween.TRANS_BACK, Tween.EASE_OUT)})
@@ -58,12 +58,12 @@ func _process(delta: float) -> void:
 	queue_redraw()
 
 ## World point just above a building's tallest part, over its footprint centre.
-static func top(id: String, origin: Vector2i) -> Vector2:
+static func top(id: String, origin: Vector2i, rot := 0) -> Vector2:
 	var b: Dictionary = Buildings.get_def(id)
 	var h := 0.0
 	for p in b["parts"]:
 		h = maxf(h, p["h"] + p["z"])
-	var fp: Vector2i = b["footprint"]
+	var fp := ParkMap.size(id, rot)
 	return IsoGrid.project(Vector2(origin) + Vector2(fp - Vector2i.ONE) * 0.5) - Vector2(0, h + 4)
 
 func _zoom() -> float:
