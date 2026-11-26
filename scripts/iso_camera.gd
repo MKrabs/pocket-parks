@@ -1,6 +1,6 @@
 class_name IsoCamera
 extends Camera2D
-# Pan with right/middle drag or WASD/arrows, zoom with the wheel.
+# Pan with middle drag or WASD/arrows, zoom with the wheel.
 
 const PAN_SPEED := 600.0  # screen px per second
 const ZOOM_MIN := 0.5
@@ -18,7 +18,7 @@ func _process(delta: float) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	var mb := event as InputEventMouseButton
 	if mb:
-		if mb.button_index in [MOUSE_BUTTON_RIGHT, MOUSE_BUTTON_MIDDLE]:
+		if mb.button_index == MOUSE_BUTTON_MIDDLE:  # right click is the eraser
 			dragging = mb.pressed
 		elif mb.pressed and mb.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
 			var f := ZOOM_STEP if mb.button_index == MOUSE_BUTTON_WHEEL_UP else 1.0 / ZOOM_STEP
