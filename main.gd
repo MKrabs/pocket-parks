@@ -25,7 +25,7 @@ func _ready() -> void:
 		zoo.map.place(s[0], s[1])
 	for x in range(1, 14):
 		zoo.map.place("path", Vector2i(x, 7))
-	zoo.map.money = ZooMap.START_MONEY  # the seeded zoo is free
+	zoo.map.money = ParkMap.START_MONEY  # the seeded zoo is free
 	add_child(zoo)
 	grid.cell_hovered.connect(zoo.on_hover)
 	grid.cell_clicked.connect(zoo.on_click)

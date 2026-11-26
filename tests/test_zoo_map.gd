@@ -8,7 +8,7 @@ func done() -> void:
 	quit(1 if failed else 0)
 
 func _init() -> void:
-	var m := ZooMap.new()
+	var m := ParkMap.new()
 	ok(m.money == 500, "start money")
 	ok(m.place("enclosure", Vector2i(2, 2)), "place enclosure")
 	ok(m.money == 350, "cost deducted")
@@ -25,5 +25,5 @@ func _init() -> void:
 	m.money = 10
 	ok(not m.place("tree", Vector2i(0, 0)), "too poor refused")
 	ok(m.money == 10 and m.occupied.is_empty(), "too poor leaves state alone")
-	ok(ZooMap.depth("enclosure", Vector2i(0, 0)) == ZooMap.depth("tree", Vector2i(2, 2)), "depth uses front corner")
+	ok(ParkMap.depth("enclosure", Vector2i(0, 0)) == ParkMap.depth("tree", Vector2i(2, 2)), "depth uses front corner")
 	done()

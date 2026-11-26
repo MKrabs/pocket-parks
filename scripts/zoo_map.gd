@@ -1,4 +1,4 @@
-class_name ZooMap
+class_name ParkMap
 extends RefCounted
 # Pure placement rules: which building covers which cell, and the money counter.
 
