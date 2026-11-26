@@ -9,6 +9,7 @@ func done() -> void:
 
 func _init() -> void:
 	var seen := {}
+	ok(Buildings.themes().keys() == ["zoo", "festival", "cinema"], "three themes, in T order")
 	for theme: String in Buildings.themes():
 		Buildings.use(theme)
 		ok(Buildings.ids_with_role("entrance").size() == 1, theme + ": exactly one entrance")

@@ -36,14 +36,15 @@ var _acc := 0.0  # sim ticks owed
 var _reported := 0  # sim.events already toasted
 var _rng := RandomNumberGenerator.new()
 
-## T swaps the active theme; the build bar follows, placed buildings stay.
+## T cycles the active theme (zoo → festival → cinema); the build bar follows, placed buildings stay.
 ## Esc leaves place mode, or closes the card in Select mode.
 func _unhandled_key_input(event: InputEvent) -> void:
 	var k := event as InputEventKey
 	if not k.pressed or k.echo:
 		return
 	if k.physical_keycode == KEY_T:
-		Buildings.use("festival" if Buildings.active == "zoo" else "zoo")
+		var ts: Array = Buildings.themes().keys()
+		Buildings.use(ts[(ts.find(Buildings.active) + 1) % ts.size()])
 		bar.fill()
 	elif k.physical_keycode == KEY_R:
 		zoo.rotate_ghost(-1 if k.shift_pressed else 1)

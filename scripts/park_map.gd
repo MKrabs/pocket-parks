@@ -25,10 +25,11 @@ func shed_needs(id: String) -> int:
 func specs(shed: Vector2i) -> Array:
 	return specialties.get(shed, [])
 
-## Specialties the builder at `shed` may show: the ones it has, plus all others while a slot is free. Never locked ones.
+## Specialties the builder at `shed` may show: the ones it has, plus the active theme's while a slot is free. Never locked ones.
 func spec_choices(shed: Vector2i) -> Array:
 	var free := specs(shed).size() < ParkLevel.cap("specialties", park_level())
-	return Specialties.ALL.keys().filter(func(s: String) -> bool: return free or s in specs(shed))
+	var offered := Specialties.for_theme(Buildings.active)
+	return Specialties.ALL.keys().filter(func(s: String) -> bool: return s in specs(shed) or (free and s in offered))
 
 ## Pick `s` for the builder at `shed`, or drop it if it already has it. False if no slot is free.
 func toggle_specialty(shed: Vector2i, s: String) -> bool:
