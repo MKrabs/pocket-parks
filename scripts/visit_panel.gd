@@ -5,7 +5,9 @@ extends CanvasLayer
 signal picked(offer: Dictionary)
 signal sent(kind: String)
 signal home
+signal join_address(text: String)
 
+var last_address := ""  # the last address typed into Join, for this session
 var _picker := PanelContainer.new()
 var _choices := VBoxContainer.new()
 var _send := PanelContainer.new()
@@ -49,8 +51,9 @@ func _ready() -> void:
 	add_child(_send)
 	_send.hide()
 
-## Show the picker: real parks on the network (with a live dot) above the bot parks, plus Cancel.
-func open(offers: Array[Dictionary], nearby: Array[Dictionary] = []) -> void:
+## Show the picker: real parks on the network (with a live dot), the join-by-address field and `own` (our address
+## for a friend to type), then the bot parks, plus Cancel.
+func open(offers: Array[Dictionary], nearby: Array[Dictionary] = [], own := "") -> void:
 	for c in _choices.get_children():
 		c.queue_free()
 	var head := Hud._label(18)
@@ -71,6 +74,29 @@ func open(offers: Array[Dictionary], nearby: Array[Dictionary] = []) -> void:
 		none.text = "No parks on your network yet"
 		none.modulate.a = 0.6
 		_choices.add_child(none)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	var field := LineEdit.new()
+	field.placeholder_text = "Join by address"
+	field.text = last_address
+	field.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	field.add_theme_font_size_override("font_size", 14)
+	for k in ["font_color", "font_placeholder_color", "caret_color"]:
+		field.add_theme_color_override(k, Palette.INK if k != "font_placeholder_color" else Palette.shade(Palette.STONE, 0.3))
+	for k in ["normal", "focus"]:
+		field.add_theme_stylebox_override(k, BuildBar.box(Palette.STONE if k == "normal" else Palette.SKY))
+	var go := func() -> void:
+		last_address = field.text.strip_edges()
+		_picker.hide()
+		join_address.emit(last_address)
+	field.text_submitted.connect(func(_t: String) -> void: go.call())
+	row.add_child(field)
+	row.add_child(Hud._button("Join", go))
+	_choices.add_child(row)
+	var mine := Hud._label(13)
+	mine.text = "Your park: %s" % (own if own != "" else "not on a network")
+	mine.modulate.a = 0.7
+	_choices.add_child(mine)
 	_choices.add_child(_section("Bot parks"))
 	for o in offers:
 		_choice(o, "%s\n%s · %d guards" % [o["name"], o["theme"], o["guards"]])

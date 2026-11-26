@@ -35,6 +35,7 @@ var transition := CloudTransition.new()
 var card := InfoCard.new()
 var net := Net.new()
 var live := false  # the park on screen is a real one over the network (net.visit_sim), not a bot park
+var _joining := {}  # a typed-address offer waiting for its park to answer (we stay home meanwhile)
 var bots := true  # bot friends send groups into your park (tests switch them off)
 var _acc := 0.0  # sim ticks owed
 var _reported := 0  # sim.events already toasted
@@ -124,7 +125,7 @@ func _ready() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7
 	offers = Visit.offers(rng)
-	hud.visit_pressed.connect(func() -> void: visit_panel.open(offers, net.offers()))
+	hud.visit_pressed.connect(open_picker)
 	hud.new_park.connect(new_park)
 	add_child(hud)
 	net.sim = sim
@@ -137,7 +138,15 @@ func _ready() -> void:
 	net.lost.connect(func() -> void:
 		if live:
 			toasts.add("wrecked", "Lost the connection: back home")
-			travel_home())
+			travel_home()
+		elif not _joining.is_empty():
+			toasts.add("wrecked", "Couldn't reach %s" % _joining["name"])
+			_joining = {})
+	net.joined.connect(func() -> void:
+		if not _joining.is_empty():
+			travel_to(_joining)
+			_joining = {})
+	visit_panel.join_address.connect(join_address)
 	net.stolen.connect(_learn)
 	add_child(net)
 	visit_panel.picked.connect(travel_to)
@@ -282,9 +291,27 @@ func visit(offer: Dictionary) -> void:
 	_visit_walkers.me = Visit.ME
 	_enter_visit(offer["name"])
 
+## The Visit picker, with our own address for a friend to type.
+func open_picker() -> void:
+	var ip := Net.local_address(IP.get_local_addresses())
+	visit_panel.open(offers, net.offers(), "%s:%d" % [ip, net.port] if ip != "" and net.port > 0 else "")
+
+## A typed address: connect while staying home, travel once it answers (net.joined), toast if it never does.
+func join_address(text: String) -> void:
+	var a := Net.parse_address(text)
+	if a.is_empty():
+		toasts.add("wrecked", "Not an address: %s" % text)
+		return
+	var shown: String = a["ip"] if a["port"] == Net.GAME_PORT else "%s:%d" % [a["ip"], a["port"]]
+	if not net.join(a["ip"], a["port"]):
+		toasts.add("wrecked", "Couldn't reach %s" % shown)
+		return
+	_joining = {"name": shown, "player": "", "theme": "", "ip": a["ip"], "port": a["port"], "live": true, "joined": true}
+
 ## A real nearby park: an empty mirror now, the views fill as its map and live state arrive.
 func _visit_live(offer: Dictionary) -> void:
-	if not net.join(offer["ip"], offer["port"]):
+	var ok_ := net.visit_map != null if offer.get("joined", false) else net.join(offer["ip"], offer["port"])
+	if not ok_:  # a typed address is already connected (or dropped during the clouds)
 		toasts.add("wrecked", "Couldn't reach %s" % offer["name"])
 		return
 	live = true
@@ -293,7 +320,7 @@ func _visit_live(offer: Dictionary) -> void:
 	_visit_zoo.sim = net.visit_sim  # construction sites show their scaffold
 	_visit_walkers = WalkerView.new()
 	_visit_walkers.sim = net.visit_sim
-	_enter_visit("%s · %s" % [offer["name"], offer["player"]])
+	_enter_visit("%s · %s" % [offer["name"], offer["player"]] if offer["player"] != "" else offer["name"])
 
 func _enter_visit(title: String) -> void:
 	card.close()

@@ -64,6 +64,35 @@ func _init() -> void:
 	ok(map.place("tree", free), "host plants a tree")
 	ok(pump(host, guest, func() -> bool: return guest.visit_map.buildings.has(free)), "a layout change is resent")
 
+	# IP: join by a typed address, no discovery involved
+	ok(Net.parse_address("192.168.1.23") == {"ip": "192.168.1.23", "port": Net.GAME_PORT}, "bare ip gets the default port")
+	ok(Net.parse_address(" 192.168.1.23:24611 ") == {"ip": "192.168.1.23", "port": 24611}, "ip:port")
+	for bad: String in ["", "hello", "192.168.1", "192.168.1.300", "1.2.3.4:", "1.2.3.4:x", "1.2.3.4:70000", "1.2.3.4:1:2"]:
+		ok(Net.parse_address(bad).is_empty(), "not an address: '%s'" % bad)
+	ok(Net.local_address(PackedStringArray(["127.0.0.1", "172.40.0.2", "172.20.0.5", "10.0.0.7", "192.168.1.40"])) == "192.168.1.40", "prefers 192.168")
+	ok(Net.local_address(PackedStringArray(["fe80::1", "172.40.0.2", "172.20.0.5", "10.0.0.7"])) == "10.0.0.7", "then 10.*")
+	ok(Net.local_address(PackedStringArray(["172.40.0.2", "172.31.0.5"])) == "172.31.0.5", "then 172.16-31 only")
+	ok(Net.local_address(PackedStringArray(["127.0.0.1"])) == "", "no private address")
+	var friend := Net.new()
+	friend.map = ParkMap.new()
+	friend.start()
+	var heard := [false]
+	friend.joined.connect(func() -> void: heard[0] = true)
+	var addr := Net.parse_address("127.0.0.1:%d" % host.port)
+	ok(friend.join(addr["ip"], addr["port"]), "typed address opens a socket")
+	ok(pump(host, friend, func() -> bool: return heard[0] and friend.visit_map.buildings == map.buildings), "typed address joins and gets the map")
+	var gone := [false]
+	friend.lost.connect(func() -> void: gone[0] = true)
+	ok(friend.join("127.0.0.1", Net.GAME_PORT + 19), "socket opens even with nobody there")
+	for i in 1000:  # ~10 s
+		friend.poll(0.01)
+		if gone[0]:
+			break
+		OS.delay_msec(10)
+	ok(gone[0], "an address that never answers is given up within 10 s")
+	friend._exit_tree()
+	friend.free()
+
 	var lost := [false]
 	guest.lost.connect(func() -> void: lost[0] = true)
 	host._host.close()
