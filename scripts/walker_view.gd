@@ -58,10 +58,19 @@ func _draw_row(ci: Node2D, d: int) -> void:
 			"guest":
 				var g: Dictionary = e[1]
 				var id: int = g["id"]
-				var jitter := Vector2(sin(id * 12.9898), cos(id * 78.233)) * 0.22
 				var base: Color = GUEST_COLORS[id % GUEST_COLORS.size()]
 				var col := base.lerp(Palette.CORAL, clampf((60.0 - g["mood"]) / 40.0, 0.0, 1.0))
-				_bean(ci, g["pos"] + jitter, id, Vector2(4.0, 4.8), col, Color(Palette.INK, 0.0), g["state"] != "queue")
+				_bean(ci, spot(g), id, Vector2(4.0, 4.8), col, Color(Palette.INK, 0.0), g["state"] != "queue")
+				if g["wanted"]:  # a guard saw it strike: CORAL "!" over its head
+					var head := IsoGrid.project(spot(g)) - Vector2(0, LIFT + 14)
+					var mark := Palette.shade(Palette.CORAL, 0.15)
+					ci.draw_colored_polygon(Squircle.points(head - Vector2(0, 5), Vector2(1.7, 4.0), 4.0, 16), mark)
+					ci.draw_colored_polygon(Squircle.points(head + Vector2(0, 2.5), Vector2(1.7, 1.7), 4.0, 12), mark)
+
+## Where a guest is drawn, in fractional cells (its position plus a per-id jitter).
+static func spot(g: Dictionary) -> Vector2:
+	var id: int = g["id"]
+	return g["pos"] + Vector2(sin(id * 12.9898), cos(id * 78.233)) * 0.22
 
 ## Squircle bean standing on the path, soft shadow, optional cap and chest mark. `half` in px.
 func _bean(ci: Node2D, p: Vector2, phase: int, half: Vector2, col: Color, cap: Color, walking: bool, mark := Color(Palette.INK, 0.0)) -> void:
