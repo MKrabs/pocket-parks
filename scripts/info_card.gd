@@ -6,7 +6,7 @@ extends CanvasLayer
 signal action(name: String)  # "upgrade", "repair", "demolish", "accuse"
 
 const WIDTH := 270.0
-const BOTTOM := 24.0  # card bottom, px above the screen bottom (crime toasts stack from the top-right)
+const BOTTOM := Hud.MARGIN * 2 + Hud.VISIT_SIZE  # card bottom sits above the Visit button; toasts above it stop at top()
 
 var sim: ParkSim
 var map: ParkMap
@@ -54,6 +54,10 @@ func _action(name: String) -> Button:
 
 func is_open() -> bool:
 	return _panel.visible
+
+## Screen y of the card's top edge.
+func top() -> float:
+	return _panel.position.y
 
 func show_building(o: Vector2i) -> void:
 	origin = o
