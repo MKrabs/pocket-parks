@@ -82,4 +82,18 @@ func _init() -> void:
 	ok(m.toggle_specialty(shed, "water") and m.specs(shed) == ["heavy"], "picking again drops it")
 	m.remove_at(shed)
 	ok(m.specs(shed).is_empty(), "demolished shed forgets its specialties")
+
+	# themes bring their own specialties: Projection only in cinema
+	m.place("builder_shed", shed)
+	ok(not "projection" in m.spec_choices(shed), "zoo: no Projection")
+	Buildings.use("cinema")
+	ok(m.spec_choices(shed) == ["landscaper", "water", "carpenter", "projection"], "cinema: shared + Projection")
+	ok(m.toggle_specialty(shed, "projection"), "pick Projection")
+	ok(Specialties.required("cin_big") == "projection", "Big Screen needs Projection")
+	ok(Specialties.speed([], "cin_big") == 0 and Specialties.speed(["projection"], "cin_big") == 1, "Big Screen: specialist-only")
+	ok(Specialties.speed([], "cin_room") == 1 and Specialties.speed(["projection"], "cin_room") == 2, "Screen Room: faster")
+	Buildings.use("festival")
+	ok(m.spec_choices(shed).has("projection"), "a picked specialty still shows after a theme swap")
+	ok(not m.toggle_specialty(shed, "aviary"), "festival: no Aviary to pick")
+	Buildings.use("zoo")
 	done()

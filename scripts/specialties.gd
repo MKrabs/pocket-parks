@@ -5,10 +5,15 @@ class_name Specialties
 const ALL := {
 	"landscaper": {"name": "Landscaper", "glyph": "L", "color": Palette.MOSS},
 	"water": {"name": "Water", "glyph": "W", "color": Palette.WATER},
-	"aviary": {"name": "Aviary", "glyph": "A", "color": Palette.SKY},
-	"heavy": {"name": "Heavy", "glyph": "H", "color": Palette.STONE},
+	"aviary": {"name": "Aviary", "glyph": "A", "color": Palette.SKY, "theme": "zoo"},
+	"heavy": {"name": "Heavy", "glyph": "H", "color": Palette.STONE, "theme": "zoo"},
 	"carpenter": {"name": "Carpenter", "glyph": "C", "color": Palette.WOOD},
+	"projection": {"name": "Projection", "glyph": "P", "color": Palette.BUTTER, "theme": "cinema"},
 }
+
+## Specialties offered in theme `t`: its own plus the shared ones (no "theme" key).
+static func for_theme(t: String) -> Array:
+	return ALL.keys().filter(func(s: String) -> bool: return ALL[s].get("theme", t) == t)
 
 ## Work per tick a builder with `specs` puts into building `id`: 0 = can't (specialist-only), 1, or 2 (faster).
 static func speed(specs: Array, id: String) -> int:

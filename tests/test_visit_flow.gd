@@ -13,6 +13,8 @@ func _init() -> void:
 	var offers := Visit.offers(rng)
 	ok(offers.size() == 3, "three parks on offer")
 	ok(offers[0]["theme"] != offers[1]["theme"] and offers[0]["name"] != offers[1]["name"], "themes mix, names differ")
+	var themes := offers.map(func(o: Dictionary) -> String: return o["theme"])
+	ok(themes.has("cinema") and themes.has("zoo") and themes.has("festival"), "one park of each theme")
 	for o in offers:
 		ok(o["guards"] >= 0 and o["guards"] <= 3, "0-3 guards")
 	ok(Visit.open(offers[0])[1].staff.size() == offers[0]["guards"], "guards hired in the visited park")

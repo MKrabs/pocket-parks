@@ -7,13 +7,13 @@ const KEEP := 3  # visited parks still simulated after you leave
 const NAMES := ["Maple Hollow", "Sunny Burrow", "Pebble Bay", "Clover Fields", "Otter Lane", "Juniper Park",
 	"Bramble Nook", "Honey Meadow", "Fern Gully", "Willow Cove"]
 
-## Three nearby parks: distinct names, themes alternating (zoo, festival, zoo or the other way), 0-3 guards.
+## Three nearby parks: distinct names, one of each theme in shuffled order, 0-3 guards.
 static func offers(rng: RandomNumberGenerator) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	var names: Array = BotPark._shuffled(rng, NAMES)
-	var first := rng.randi() % 2
+	var themes: Array = BotPark._shuffled(rng, Buildings.themes().keys())
 	for i in 3:
-		out.append({"name": names[i], "theme": ["zoo", "festival"][(first + i) % 2], "seed": rng.randi(),
+		out.append({"name": names[i], "theme": themes[i % themes.size()], "seed": rng.randi(),
 			"size": "small" if rng.randf() < 0.6 else "large", "guards": rng.randi_range(0, 3)})
 	return out
 

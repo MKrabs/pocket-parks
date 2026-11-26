@@ -9,7 +9,7 @@ func done() -> void:
 	quit(1 if failed else 0)
 
 func _init() -> void:
-	for theme: String in ["zoo", "festival"]:
+	for theme: String in ["zoo", "festival", "cinema"]:
 		for size: String in ["small", "large"]:
 			for s in 20:
 				check(theme, s, size)
