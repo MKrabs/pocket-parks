@@ -2,7 +2,7 @@ class_name IsoGrid
 # Pure isometric grid math (2:1 tiles). Cell (0,0) centre sits at screen (0,0).
 
 const TILE := Vector2(64, 32)
-const SIZE := Vector2i(16, 16)
+const SIZE := Vector2i(20, 20)
 
 ## Screen position of a cell's centre.
 static func to_screen(cell: Vector2i) -> Vector2:

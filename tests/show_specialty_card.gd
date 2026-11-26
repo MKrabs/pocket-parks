@@ -19,9 +19,9 @@ func _process(_delta: float) -> bool:
 	main.sim.money = 2000
 	main.zoo.map.money = 2000
 	main.zoo.selected = "aviary"
-	main.zoo.on_click(Vector2i(8, 10))
+	main.zoo.on_click(Vector2i(12, 13))
 	main.zoo.selected = ""
 	main.advance(100)
 	main.bar.show_tab("Attractions")
-	main.card.show_building(Vector2i(2, 8))
+	main.card.show_building(Vector2i(6, 12))
 	return false

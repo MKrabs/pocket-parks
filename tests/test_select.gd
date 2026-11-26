@@ -29,18 +29,18 @@ func _initialize() -> void:
 	ok(zoo.selected == "", "unpressing the same item returns to Select")
 
 	bar.pick("path")
-	main._on_cell_clicked(Vector2i(4, 13), L)
-	ok(zoo.map.buildings.get(Vector2i(4, 13)) == "path" and zoo.selected == "path", "path stays active after placing")
+	main._on_cell_clicked(Vector2i(8, 13), L)
+	ok(zoo.map.buildings.get(Vector2i(8, 13)) == "path" and zoo.selected == "path", "path stays active after placing")
 	bar.pick("snack_stand")
-	main._on_cell_clicked(Vector2i(9, 13), L)
-	ok(zoo.map.buildings.get(Vector2i(9, 13)) == "snack_stand" and zoo.selected == "", "a snack stand goes back to Select")
+	main._on_cell_clicked(Vector2i(13, 13), L)
+	ok(zoo.map.buildings.get(Vector2i(13, 13)) == "snack_stand" and zoo.selected == "", "a snack stand goes back to Select")
 	bar.pick("snack_stand")
-	main._on_cell_clicked(Vector2i(10, 13), L, true)
-	ok(zoo.map.buildings.get(Vector2i(10, 13)) == "snack_stand" and zoo.selected == "snack_stand", "Shift keeps placing")
+	main._on_cell_clicked(Vector2i(14, 13), L, true)
+	ok(zoo.map.buildings.get(Vector2i(14, 13)) == "snack_stand" and zoo.selected == "snack_stand", "Shift keeps placing")
 	main.escape()
 
 	# Building card: name, level, upgrade from the card.
-	var o := Vector2i(8, 8)
+	var o := Vector2i(12, 12)
 	main.select_at(o, Vector2(-9999, -9999))
 	ok(card.is_open() and card.origin == o, "clicking a building opens its card")
 	ok(card.title.text == "Snack Stand · Lv 1", "card title %s" % card.title.text)
@@ -66,10 +66,10 @@ func _initialize() -> void:
 	ok(not card.is_open(), "a click on empty ground closes the card")
 
 	# Demolish refunds.
-	main.select_at(Vector2i(9, 13), Vector2(-9999, -9999))
+	main.select_at(Vector2i(13, 13), Vector2(-9999, -9999))
 	money = main.sim.money
 	card.demolish.pressed.emit()
-	ok(not zoo.map.buildings.has(Vector2i(9, 13)) and main.sim.money == money + 60 and not card.is_open(), "Demolishing a site refunds everything")
+	ok(not zoo.map.buildings.has(Vector2i(13, 13)) and main.sim.money == money + 60 and not card.is_open(), "Demolishing a site refunds everything")
 
 	# Person card: accuse works like the old tool.
 	main.send_group("Mia", ["thief"])

@@ -3,6 +3,9 @@ extends RefCounted
 # Pure placement rules: which building covers which cell, and the money counter.
 
 const START_MONEY := 500
+const PLOT := 4  # plot side in cells: the 20×20 world is 5×5 plots
+const PLOT_PRICE := 200  # the first plot; each one bought adds this again
+const START_PLOTS := Rect2i(1, 1, 3, 3)  # in plot coords: the 12×12 centre you start with
 
 var money: int = START_MONEY
 var buildings: Dictionary = {}  # origin cell (Vector2i) -> building id
@@ -11,6 +14,47 @@ var levels: Dictionary = {}     # origin cell -> level 2..3 (absent = 1)
 var rotations: Dictionary = {}  # origin cell -> quarter turns 1..3 (absent = 0)
 var xp := 0                     # park XP (ParkLevel); the sim owns it while the day runs, like money
 var specialties: Dictionary = {}  # builder shed origin -> Array of Specialties ids its builder picked
+var owned: Dictionary = {}  # plot coord -> true. Empty = no plots, every cell is yours (bot parks)
+var bought := 0  # plots bought beyond the start area
+
+## Your park: own only the start area; the rest is for sale.
+func start_small() -> void:
+	for x in range(START_PLOTS.position.x, START_PLOTS.end.x):
+		for y in range(START_PLOTS.position.y, START_PLOTS.end.y):
+			owned[Vector2i(x, y)] = true
+
+static func plot_of(cell: Vector2i) -> Vector2i:
+	return Vector2i(floori(cell.x / float(PLOT)), floori(cell.y / float(PLOT)))  # -1 is plot -1, not 0
+
+func owns(cell: Vector2i) -> bool:
+	return owned.is_empty() or owned.has(plot_of(cell))
+
+## Not yet owned, inside the world, and sharing an edge with land you own.
+func buyable(plot: Vector2i) -> bool:
+	if owned.is_empty() or owned.has(plot) or not IsoGrid.in_bounds(plot * PLOT):
+		return false
+	for d: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+		if owned.has(plot + d):
+			return true
+	return false
+
+func plot_price() -> int:
+	return PLOT_PRICE * (bought + 1)
+
+## Park level another plot waits for, or 0 if you may buy one now (-1: no more ever).
+func plot_needs() -> int:
+	return 0 if bought < ParkLevel.cap("plots", park_level()) else ParkLevel.needed("plots", bought + 1)
+
+func can_buy(plot: Vector2i) -> bool:
+	return buyable(plot) and money >= plot_price() and plot_needs() == 0
+
+func buy(plot: Vector2i) -> bool:
+	if not can_buy(plot):
+		return false
+	money -= plot_price()
+	owned[plot] = true
+	bought += 1
+	return true
 
 func park_level() -> int:
 	return ParkLevel.of(xp)
@@ -64,9 +108,13 @@ func cells(origin: Vector2i) -> Array[Vector2i]:
 
 func fits(id: String, cell: Vector2i, rot := 0) -> bool:
 	for c in footprint(id, cell, rot):
-		if not IsoGrid.in_bounds(c) or occupied.has(c):
+		if not IsoGrid.in_bounds(c) or occupied.has(c) or not owns(c):
 			return false
 	return true
+
+## True if some in-bounds footprint cell is land you don't own (the ghost says so).
+func on_unowned(id: String, cell: Vector2i, rot := 0) -> bool:
+	return footprint(id, cell, rot).any(func(c: Vector2i) -> bool: return IsoGrid.in_bounds(c) and not owns(c))
 
 func can_place(id: String, cell: Vector2i, rot := 0) -> bool:
 	return fits(id, cell, rot) and money >= Buildings.get_def(id)["cost"] and shed_needs(id) == 0

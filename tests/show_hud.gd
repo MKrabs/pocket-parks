@@ -18,6 +18,6 @@ func _process(_delta: float) -> bool:
 	main.hud.speed = 0
 	for k: String in ["robbed", "littered", "spied", "wrecked"]:
 		main.toasts.add(k, "Snack Stand: " + k)
-	main.card.show_building(Vector2i(8, 8))
+	main.card.show_building(Vector2i(12, 12))
 	main.bar.show_tab("Staff")
 	return false

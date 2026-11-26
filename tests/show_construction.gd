@@ -17,9 +17,9 @@ func _process(_delta: float) -> bool:
 	_done = true
 	main.hud.speed = 0
 	main.zoo.selected = "pond"
-	main.zoo.on_click(Vector2i(8, 10))
+	main.zoo.on_click(Vector2i(12, 14))
 	main.zoo.selected = ""
-	main.zoo.upgrade(Vector2i(5, 8))
+	main.zoo.upgrade(Vector2i(9, 12))
 	main.advance(200)
-	main.card.show_building(Vector2i(5, 8))
+	main.card.show_building(Vector2i(9, 12))
 	return false
