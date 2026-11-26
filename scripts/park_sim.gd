@@ -17,6 +17,15 @@ const VISIT_TICKS := {"attraction": 40, "shop": 15}
 const LITTER_CHANCE := 0.3
 const QUEUE_GIVE_UP := 100  # ticks
 const UNHAPPY := 20.0
+# Raids (docs/design/game.md → Raids). Speeds: guest < raider < guard.
+const RAID_TICKS := 60 * TPS
+const RAIDER_SPEED := 0.25
+const GUARD_SPEED := 0.3
+const RAIDER_GAP := 5          # ticks between raiders entering
+const CATCH_PAUSE := 2 * TPS
+const RAIDER_WORK := {"hooligan": 3 * TPS, "thief": 4 * TPS, "spy": 5 * TPS}
+const LITTER_EVERY := TPS
+const THEFT_SHARE := 0.2       # thieves take this share of the target's money
 
 var money: int
 var tick := 0
@@ -27,6 +36,12 @@ var closed: Dictionary = {}         # building origin -> true (R1: wrecked by ra
 var income := 0
 var served := 0   # guests who finished at least one visit
 var spawned := 0
+var raiders: Array[Dictionary] = []  # walker + state: go|work|roam|escape, wait, loot, target
+var raiding := false
+var _raid_queue: Array[String] = []
+var _raid_end := 0
+var _raid_litter: Dictionary = {}
+var _raid := {}
 
 var _rng := RandomNumberGenerator.new()
 var _astar := AStarGrid2D.new()
@@ -72,7 +87,7 @@ func _init(map: ParkMap, seed_value: int) -> void:
 			if door.x < 0:
 				continue
 			var shop: bool = d["role"] == "shop"
-			_targets.append({"origin": origin, "role": d["role"], "door": door, "inside": 0,
+			_targets.append({"id": id, "origin": origin, "role": d["role"], "door": door, "inside": 0,
 				"appeal": SHOP_APPEAL if shop else d["appeal"], "capacity": SHOP_CAPACITY if shop else d["capacity"],
 				"price": d.get("price", 0)})
 			_appeal += _targets[-1]["appeal"]
@@ -110,6 +125,8 @@ func step() -> void:
 	guests = stay
 	for s in staff:
 		_step_staff(s)
+	if raiding:
+		_step_raid()
 	if tick == DAY_TICKS:
 		for s in staff:
 			_wages += STAFF[s["kind"]]["wage"]
@@ -264,7 +281,10 @@ func _leave(g: Dictionary) -> void:
 	_go(g, _entrance)
 
 func _step_staff(s: Dictionary) -> void:
-	if not _walk(s, STAFF_SPEED):
+	if s["kind"] == "guard" and s.get("pause", 0) > 0:
+		s["pause"] -= 1
+		return
+	if not _walk(s, GUARD_SPEED if s["kind"] == "guard" else STAFF_SPEED):
 		return
 	if s["kind"] == "guard":
 		if not _paths.is_empty():
@@ -281,3 +301,128 @@ func _step_staff(s: Dictionary) -> void:
 			best_d = d
 	if best.x >= 0:
 		_go(s, best)
+
+## Raiders (hooligan, litterbug, thief, spy) enter at the entrance one by one. Ends after 60 s or when none are left.
+func start_raid(squad: Array[String]) -> void:
+	if _entrance.x < 0:
+		return
+	raiding = true
+	raiders.clear()
+	_raid_queue = squad.duplicate()
+	_raid_end = tick + RAID_TICKS
+	_raid = {"stolen_money": 0, "blueprints": [] as Array[String], "wrecked": 0, "end_happiness": -1.0}
+
+func raid_result() -> Dictionary:
+	var r := _raid.duplicate()
+	if r["end_happiness"] < 0.0:
+		r["end_happiness"] = _happiness_now()
+	r["stars"] = [r["wrecked"] > 0, r["stolen_money"] > 0 or not r["blueprints"].is_empty(),
+		r["end_happiness"] < 50.0] as Array[bool]
+	return r
+
+## Undo the temporary damage: wrecked buildings reopen, raid litter goes.
+func end_raid() -> void:
+	if raiding:
+		_finish_raid()
+	closed.clear()
+	for c: Vector2i in _raid_litter:
+		litter.erase(c)
+	_raid_litter.clear()
+
+func _happiness_now() -> float:
+	if guests.is_empty():
+		return day_report()["happiness"]
+	var m := 0.0
+	for g in guests:
+		m += g["mood"]
+	return m / guests.size()
+
+func _finish_raid() -> void:
+	raiding = false
+	raiders.clear()
+	_raid_queue.clear()
+	_raid["end_happiness"] = _happiness_now()
+
+func _step_raid() -> void:
+	if not _raid_queue.is_empty() and (_raid_end - RAID_TICKS - tick) % RAIDER_GAP == 0:
+		var r := _walker(_raid_queue.pop_front())
+		r.merge({"state": "go", "wait": 0, "loot": 0, "target": -1})
+		raiders.append(r)
+		_raider_next(r)
+	var out: Array[Dictionary] = []
+	for r in raiders:
+		if _step_raider(r):
+			out.append(r)
+	for s in staff:
+		if s["kind"] != "guard" or s.get("pause", 0) > 0:
+			continue
+		for r in raiders:
+			if not r in out and s["pos"].distance_to(r["pos"]) <= 1.0:
+				out.append(r)
+				s["pause"] = CATCH_PAUSE
+				break
+	raiders = raiders.filter(func(r: Dictionary) -> bool: return not r in out)
+	if tick >= _raid_end or (raiders.is_empty() and _raid_queue.is_empty()):
+		_finish_raid()
+
+## Picks the raider's next job: hooligans any open attraction/shop, thieves a shop, spies the top-appeal building.
+func _raider_next(r: Dictionary) -> void:
+	var kind: String = r["kind"]
+	if kind == "litterbug":
+		r["state"] = "roam"
+		if not _paths.is_empty():
+			_go(r, _paths[_rng.randi() % _paths.size()])
+		return
+	var pick: Array[int] = []
+	for i in _targets.size():
+		var t := _targets[i]
+		if kind == "hooligan" and not closed.has(t["origin"]) or kind == "thief" and t["role"] == "shop":
+			pick.append(i)
+		elif kind == "spy" and (pick.is_empty() or Buildings.get_def(t["id"]).get("appeal", 0) > Buildings.get_def(_targets[pick[0]]["id"]).get("appeal", 0)):
+			pick = [i]
+	if pick.is_empty():
+		r["state"] = "escape"
+		_go(r, _entrance)
+		return
+	r["target"] = pick[_rng.randi() % pick.size()]
+	r["state"] = "go"
+	_go(r, _targets[r["target"]]["door"])
+
+## True when the raider leaves the park (escaped with loot or gave up).
+func _step_raider(r: Dictionary) -> bool:
+	match r["state"]:
+		"go":
+			if _walk(r, RAIDER_SPEED):
+				r["state"] = "work"
+				r["wait"] = RAIDER_WORK[r["kind"]]
+		"work":
+			r["wait"] -= 1
+			if r["wait"] > 0:
+				return false
+			var t: Dictionary = _targets[r["target"]]
+			if r["kind"] == "hooligan":
+				if not closed.has(t["origin"]):
+					closed[t["origin"]] = true
+					_raid["wrecked"] += 1
+				_raider_next(r)
+			else:
+				if r["kind"] == "thief":
+					r["loot"] = int(money * THEFT_SHARE)
+				r["state"] = "escape"
+				_go(r, _entrance)
+		"roam":
+			if tick % LITTER_EVERY == 0 and r["cell"] != _entrance and not litter.has(r["cell"]):
+				litter[r["cell"]] = true
+				_raid_litter[r["cell"]] = true
+			if _walk(r, RAIDER_SPEED):
+				_raider_next(r)
+		"escape":
+			if _walk(r, RAIDER_SPEED):
+				if r["kind"] == "thief":
+					var m := mini(r["loot"], money)
+					money -= m
+					_raid["stolen_money"] += m
+				elif r["kind"] == "spy" and r["target"] >= 0:
+					_raid["blueprints"].append(_targets[r["target"]]["id"])
+				return true
+	return false
