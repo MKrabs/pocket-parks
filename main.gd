@@ -401,7 +401,10 @@ func _on_card_action(what: String) -> void:
 				grid.queue_redraw()
 				card.close()
 		"upgrade":
-			zoo.upgrade(o)
+			if card.staff >= 0:
+				sim.upgrade_staff(card.staff)  # map money follows in _process
+			else:
+				zoo.upgrade(o)
 		"demolish":
 			if zoo.demolish(o):
 				card.close()
