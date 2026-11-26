@@ -8,7 +8,8 @@ Godot 4.6 (GDScript). You own ONE ticket. The ticket text is in your prompt.
 
 ## Rules
 - Read `CLAUDE.md` first: its Godot conventions and Look sections are binding.
-- Work only inside the current directory (your worktree, on branch `t/<ID>`).
+- Work only inside the current directory (your worktree, on branch `t/<ID>`). Use **relative paths**
+  for every Read/Write/Edit. An absolute path into `~/Projects/project-szm/...` writes into the main checkout, not your worktree.
   Never touch `tickets/` files directly. Ticket state changes go through `./tix` only.
 - Create and change files with the Write/Edit tools, never shell redirection or heredocs.
   Bash is for `./gd`, `./tix`, git, `jq`, `ls`.
