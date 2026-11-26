@@ -59,10 +59,10 @@ Only the next milestone gets detailed tickets. Later ones stay one-liners until 
 - Kick raiders by hand: click a raider in your park to throw it out (costs a moment of your attention, guards do it automatically).
 - Raider readability: bigger beans and clearer role marks (from the GATE2 review).
 
-**M4 Online foundation.** The big fork; see Decision needed below.
-- Server that hosts every park's day sim (the same `ParkSim` code, headless Godot). Your park keeps running while you're away.
-- Identity-lite: a name and a colour, no passwords at first (friends only).
-- Visit any park live: you watch its real day.
+**M4 Local network foundation.** See Decided: networking, below.
+- Each game hosts its own park on the local network; a "Parks nearby" list (UDP broadcast discovery).
+- Identity-lite: a name and a colour.
+- Visit a nearby park live: connect to its owner's game and watch its real day.
 
 **M5 Live social** (needs M4)
 - Your own character: walk around the park you're visiting, alongside the guests.
@@ -76,13 +76,15 @@ Only the next milestone gets detailed tickets. Later ones stay one-liners until 
 
 **Later themes:** amusement park, conference, food festival in full.
 
-## Decision needed before M4
-Live presence (M5) and live raids (M6) need parks that exist on a server in real time. The async
-snapshots this doc assumed can't show who's visiting right now. **Proposed:** one small authoritative
-server (Godot headless, Godot's high-level multiplayer over WebSocket/ENet) runs all park sims; clients
-only render and send intents. `ParkSim` is already pure and deterministic, so it moves to the server as is.
-Open: where it's hosted, and how many players to plan for (friends ≈ 10, or public).
+## Decided: networking (2026-11-26)
+**Peer-to-peer on the local network, no server.** Each player's game is the authority for its own park:
+it runs the day sim, judges raids on it, and passes presence and chat between its visitors. Games find
+each other by UDP broadcast and connect directly (Godot ENet, one channel for "my park" and one for "the
+park I'm visiting"). **Parks whose owner is offline, or on another network, are unavailable. That is
+accepted, not a problem to solve.** Friends elsewhere can join a shared virtual network (e.g. Tailscale);
+that's their setup, not a feature. Cheating isn't a concern (friends only).
+Would reverse it: the game is meant for players who don't know each other.
 
 ## Parked
-Roguelike run structure. Meta progression. Saving (until M4 makes the server the save).
+Roguelike run structure. Meta progression. Saving your own park to disk (small; becomes needed in M4, since your park must survive a restart).
 Sound. Leagues and likes.
