@@ -151,15 +151,20 @@ func _building() -> void:
 		"attraction": lines.append("Attraction · appeal %d, holds %d" % [d["appeal"], d["capacity"]])
 		"decor": lines.append("Decor · cheers up guests nearby")
 		"entrance": lines.append("Entrance · $%d a guest" % ParkSim.ENTRY_FEE)
+		"staff": lines.append(_builder_line())
 		_: lines.append("Path")
-	if d["role"] in ["shop", "attraction", "entrance"]:
+	var j := sim.job_at(origin)
+	if not j.is_empty():
+		lines.append(site_line(sim, j))
+	elif d["role"] in ["shop", "attraction", "entrance"]:
 		var t: Dictionary = sim.today.get(origin, {"guests": 0, "income": 0})
 		lines.append("Today: %d guests · $%d" % [t["guests"], t["income"]])
-	lines.append(_status())
+	if j.is_empty():
+		lines.append(_status())
 	body.text = "\n".join(lines)
 
 	var cost := map.upgrade_cost(origin)
-	upgrade.visible = Buildings.upgradable(id)
+	upgrade.visible = Buildings.upgradable(id) and j.is_empty()
 	upgrade.disabled = not map.can_upgrade(origin)
 	if cost < 0:
 		upgrade.text = "Upgrade · max level"
@@ -173,9 +178,27 @@ func _building() -> void:
 	repair.disabled = sim.money < sim.repair_cost(origin)
 	repair.text = "Repair now · $%d" % sim.repair_cost(origin)
 	demolish.visible = true
-	demolish.text = "Demolish · +$%d back" % map.refund(origin)
+	demolish.text = "Demolish · +$%d back" % sim.demolish_refund(origin)
 	accuse.visible = false
 	warning.visible = false
+
+## "Building · 40% · Bo is working on it" / "Upgrading to Lv 2 · 0% · Waiting for a builder".
+static func site_line(s: ParkSim, j: Dictionary) -> String:
+	var what := "Building" if j["level"] == 1 else "Upgrading to Lv %d" % j["level"]
+	var pct := roundi(100.0 * (1.0 - float(j["left"]) / j["total"]))
+	var who := "Waiting for a builder"
+	for b in s.builders:
+		if b["name"] == j["builder"]:
+			who = "%s is %s" % [b["name"], "working on it" if b["state"] == "work" else "on the way"]
+	return "%s · %d%%\n%s" % [what, pct, who]
+
+func _builder_line() -> String:
+	var b := sim.builder_of(origin)
+	if b.is_empty():
+		return "Builder shed · houses one builder"
+	var j := sim.job_of(b)
+	var doing := "resting at home" if j.is_empty() else "building the %s" % Buildings.get_def(j["id"])["name"]
+	return "Builder shed · home of %s\n%s is %s" % [b["name"], b["name"], doing]
 
 ## The building's state in words: wrecked (with the reopen countdown), littered, robbed, spied, or open.
 func _status() -> String:

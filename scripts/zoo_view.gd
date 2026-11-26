@@ -13,9 +13,30 @@ var hovered := GridView.NONE
 var lifted := GridView.NONE  # origin of the hovered building in Select mode
 var ghost: BuildingView
 var fx: Node2D  # where place/remove puffs go (main's Feedback); none in a visited park
+var sim: ParkSim  # your park: placing and upgrading open construction sites; none in a visited park (instant)
 
 func _ready() -> void:
 	rebuild()
+
+## Sites show their scaffold and progress; finished ones pop.
+func _process(_delta: float) -> void:
+	if not sim:
+		return
+	for v: BuildingView in get_children():
+		if v == ghost:
+			continue
+		var j := sim.job_at(v.origin)
+		v.site_upgrade = not j.is_empty() and j["level"] > 1
+		v.site = -1.0 if j.is_empty() else 1.0 - float(j["left"]) / j["total"]
+	for o in sim.finished:
+		var v := view_at(o)
+		if v:
+			if v.level != map.level(o):
+				v.level = map.level(o)
+				v.fresh = 0.0
+				v.create_tween().tween_property(v, "fresh", 1.0, Motion.POP_TIME).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+			Motion.pop(v)
+	sim.finished.clear()
 
 ## Re-create one BuildingView per building, sorted back to front.
 func rebuild() -> void:
@@ -80,7 +101,7 @@ func highlight(origin: Vector2i) -> void:
 
 ## Place the selected building at `cell`. True if it was placed.
 func on_click(cell: Vector2i) -> bool:
-	if selected == "" or not map.place(selected, cell, turn):
+	if selected == "" or not (sim.build(selected, cell, turn) if sim else map.place(selected, cell, turn)):
 		return false
 	rebuild()
 	Motion.squish(view_at(cell))
@@ -89,6 +110,12 @@ func on_click(cell: Vector2i) -> bool:
 	return true
 
 func upgrade(origin: Vector2i) -> bool:
+	if sim:
+		if not sim.upgrade(origin):
+			return false
+		rebuild()
+		Motion.bounce(view_at(origin))  # the scaffold goes up; the new level pops in when it's done
+		return true
 	if not map.upgrade(origin):
 		return false
 	rebuild()
@@ -101,7 +128,7 @@ func upgrade(origin: Vector2i) -> bool:
 ## Remove the building at `origin` for its refund; a copy shrinks into a puff.
 func demolish(origin: Vector2i) -> bool:
 	var gone := view_at(origin)
-	if not map.remove_at(origin):
+	if not (sim.demolish(origin) if sim else map.remove_at(origin)):
 		return false
 	rebuild()
 	if fx and gone:

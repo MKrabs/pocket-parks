@@ -40,4 +40,6 @@ static func catalog() -> Dictionary:
 				Buildings.part(Vector2(-0.1, 0.34), Vector2(0.07, 0.07), 6, Palette.BUTTER, 8),
 				Buildings.part(Vector2(0.26, 0.26), Vector2(0.07, 0.07), 6, Palette.BUTTER, 18),
 			]},
+		"fest_shed": {"name": "Builder Shed", "role": "staff", "footprint": Vector2i(1, 1), "cost": 80,
+			"parts": Buildings.shed(Palette.SKY)},
 	}

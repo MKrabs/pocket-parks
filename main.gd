@@ -5,7 +5,7 @@ extends Node2D
 const SEED := [
 	["zoo_gate", Vector2i(0, 7)], ["enclosure", Vector2i(2, 4)], ["pond", Vector2i(12, 5)], ["snack_stand", Vector2i(8, 8)],
 	["snack_stand", Vector2i(5, 8)], ["tree", Vector2i(12, 2)], ["tree", Vector2i(13, 10)], ["tree", Vector2i(3, 11)],
-	["tree", Vector2i(11, 12)], ["tree", Vector2i(6, 1)],
+	["tree", Vector2i(11, 12)], ["tree", Vector2i(6, 1)], ["builder_shed", Vector2i(2, 8)],
 ]
 # Bot "friends" stand in for real ones: every SEND_EVERY ticks one sends a mixed group into your park.
 const BOTS := ["Mia", "Theo"]
@@ -72,6 +72,7 @@ func _ready() -> void:
 		zoo.map.place("path", Vector2i(x, 7))
 	zoo.map.money = ParkMap.START_MONEY  # the seeded zoo is free
 	sim = ParkSim.new(zoo.map, 1)
+	zoo.sim = sim
 	_rng.seed = 1
 	zoo.money_changed.connect(_on_map_changed)
 	add_child(zoo)
