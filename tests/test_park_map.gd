@@ -15,7 +15,7 @@ func _init() -> void:
 	ok(not m.can_place("tree", Vector2i(4, 4)), "overlap refused (far corner)")
 	ok(not m.place("pond", Vector2i(1, 1)), "partial overlap refused")
 	ok(m.money == 350, "refused place costs nothing")
-	ok(not m.can_place("pond", Vector2i(15, 3)), "out of bounds refused")
+	ok(not m.can_place("pond", Vector2i(19, 3)), "out of bounds refused")
 	ok(not m.can_place("tree", Vector2i(-1, 0)), "negative out of bounds refused")
 	ok(m.can_place("pond", Vector2i(14, 14)), "fits in the last corner")
 	ok(m.remove_at(Vector2i(4, 3)), "remove by any covered cell")

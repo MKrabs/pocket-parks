@@ -5,6 +5,7 @@ const CREAM := Color("#F2EDE3")     # background / sky
 const INK := Color("#5B5348")       # text, outlines (use sparingly, often at low alpha)
 const GRASS := Color("#B5D1A4")     # ground tile
 const GRASS_DARK := Color("#A3C293")  # checker / alternate tile
+const GRASS_PALE := Color("#CCD9C0")  # land you don't own yet (muted, desaturated)
 const MOSS := Color("#86A97E")      # foliage, trees
 const SAND := Color("#E8D8B4")      # paths
 const WATER := Color("#A7CFD9")     # pools

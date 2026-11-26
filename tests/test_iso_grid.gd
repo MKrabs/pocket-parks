@@ -20,7 +20,7 @@ func _init() -> void:
 	for d in [Vector2(30, 0), Vector2(-30, 0), Vector2(0, 15), Vector2(0, -15)]:
 		ok(IsoGrid.to_cell(p + d) == c, "inside edge %s" % d)
 	ok(IsoGrid.to_cell(p + Vector2(0, 17)) == Vector2i(6, 10), "past bottom corner")
-	ok(IsoGrid.in_bounds(Vector2i(0, 0)) and IsoGrid.in_bounds(Vector2i(15, 15)), "corners in bounds")
-	ok(not IsoGrid.in_bounds(Vector2i(16, 0)) and not IsoGrid.in_bounds(Vector2i(0, -1)), "out of bounds")
+	ok(IsoGrid.in_bounds(Vector2i(0, 0)) and IsoGrid.in_bounds(Vector2i(19, 19)), "corners in bounds")
+	ok(not IsoGrid.in_bounds(Vector2i(20, 0)) and not IsoGrid.in_bounds(Vector2i(0, -1)), "out of bounds")
 	ok(not IsoGrid.in_bounds(IsoGrid.to_cell(Vector2(0, -100))), "above board is out of bounds")
 	done()

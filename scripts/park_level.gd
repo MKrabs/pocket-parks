@@ -7,16 +7,18 @@ const HAPPY := 60.0   # mood at or above this on the way out counts as happy (sa
 # Total XP needed to reach level i + 1 (index 0 = level 1).
 const THRESHOLDS := [0, 30, 80, 150, 250, 380, 550, 760, 1000, 1300]
 const MAX := 10
-# Park level -> what it raises. Later: plots, themes.
+# Park level -> what it raises. Later: themes. `plots` = land plots you may buy beyond the start area.
 const UNLOCKS := {
-	2: {"building_level": 2},
+	2: {"building_level": 2, "plots": 1},
 	3: {"sheds": 2},
-	4: {"building_level": 3},
+	4: {"building_level": 3, "plots": 2},
 	5: {"sheds": 3},
-	6: {"specialties": 2},
+	6: {"specialties": 2, "plots": 3},
 	7: {"sheds": 4},
+	8: {"plots": 4},
+	10: {"plots": 5},
 }
-const BASE := {"building_level": 1, "sheds": 1, "specialties": 1}
+const BASE := {"building_level": 1, "sheds": 1, "specialties": 1, "plots": 0}
 
 static func of(xp: int) -> int:
 	var lv := 1
@@ -31,7 +33,7 @@ static func progress(xp: int) -> float:
 		return 1.0
 	return float(xp - THRESHOLDS[lv - 1]) / (THRESHOLDS[lv] - THRESHOLDS[lv - 1])
 
-## The value of `key` (building_level, sheds, specialties) at park level `lv`.
+## The value of `key` (building_level, sheds, specialties, plots) at park level `lv`.
 static func cap(key: String, lv: int) -> int:
 	var v: int = BASE[key]
 	for l: int in UNLOCKS:
@@ -55,4 +57,5 @@ static func describe(lv: int) -> Array[String]:
 			"building_level": out.append("Buildings up to Lv %d" % v)
 			"sheds": out.append("%d builder sheds" % v)
 			"specialties": out.append("A second builder specialty")
+			"plots": out.append("Buy up to %d land plot%s" % [v, "" if v == 1 else "s"])
 	return out

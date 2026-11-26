@@ -3,7 +3,7 @@ extends CanvasLayer
 # Select mode UI: the right-side card for the clicked building or person (slides in, updates every
 # frame) and the small hover tooltip. Buttons emit `action`; main does the work.
 
-signal action(name: String)  # "upgrade", "repair", "demolish", "accuse"
+signal action(name: String)  # "upgrade", "repair", "demolish", "accuse", "buy"
 
 const WIDTH := 270.0
 const BOTTOM := Hud.MARGIN * 2 + Hud.VISIT_SIZE  # card bottom sits above the Visit button; toasts above it stop at top()
@@ -13,12 +13,14 @@ var map: ParkMap
 var origin := GridView.NONE  # building on the card
 var person := -1  # guest id on the card
 var staff := -1  # staff index on the card
+var plot := GridView.NONE  # land plot for sale on the card (plot coords)
 var title := Hud._label(22)
 var body := Hud._label(16)
 var upgrade := _action("upgrade")
 var repair := _action("repair")
 var demolish := _action("demolish")
 var accuse := _action("accuse")
+var buy := _action("buy")
 var specs := HFlowContainer.new()  # a builder's specialty toggles; only the choosable or chosen ones show
 var warning := Hud._label(13)
 var tip := Hud._label(14)
@@ -48,7 +50,7 @@ func _ready() -> void:
 		for k in ["normal", "hover", "pressed", "hover_pressed"]:
 			(b.get_theme_stylebox(k) as StyleBoxFlat).set_content_margin_all(5)
 		specs.add_child(b)
-	for c in [title, body, specs, upgrade, repair, demolish, accuse, warning]:
+	for c in [title, body, specs, upgrade, repair, demolish, accuse, buy, warning]:
 		col.add_child(c)
 	_panel.add_child(col)
 	_panel.visible = false
@@ -77,24 +79,35 @@ func show_building(o: Vector2i) -> void:
 	origin = o
 	person = -1
 	staff = -1
+	plot = GridView.NONE
 	_open()
 
 func show_person(guest_id: int) -> void:
 	origin = GridView.NONE
 	person = guest_id
 	staff = -1
+	plot = GridView.NONE
 	_open()
 
 func show_staff(i: int) -> void:
 	origin = GridView.NONE
 	person = -1
 	staff = i
+	plot = GridView.NONE
+	_open()
+
+func show_plot(p: Vector2i) -> void:
+	origin = GridView.NONE
+	person = -1
+	staff = -1
+	plot = p
 	_open()
 
 func close() -> void:
 	origin = GridView.NONE
 	person = -1
 	staff = -1
+	plot = GridView.NONE
 	_panel.visible = false
 
 func _open() -> void:
@@ -137,7 +150,7 @@ func _process(_delta: float) -> void:
 		title.text = guest_title(g)
 		body.text = "Mood: %d / 100\nSpent: $%d" % [roundi(g["mood"]), g["spent"]]
 		accuse.text = "Accuse"
-		for b in [upgrade, repair, demolish]:
+		for b in [upgrade, repair, demolish, buy]:
 			b.visible = false
 		accuse.visible = true
 		warning.visible = true
@@ -145,8 +158,13 @@ func _process(_delta: float) -> void:
 	elif staff >= 0 and staff < sim.staff.size():
 		title.text = (sim.staff[staff]["kind"] as String).capitalize()
 		body.text = "Your staff"
-		for b in [upgrade, repair, demolish, accuse, warning, specs]:
+		for b in [upgrade, repair, demolish, accuse, buy, warning, specs]:
 			b.visible = false
+	elif plot != GridView.NONE:
+		if not map.buyable(plot):
+			close()
+			return
+		_plot()
 	_panel.reset_size()
 	_panel.position.y = _panel.get_viewport_rect().size.y - _panel.size.y - BOTTOM
 
@@ -201,7 +219,27 @@ func _building() -> void:
 	demolish.visible = true
 	demolish.text = "Demolish · +$%d back" % sim.demolish_refund(origin)
 	accuse.visible = false
+	buy.visible = false
 	warning.visible = false
+
+func _plot() -> void:
+	var price := map.plot_price()
+	title.text = "Land for sale"
+	body.text = "%d × %d plot · $%d\nYou own %d of %d extra plots" % [ParkMap.PLOT, ParkMap.PLOT, price,
+		map.bought, ParkLevel.cap("plots", map.park_level())]
+	for b in [upgrade, repair, demolish, accuse, warning, specs]:
+		b.visible = false
+	buy.visible = true
+	buy.disabled = not map.can_buy(plot)
+	var needs := map.plot_needs()
+	if needs < 0:
+		buy.text = "No more land for sale"
+	elif needs > 0:
+		buy.text = "More land at park level %d" % needs
+	elif map.money < price:
+		buy.text = "Buy $%d · need $%d more" % [price, price - map.money]
+	else:
+		buy.text = "Buy · $%d" % price
 
 ## "Building · 40% · Bo is working on it" / "Upgrading to Lv 2 · 0% · Waiting for a builder".
 static func site_line(s: ParkSim, j: Dictionary) -> String:

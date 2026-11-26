@@ -1,11 +1,11 @@
 extends Node2D
 # Entry point. Build child nodes in code here; keep main.tscn as the only scene file.
 
-# Every attraction and shop touches the path along y=7 that runs from the gate.
+# Inside the owned 12×12 start area (cells 4..15). Every attraction and shop touches the path along y=11 from the gate.
 const SEED := [
-	["zoo_gate", Vector2i(0, 7)], ["enclosure", Vector2i(2, 4)], ["pond", Vector2i(12, 5)], ["snack_stand", Vector2i(8, 8)],
-	["snack_stand", Vector2i(5, 8)], ["tree", Vector2i(12, 2)], ["tree", Vector2i(13, 10)], ["tree", Vector2i(3, 11)],
-	["tree", Vector2i(11, 12)], ["tree", Vector2i(6, 1)], ["builder_shed", Vector2i(2, 8)],
+	["zoo_gate", Vector2i(4, 11)], ["enclosure", Vector2i(6, 8)], ["pond", Vector2i(14, 9)], ["snack_stand", Vector2i(12, 12)],
+	["snack_stand", Vector2i(9, 12)], ["tree", Vector2i(14, 6)], ["tree", Vector2i(15, 14)], ["tree", Vector2i(7, 15)],
+	["tree", Vector2i(11, 15)], ["tree", Vector2i(10, 5)], ["builder_shed", Vector2i(6, 12)],
 ]
 # Bot "friends" stand in for real ones: every SEND_EVERY ticks one sends a mixed group into your park.
 const BOTS := ["Mia", "Theo"]
@@ -13,6 +13,7 @@ const SEND_EVERY := 30 * ParkSim.TPS
 const PICK_RADIUS := 12.0  # screen px around a person for hover and click in Select mode
 const PAINT_ROLES := ["path", "decor"]  # stay in place mode after placing (paths, trees); others go back to Select
 
+var grid := GridView.new()
 var bar := BuildBar.new()
 var zoo := ZooView.new()
 var hud := Hud.new()
@@ -64,13 +65,14 @@ func _unhandled_input(event: InputEvent) -> void:
 		bar.clear()
 
 func _ready() -> void:
-	var grid := GridView.new()
+	zoo.map.start_small()
+	grid.map = zoo.map
 	add_child(grid)
 	zoo.map.money = 1 << 30  # seed without running out
 	for s in SEED:
 		zoo.map.place(s[0], s[1])
-	for x in range(1, 14):
-		zoo.map.place("path", Vector2i(x, 7))
+	for x in range(5, 16):
+		zoo.map.place("path", Vector2i(x, 11))
 	zoo.map.money = ParkMap.START_MONEY  # the seeded zoo is free
 	sim = ParkSim.new(zoo.map, 1)
 	zoo.sim = sim
@@ -122,7 +124,7 @@ func _ready() -> void:
 
 	# centre of the board top, nudged down by half the slab depth, sized to sit between the two bars
 	cam.position = IsoGrid.project(Vector2(IsoGrid.SIZE) / 2.0 - Vector2(0.5, 0.5)) + Vector2(0, GridView.SLAB / 2)
-	cam.zoom = Vector2.ONE * 0.92
+	cam.zoom = Vector2.ONE * 0.74  # the whole 20×20 world, for-sale land included, between the bars
 	add_child(cam)
 
 	if debug_visit:
@@ -221,6 +223,7 @@ func visit(offer: Dictionary) -> void:
 	card.close()
 	card.hover("", Vector2.ZERO)
 	bar.clear()
+	grid.map = null  # bot parks own all their land
 	for n in [zoo, walkers, pins, fx, bar, hud]:
 		n.hide()
 	add_child(_visit_zoo)
@@ -241,6 +244,7 @@ func go_home() -> void:
 	if not visiting:
 		return
 	visiting = false
+	grid.map = zoo.map
 	_visit_zoo.queue_free()
 	_visit_walkers.queue_free()
 	visit_panel.close()
@@ -338,6 +342,8 @@ func select_at(cell: Vector2i, world: Vector2) -> void:
 		card.show_staff(s)
 	elif zoo.map.occupied.has(cell):
 		card.show_building(zoo.map.occupied[cell])
+	elif zoo.map.buyable(ParkMap.plot_of(cell)):
+		card.show_plot(ParkMap.plot_of(cell))
 	else:
 		card.close()
 
@@ -350,6 +356,12 @@ func _on_card_action(what: String) -> void:
 		zoo.map.toggle_specialty(o, what.trim_prefix("spec_"))
 		return
 	match what:
+		"buy":
+			zoo.map.money = sim.money
+			if zoo.map.buy(card.plot):
+				sim.money = zoo.map.money
+				grid.queue_redraw()
+				card.close()
 		"upgrade":
 			zoo.upgrade(o)
 		"demolish":

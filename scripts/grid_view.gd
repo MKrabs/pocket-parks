@@ -9,6 +9,10 @@ const SLAB := 18.0  # depth of the ground slab in px
 const NONE := Vector2i(-1, -1)
 
 var hovered := NONE
+var map: ParkMap:  # whose land: unowned cells are muted, buyable plots get a for-sale sign; null = all owned
+	set(m):
+		map = m
+		queue_redraw()
 var tile_hover := false:  # tint the hovered tile (place mode only; Select mode lifts buildings instead)
 	set(on):
 		tile_hover = on
@@ -44,6 +48,24 @@ func _draw() -> void:
 		for y in IsoGrid.SIZE.y:
 			var cell := Vector2i(x, y)
 			var col := Palette.GRASS if (x + y) % 2 == 0 else Palette.GRASS_DARK
+			if map and not map.owns(cell):
+				col = Palette.GRASS_PALE
 			if cell == hovered and tile_hover:
 				col = Palette.SKY
 			draw_colored_polygon(Squircle.iso_points(IsoGrid.to_screen(cell), Vector2(0.47, 0.47), 6.0, 48), col)
+	if not map:
+		return
+	for px in IsoGrid.SIZE.x / ParkMap.PLOT:
+		for py in IsoGrid.SIZE.y / ParkMap.PLOT:
+			if map.buyable(Vector2i(px, py)):
+				_sign(IsoGrid.project(Vector2(px, py) * ParkMap.PLOT + Vector2.ONE * (ParkMap.PLOT - 1) / 2.0))
+
+## A small for-sale sign: wood post, butter board with a $.
+func _sign(at: Vector2) -> void:
+	draw_colored_polygon(Squircle.points(at + Vector2(0, 2), Vector2(9, 4.5)), Palette.shade(Palette.GRASS_PALE, 0.12))
+	draw_colored_polygon(Squircle.points(at + Vector2(0, -8), Vector2(2, 10)), Palette.shade(Palette.WOOD, 0.12))
+	var board := at + Vector2(0, -22)
+	draw_colored_polygon(Squircle.points(board + Vector2(0, 2.5), Vector2(13, 9)), Palette.shade(Palette.BUTTER, 0.22))
+	draw_colored_polygon(Squircle.points(board, Vector2(13, 9)), Palette.BUTTER)
+	var w := Palette.FONT_BOLD.get_string_size("$", HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x
+	draw_string(Palette.FONT_BOLD, board + Vector2(-w * 0.5, 5), "$", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Palette.INK)
