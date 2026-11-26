@@ -11,6 +11,7 @@ func done() -> void:
 func park() -> ParkMap:
 	var m := ParkMap.new()
 	m.money = 1 << 30
+	m.xp = ParkLevel.THRESHOLDS[-1]  # every building level unlocked (tests/test_park_level.gd covers the caps)
 	m.place("zoo_gate", Vector2i(0, 7))
 	for x in range(1, 14):
 		m.place("path", Vector2i(x, 7))

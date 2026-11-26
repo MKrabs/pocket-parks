@@ -45,6 +45,12 @@ func _initialize() -> void:
 	ok(card.is_open() and card.origin == o, "clicking a building opens its card")
 	ok(card.title.text == "Snack Stand · Lv 1", "card title %s" % card.title.text)
 	ok(card.body.text.contains("Shop · sells at $5"), "role line: %s" % card.body.text)
+	await process_frame
+	await process_frame
+	ok(card.upgrade.disabled and card.upgrade.text == "Lv 2 unlocks at park level 2", "park level gates upgrade: %s" % card.upgrade.text)
+	main.sim.xp = ParkLevel.THRESHOLDS[-1]
+	await process_frame
+	await process_frame
 	var money: int = main.sim.money
 	card.upgrade.pressed.emit()
 	await process_frame

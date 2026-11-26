@@ -33,6 +33,10 @@ var _bounced := -INF
 var _time := 0.0
 var _card := PanelContainer.new()
 var _card_text := _label(18)
+var _xp := -1  # sim.xp the badge last drew
+var level_card := PanelContainer.new()
+var _level_text := _label(16)
+var _level_title := _label(24)
 
 ## Mood face for an average happiness (0..100).
 static func face_for(happiness: float) -> int:
@@ -142,6 +146,22 @@ func _ready() -> void:
 	add_child(_card)
 	_card.hide()
 
+	var lbox := BuildBar.box(Palette.BUTTER, 20)
+	lbox.set_content_margin_all(18)
+	level_card.add_theme_stylebox_override("panel", lbox)
+	level_card.custom_minimum_size = Vector2(220, 0)
+	var lc := VBoxContainer.new()
+	lc.add_theme_constant_override("separation", 8)
+	_level_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_level_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lc.add_child(_level_title)
+	lc.add_child(_level_text)
+	lc.add_child(_button("Nice", func() -> void: Motion.vanish(level_card, false).finished.connect(level_card.hide)))
+	level_card.add_child(lc)
+	add_child(level_card)
+	level_card.hide()
+	level = ParkLevel.of(sim.xp)
+
 func _process(delta: float) -> void:
 	_time += delta
 	if sim.money != _target:  # count to the new value; bounce at most once per MONEY_EVERY
@@ -154,6 +174,12 @@ func _process(delta: float) -> void:
 			_bounced = _time
 			_chip.pivot_offset = _chip.size * 0.5
 			Motion.bounce(_chip)
+	if sim.xp != _xp:
+		_xp = sim.xp
+		var lv := ParkLevel.of(sim.xp)
+		if lv > level:
+			_level_up(lv)
+		set_level(lv, ParkLevel.progress(sim.xp))
 	var r := sim.day_report()
 	_day_label.text = "Day %d" % day
 	_clock.value = sim.tick
@@ -170,6 +196,21 @@ func _process(delta: float) -> void:
 		_card.reset_size()
 		_card.set_anchors_and_offsets_preset(Control.PRESET_CENTER, Control.PRESET_MODE_MINSIZE)
 	_card.visible = over
+
+## Badge pops; the "Level up!" card drops in at the top centre listing what `lv` unlocks.
+func _level_up(lv: int) -> void:
+	_badge.pivot_offset = _badge.size * 0.5
+	Motion.bounce(_badge)
+	_level_title.text = "Level up!"
+	var lines := ["Park level %d" % lv]
+	lines.append_array(ParkLevel.describe(lv))
+	_level_text.text = "\n".join(lines)
+	level_card.modulate.a = 1.0
+	level_card.show()
+	level_card.reset_size()
+	level_card.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP, Control.PRESET_MODE_MINSIZE, MARGIN * 6)
+	level_card.pivot_offset = level_card.size * 0.5
+	Motion.pop(level_card)
 
 ## Money in (amount > 0): a BUTTER coin flies from `screen` to the chip. Out: a CORAL coin flies from it to `screen`.
 func coin_fly(screen: Vector2, amount: int) -> void:
