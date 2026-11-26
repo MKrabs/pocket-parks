@@ -9,10 +9,23 @@ var level := 1:  # 2-3 add flags (attractions, shops) or a bigger canopy (decor)
 		level = l
 		queue_redraw()
 var label := ""  # short text in a pill above the building (the upgrade ghost's price)
-var wrecked := false:  # wrecked by a hooligan: drawn grey and tilted
+var wrecked := false:  # wrecked by a hooligan: drawn grey and tilted (eases in and out)
 	set(w):
 		wrecked = w
-		rotation = 0.18 if w else 0.0
+		if not is_inside_tree():
+			rotation = 0.18 if w else 0.0
+			grey = 1.0 if w else 0.0
+			return
+		var t := create_tween().set_parallel().set_trans(Tween.TRANS_SINE)
+		t.tween_property(self, "rotation", 0.18 if w else 0.0, Motion.TILT_TIME)
+		t.tween_property(self, "grey", 1.0 if w else 0.0, Motion.TILT_TIME)
+var grey := 0.0:  # 0 = own colours, 1 = wrecked grey
+	set(g):
+		grey = g
+		queue_redraw()
+var fresh := 1.0:  # scale of the flags this level added (pops 0 -> 1 after an upgrade)
+	set(f):
+		fresh = f
 		queue_redraw()
 
 func _init(building_id: String) -> void:
@@ -31,8 +44,10 @@ func _draw() -> void:
 		var spots := [Vector2(-c.x, -c.y)]  # level 2: a flag at the back
 		if level >= 3:
 			spots += [Vector2(-c.x, c.y), Vector2(c.x, -c.y)]  # level 3: and at the sides
-		for s: Vector2 in spots:
-			_flag(IsoGrid.project(mid + s), maxf(top, 10.0) + 14.0)
+		for i in spots.size():
+			var k := fresh if (level == 2) == (i == 0) else 1.0  # level 2 added spot 0, level 3 the others
+			if k > 0.01:
+				_flag(IsoGrid.project(mid + spots[i]), (maxf(top, 10.0) + 14.0) * k, k)
 	elif b["role"] == "decor":
 		grow = 1.0 + 0.14 * (level - 1)  # decor: a bigger canopy
 	for p in b["parts"]:
@@ -52,13 +67,13 @@ func _draw() -> void:
 		draw_string(f, at + Vector2(-w * 0.5, 5), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Palette.INK)
 
 func _tint(c: Color) -> Color:
-	return Palette.STONE.lerp(c, 0.2) if wrecked else c
+	return c.lerp(Palette.STONE.lerp(c, 0.2), grey)
 
-## A thin pole with a small rounded BUTTER pennant at its top.
-func _flag(base: Vector2, h: float) -> void:
+## A thin pole with a small rounded BUTTER pennant at its top, pennant scaled by k.
+func _flag(base: Vector2, h: float, k := 1.0) -> void:
 	block(self, Squircle.iso_points(base, Vector2(0.03, 0.03), 4.0, 16), h, 0.0, _tint(Palette.WOOD))
 	var tip := base + Vector2(0, -h)
-	draw_colored_polygon(Squircle.points(tip + Vector2(6, 4), Vector2(6, 3.6)), _tint(Palette.BUTTER))
+	draw_colored_polygon(Squircle.points(tip + Vector2(6, 4) * k, Vector2(6, 3.6) * k), _tint(Palette.BUTTER))
 
 ## Extruded squircle: sides for edges facing the viewer, then the top face lifted by z + h.
 static func block(ci: CanvasItem, foot: PackedVector2Array, h: float, z: float, c: Color) -> void:

@@ -46,6 +46,12 @@ func _init() -> void:
 	ok(a["guests"] >= 40, "a decent crowd turns up")
 	ok(a["served"] > 0 and a["income"] > a["guests"] * ParkSim.ENTRY_FEE, "guests visit and pay at shops")
 	ok(a["happiness"] > 0.0 and a["happiness"] <= 100.0, "happiness in range")
+	var paid := 0
+	var at_gate := 0
+	for c: Dictionary in big.cash_events:
+		paid += c["amount"]
+		at_gate += 1 if c["origin"] == big._entrance else 0
+	ok(paid == a["income"] and at_gate == a["guests"], "cash_events add up to income, one entry fee per guest at the gate")
 	ok(big.day_time() == 120.0, "day ends at 120 s")
 
 	ok(run(ParkSim.new(park(true), 7)) == a, "same seed, same report")

@@ -8,6 +8,7 @@ var map := ParkMap.new()
 var selected := ""  # catalog id, or "" for the eraser
 var hovered := GridView.NONE
 var ghost: BuildingView
+var fx: Node2D  # where place/remove puffs go (main's Feedback); none in a visited park
 
 func _ready() -> void:
 	rebuild()
@@ -73,10 +74,33 @@ func on_hover(cell: Vector2i) -> void:
 
 func on_click(cell: Vector2i, button: MouseButton) -> void:
 	if button == MOUSE_BUTTON_RIGHT or (button == MOUSE_BUTTON_LEFT and selected == ""):
+		var o: Vector2i = map.occupied.get(cell, GridView.NONE)
+		var gone := view_at(o)
 		if map.remove_at(cell):
 			rebuild()
+			if fx and gone:  # a copy shrinks into a puff
+				var v := BuildingView.new(gone.id)
+				v.level = gone.level
+				v.position = gone.position
+				fx.add_child(v)
+				Motion.vanish(v)
+				Motion.puff_at(fx, Feedback.base_of(v.id, o), Motion.DUST_SIZE)
 	elif button == MOUSE_BUTTON_LEFT and selected == BuildBar.UPGRADE:
 		if map.occupied.has(cell) and map.upgrade(map.occupied[cell]):
 			rebuild()
+			var v := view_at(map.occupied[cell])
+			Motion.bounce(v)
+			v.fresh = 0.0
+			v.create_tween().tween_property(v, "fresh", 1.0, Motion.POP_TIME).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	elif button == MOUSE_BUTTON_LEFT and map.place(selected, cell):
 		rebuild()
+		Motion.squish(view_at(cell))
+		if fx:
+			Motion.puff_at(fx, Feedback.base_of(selected, cell), Motion.DUST_SIZE)
+
+## The building view at a building origin, or null.
+func view_at(origin: Vector2i) -> BuildingView:
+	for v: BuildingView in get_children():
+		if v != ghost and v.origin == origin and not v.is_queued_for_deletion():
+			return v
+	return null

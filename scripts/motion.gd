@@ -12,6 +12,24 @@ const SHAKE_STEPS := 6
 const FLY_TIME := 0.5
 const PUFF_TIME := 0.6  # puff_at: pop, then grow and fade
 const PUFF_GROW := 1.25
+const BOUNCE := 1.08  # bounce: grow by this, then settle back
+const BOUNCE_TIME := 0.3
+# Gameplay feedback (scripts/feedback.gd and the views it pokes):
+const CRIME_SHAKE := 3.0  # px
+const TILT_TIME := 0.5  # wrecked: grey tilt eases in
+const DEBRIS := 3  # wrecked: small puffs around the base
+const DEBRIS_SIZE := 18.0
+const LITTER_PUFF := 14.0
+const LOOT_FLY := Vector2(40, -48)  # robbed: the coin flies this far from the shop top
+const GLINT_HOLD := 0.2  # spied: glint stays this long after popping in
+const MONEY_EVERY := 1.0  # at most one floating "+$" per building per this many seconds (amounts summed)
+const MONEY_RISE := 26.0
+const MONEY_TIME := 1.3
+const COUNT_TIME := 0.4  # HUD money chip counts to the new value
+const ARREST_PUFF := 26.0
+const HOP := 7.0  # guard hop height, px
+const HOP_TIME := 0.3
+const DUST_SIZE := 34.0  # placing / removing a building
 # Cloud transition (scripts/cloud_transition.gd), seconds from its start:
 const TRAVEL_ZOOM := 0.75 / 0.92  # zoom factor at the widest point (0.92 → 0.75 at the default zoom)
 const TRAVEL_ZOOM_TIME := 0.3  # zoom out, ease in
@@ -45,6 +63,13 @@ static func squish(node: CanvasItem) -> Tween:
 	t.tween_property(node, "scale", s * SQUISH, SQUISH_TIME * 0.3)
 	t.tween_property(node, "scale", s * Vector2(SQUISH.y, SQUISH.x), SQUISH_TIME * 0.3)
 	t.tween_property(node, "scale", s, SQUISH_TIME * 0.4).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	return t
+
+static func bounce(node: CanvasItem) -> Tween:
+	var s: Vector2 = node.scale
+	var t := node.create_tween().set_trans(Tween.TRANS_SINE)
+	t.tween_property(node, "scale", s * BOUNCE, BOUNCE_TIME * 0.35).set_ease(Tween.EASE_OUT)
+	t.tween_property(node, "scale", s, BOUNCE_TIME * 0.65).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	return t
 
 ## Decaying jitter around the current position, ending back on it.

@@ -13,6 +13,11 @@ var me := ""  # sender whose people get a dot above the bean (only we can see th
 var _layers: Array[Node2D] = []
 var _rows: Array = []  # per depth: [[kind, item], ...]
 var _time := 0.0
+var _hops: Dictionary = {}  # staff index -> time its hop started
+
+## A little hop for staff member i (a guard who just caught someone).
+func hop(i: int) -> void:
+	_hops[i] = _time
 
 func _ready() -> void:
 	for d in IsoGrid.SIZE.x + IsoGrid.SIZE.y:
@@ -30,8 +35,10 @@ func _process(delta: float) -> void:
 		_rows[i] = []
 	for c: Vector2i in sim.litter:
 		_row(Vector2(c)).append(["litter", c])
-	for s in sim.staff:
-		_row(s["pos"]).append(["staff", s])
+	for i in sim.staff.size():
+		var t: float = _time - _hops.get(i, -INF)
+		var lift := sin(t / Motion.HOP_TIME * PI) * Motion.HOP if t < Motion.HOP_TIME else 0.0
+		_row(sim.staff[i]["pos"]).append(["staff", sim.staff[i], lift])
 	for g in sim.guests:
 		if g["state"] != "visit":  # inside the building
 			_row(g["pos"]).append(["guest", g])
@@ -56,7 +63,7 @@ func _draw_row(ci: Node2D, d: int) -> void:
 			"staff":
 				var s: Dictionary = e[1]
 				var cap: Color = CAPS[s["kind"]]
-				_bean(ci, s["pos"], 0, Vector2(5.5, 6.5), Palette.shade(cap, 0.3), cap, not s["path"].is_empty())
+				_bean(ci, s["pos"], 0, Vector2(5.5, 6.5), Palette.shade(cap, 0.3), cap, not s["path"].is_empty(), Color(Palette.INK, 0.0), e[2])
 			"guest":
 				var g: Dictionary = e[1]
 				var id: int = g["id"]
@@ -80,10 +87,11 @@ static func spot(g: Dictionary) -> Vector2:
 	return g["pos"] + Vector2(sin(id * 12.9898), cos(id * 78.233)) * 0.22
 
 ## Squircle bean standing on the path, soft shadow, optional cap and chest mark. `half` in px.
-func _bean(ci: Node2D, p: Vector2, phase: int, half: Vector2, col: Color, cap: Color, walking: bool, mark := Color(Palette.INK, 0.0)) -> void:
+func _bean(ci: Node2D, p: Vector2, phase: int, half: Vector2, col: Color, cap: Color, walking: bool, mark := Color(Palette.INK, 0.0), hop := 0.0) -> void:
 	var foot := IsoGrid.project(p) - Vector2(0, LIFT)
 	var bob := absf(sin(_time * 9.0 + phase)) * 1.5 if walking else 0.0
 	ci.draw_colored_polygon(Squircle.points(foot, Vector2(half.x, half.x * 0.5), 4.0, 16), Color(Palette.INK, 0.15))
+	foot.y -= hop  # the shadow stays on the ground
 	var body := Squircle.points(foot - Vector2(0, half.y + bob), half, 4.0, 20)
 	ci.draw_colored_polygon(body, col)
 	body.append(body[0])

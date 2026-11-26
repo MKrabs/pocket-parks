@@ -18,18 +18,38 @@ var cam: Camera2D
 var pins: Array[Dictionary] = []  # {origin, kind, at (world), alpha}
 var hovered := -1
 var _time := 0.0
+var _born: Dictionary = {}  # pin key -> time it appeared (pops in)
+var _gone: Array[Dictionary] = []  # pins that went, still vanishing
 
 func _ready() -> void:
 	z_index = 1500  # above buildings, walkers and the ghost
 
 func _process(delta: float) -> void:
 	_time += delta
+	var old := pins.filter(func(p: Dictionary) -> bool: return not p.has("gone"))
 	pins.clear()
 	for o: Vector2i in map.buildings:
 		var st := sim.building_status(o)
 		for i in st.size():
-			pins.append({"origin": o, "kind": st[i], "at": top(map.buildings[o], o), "i": i, "n": st.size(),
-				"alpha": _robbed_alpha(o) if st[i] == "robbed" else 1.0})
+			var key := "%s %s" % [o, st[i]]
+			if not _born.has(key):
+				_born[key] = _time
+			pins.append({"origin": o, "kind": st[i], "at": top(map.buildings[o], o), "i": i, "n": st.size(), "key": key,
+				"alpha": _robbed_alpha(o) if st[i] == "robbed" else 1.0,
+				"scale": Tween.interpolate_value(0.0, 1.0, minf(_time - _born[key], Motion.POP_TIME), Motion.POP_TIME,
+					Tween.TRANS_BACK, Tween.EASE_OUT)})
+	var live := pins.map(func(p: Dictionary) -> String: return p["key"])
+	for p: Dictionary in old:  # pins that just went vanish
+		if not p["key"] in live:
+			_born.erase(p["key"])
+			p["gone"] = _time
+			_gone.append(p)
+	_gone.assign(_gone.filter(func(p: Dictionary) -> bool: return _time - p["gone"] < Motion.VANISH_TIME))
+	for p: Dictionary in _gone:
+		var k: float = (_time - p["gone"]) / Motion.VANISH_TIME
+		p["scale"] = lerpf(1.0, Motion.VANISH_SCALE, k)
+		p["fade"] = 1.0 - k
+		pins.append(p)
 	hovered = -1
 	var m := get_local_mouse_position()
 	for i in pins.size():
@@ -75,10 +95,13 @@ func _draw() -> void:
 	for i in pins.size():
 		var p := pins[i]
 		var c: Color = COLORS[p["kind"]]
-		var a: float = p["alpha"]
+		var a: float = p["alpha"] * p.get("fade", 1.0)
 		var head := _head(i)
-		draw_set_transform(head, 0.0, Vector2(s, s))
-		var tip: Vector2 = (p["at"] - head) / s
+		var k: float = s * p["scale"]
+		if k < 0.01:
+			continue
+		draw_set_transform(head, 0.0, Vector2(k, k))
+		var tip: Vector2 = (p["at"] - head) / k
 		var tail := PackedVector2Array([Vector2(-HEAD * 0.45, HEAD * 0.6), Vector2(HEAD * 0.45, HEAD * 0.6), tip])
 		var outline := Color(Palette.shade(c, 0.25), a)
 		draw_colored_polygon(Squircle.points(Vector2.ZERO, Vector2.ONE * (HEAD + 1.5), 4.0, 32), outline)

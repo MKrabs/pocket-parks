@@ -1,13 +1,12 @@
 class_name CrimeToasts
 extends CanvasLayer
-# Toasts stacked top-right: newest on top, at most MAX, each fades out after LIFE seconds.
+# Toasts stacked top-right: newest on top, at most MAX, each vanishes (Motion.vanish) after LIFE seconds.
 # A toast with an origin pans the camera there when clicked (`clicked`).
 
 signal clicked(origin: Vector2i)
 
 const MAX := 4
 const LIFE := 6.0
-const FADE := 1.0
 const NO_ORIGIN := Vector2i(-1, -1)
 
 var items: Array[Dictionary] = []  # {panel, sub, event, age}, newest first
@@ -60,13 +59,17 @@ func add(kind: String, text: String, origin := NO_ORIGIN, event := {}) -> void:
 	_col.move_child(panel, 0)
 	items.push_front({"panel": panel, "sub": sub, "event": event, "age": 0.0})
 	while items.size() > MAX:
-		items.pop_back()["panel"].queue_free()
+		_vanish(items.pop_back()["panel"])
 
 func _process(delta: float) -> void:
 	for t in items.duplicate():
 		t["age"] += delta
 		t["sub"].visible = t["event"].get("witnessed", false)
-		t["panel"].modulate.a = clampf((LIFE - t["age"]) / FADE, 0.0, 1.0)
 		if t["age"] >= LIFE:
 			items.erase(t)
-			t["panel"].queue_free()
+			_vanish(t["panel"])
+
+func _vanish(panel: Control) -> void:
+	panel.pivot_offset = panel.size * 0.5
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	Motion.vanish(panel)

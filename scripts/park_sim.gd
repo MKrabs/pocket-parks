@@ -47,6 +47,8 @@ var events: Array = []              # crimes: {tick, kind, origin, amount, witne
 var ledger: Dictionary = {}         # sender -> money owed to it (negative: it owes the host)
 var blueprints: Dictionary = {}     # sender -> Array of building ids its spies brought home
 var fined: Dictionary = {}          # sender -> fines it paid so far (already inside ledger)
+var cash_events: Array = []         # guest payments: {tick, origin (gate or shop), amount}; for the money floats
+var arrests: Array = []             # {tick, pos (cell), guard (staff index, -1 = accused), amount, wrongful}
 var _gate: Array = []               # [kind, sender] waiting to enter
 
 var _rng := RandomNumberGenerator.new()
@@ -244,6 +246,7 @@ func _spawn(kind := "guest", sender := "") -> void:
 	spawned += 1
 	money += ENTRY_FEE
 	income += ENTRY_FEE
+	cash_events.append({"tick": tick, "origin": _entrance, "amount": ENTRY_FEE})
 	_pick(g)
 
 ## Left through the gate: the sender gets its guest share, or the actor's loot and blueprints.
@@ -364,6 +367,7 @@ func _finish(g: Dictionary) -> void:
 	if t["role"] == "shop":
 		money += t["price"]
 		income += t["price"]
+		cash_events.append({"tick": tick, "origin": t["origin"], "amount": t["price"]})
 		g["spent"] += t["price"]
 		g["mood"] += 5
 		if _rng.randf() < LITTER_CHANCE:
@@ -469,6 +473,7 @@ func accuse(person_id: int) -> Dictionary:
 		if g["crimes"] > 0:
 			return _arrest(g)
 		money -= WRONGFUL_FINE
+		arrests.append({"tick": tick, "pos": g["pos"], "guard": -1, "amount": -WRONGFUL_FINE, "wrongful": true})
 		if g["sender"] != "":
 			ledger[g["sender"]] = ledger.get(g["sender"], 0) + WRONGFUL_FINE
 		if g["state"] == "visit":
@@ -478,9 +483,10 @@ func accuse(person_id: int) -> Dictionary:
 	return {}
 
 ## Caught with evidence: the sender is fined BASE_FINE × crimes, the loot goes back to the host.
-func _arrest(g: Dictionary) -> Dictionary:
+func _arrest(g: Dictionary, guard := -1) -> Dictionary:
 	var fine: int = BASE_FINE[g["kind"]] * g["crimes"]
 	money += fine + g["loot"]
+	arrests.append({"tick": tick, "pos": g["pos"], "guard": guard, "amount": fine + g["loot"], "wrongful": false})
 	if g["sender"] != "":
 		ledger[g["sender"]] = ledger.get(g["sender"], 0) - fine
 		fined[g["sender"]] = fined.get(g["sender"], 0) + fine
@@ -509,7 +515,7 @@ func _step_guard(s: Dictionary) -> void:
 	if _walk(s, GUARD_SPEED) and best.is_empty() and not _paths.is_empty():
 		_go(s, _paths[_rng.randi() % _paths.size()])
 	if not best.is_empty() and s["pos"].distance_to(best["pos"]) <= 1.0:
-		_arrest(best)
+		_arrest(best, staff.find(s))
 		s["pause"] = CATCH_PAUSE
 		s["path"] = []
 
