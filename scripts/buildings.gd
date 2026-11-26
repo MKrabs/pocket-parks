@@ -33,6 +33,21 @@ static func ids() -> Array:
 static func ids_with_role(role: String) -> Array:
 	return ids().filter(func(id: String) -> bool: return themes()[active][id]["role"] == role)
 
+const MAX_LEVEL := 3
+
+static func upgradable(id: String) -> bool:
+	return get_def(id)["role"] in ["attraction", "shop", "decor"]
+
+## Def with the level effect applied: +50% appeal, capacity and price per level above 1.
+## The sim and the UI both read this, so they agree.
+static func leveled(id: String, level: int) -> Dictionary:
+	var d: Dictionary = get_def(id).duplicate()
+	var f := 1.0 + 0.5 * (level - 1)
+	for k in ["appeal", "capacity", "price"]:
+		if d.has(k):
+			d[k] = roundi(d[k] * f)
+	return d
+
 static func part(at: Vector2, half: Vector2, h: float, color: Color, z := 0.0) -> Dictionary:
 	return {"at": at, "half": half, "h": h, "z": z, "color": color}
 
