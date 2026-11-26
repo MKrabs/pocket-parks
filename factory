@@ -73,12 +73,31 @@ run() {  # one headless worker, hard-capped by budget and turns
   rc=$?
   cost="$(tail -n 50 "$log" | jq -rs 'map(select(.type=="result")) | last | .total_cost_usd // "?"' 2>/dev/null)"
   echo "$(date '+%F %T')  $id worker exited rc=$rc cost=\$$cost log=logs/$(basename "$log")" >>"$TIX_DIR/log.txt"
+  # Usage limit: not the ticket's fault. Put it back and make the dispatcher wait for the reset.
+  reset="$(grep '^{' "$log" | jq -r 'select(.type=="rate_limit_event" and .rate_limit_info.status=="rejected")
+           | .rate_limit_info.resetsAt' 2>/dev/null | tail -1)"
+  if [ -n "$reset" ] && [ "$(./tix status "$id")" = doing ]; then
+    echo "$reset" >"$ROOT/logs/.ratelimit"
+    ./tix release "$id" "usage limit hit; retry after $(date -d "@$reset" '+%F %T')"
+    return
+  fi
   if [ "$(./tix status "$id")" = doing ]; then
     ./tix block "$id" "worker exited (rc=$rc) without handing back; see logs/$(basename "$log")"
   fi
 }
 
+wait_for_limit() {  # sleep until a recorded usage-limit reset has passed
+  [ -f "$ROOT/logs/.ratelimit" ] || return 0
+  local r now; r="$(cat "$ROOT/logs/.ratelimit")"; now="$(date +%s)"
+  if [ "$now" -lt "$r" ]; then
+    echo "$(date +%T) usage limit: waiting until $(date -d "@$r" +%T)"
+    sleep $(( r - now + 60 ))
+  fi
+  rm -f "$ROOT/logs/.ratelimit"
+}
+
 while :; do
+  wait_for_limit
   out="$(./tix claim "worker" $ONLY)"; rc=$?
   [ $rc -gt 2 ] && { echo "factory: tix claim failed (rc=$rc): $out" >&2; break; }
   if [ $rc -eq 0 ]; then
