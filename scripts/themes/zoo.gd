@@ -23,6 +23,8 @@ static func catalog() -> Dictionary:
 			]},
 		"enclosure": {"name": "Enclosure", "role": "attraction", "appeal": 10, "capacity": 10, "footprint": Vector2i(3, 3), "cost": 150,
 			"parts": enclosure()},
+		"builder_shed": {"name": "Builder Shed", "role": "staff", "footprint": Vector2i(1, 1), "cost": 80,
+			"parts": B.shed(Palette.CLAY)},
 	}
 
 static func enclosure() -> Array:

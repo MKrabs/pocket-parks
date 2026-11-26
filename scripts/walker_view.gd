@@ -42,6 +42,8 @@ func _process(delta: float) -> void:
 		var t: float = _time - _hops.get(i, -INF)
 		var lift := sin(t / Motion.HOP_TIME * PI) * Motion.HOP if t < Motion.HOP_TIME else 0.0
 		_row(sim.staff[i]["pos"]).append(["staff", sim.staff[i], lift + (HOVER_LIFT if i == hovered_staff else 0.0)])
+	for b in sim.builders:
+		_row(b["pos"]).append(["builder", b])
 	for g in sim.guests:
 		if g["state"] != "visit":  # inside the building
 			_row(g["pos"]).append(["guest", g])
@@ -67,6 +69,9 @@ func _draw_row(ci: Node2D, d: int) -> void:
 				var s: Dictionary = e[1]
 				var cap: Color = CAPS[s["kind"]]
 				_bean(ci, s["pos"], 0, Vector2(5.5, 6.5), Palette.shade(cap, 0.3), cap, not s["path"].is_empty(), Color(Palette.INK, 0.0), e[2])
+			"builder":  # overalls and a BUTTER hard hat; bobs while walking or hammering
+				var b: Dictionary = e[1]
+				_bean(ci, b["pos"], 3, Vector2(5.5, 6.5), Palette.shade(Palette.SKY, 0.2), Palette.BUTTER, b["state"] != "home")
 			"guest":
 				var g: Dictionary = e[1]
 				var id: int = g["id"]

@@ -5,7 +5,7 @@ class_name Buildings
 # h = height px, z = lift px, color. Parts are drawn in list order (back to front).
 # Ids are unique across themes, so get_def finds a building from any theme.
 
-const ROLES := ["entrance", "path", "attraction", "shop", "decor"]
+const ROLES := ["entrance", "path", "attraction", "shop", "decor", "staff"]
 
 static var active := "zoo"
 static var _themes: Dictionary = {}  # theme id -> {building id -> def}, filled on first use
@@ -57,6 +57,16 @@ static func arch(post: Color, top: Color) -> Array:
 		part(Vector2(0, -0.32), Vector2(0.1, 0.1), 26, post),
 		part(Vector2(0, 0.32), Vector2(0.1, 0.1), 26, post),
 		part(Vector2.ZERO, Vector2(0.14, 0.46), 7, top, 26),
+	]
+
+## Builder shed on a 1x1 tile: wooden hut, roof, and a BUTTER hard-hat sign on the +x face.
+static func shed(roof: Color) -> Array:
+	return [
+		part(Vector2.ZERO, Vector2(0.3, 0.3), 16, Palette.WOOD),
+		part(Vector2.ZERO, Vector2(0.38, 0.38), 5, roof, 16),
+		part(Vector2(0.33, 0), Vector2(0.04, 0.17), 9, Palette.STONE, 4),
+		part(Vector2(0.37, 0), Vector2(0.03, 0.11), 4, Palette.BUTTER, 8),
+		part(Vector2(0.37, 0), Vector2(0.03, 0.06), 3, Palette.BUTTER, 12),
 	]
 
 static func tree(at: Vector2) -> Array:

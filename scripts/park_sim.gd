@@ -33,6 +33,11 @@ const BASE_FINE := {"hooligan": 40, "litterbug": 30, "thief": 50, "spy": 60}
 const WRONGFUL_FINE := 40
 const ROBBED_TICKS := 20 * TPS
 const KINDS := ["guest", "hooligan", "litterbug", "thief", "spy"]
+# Construction (docs/design/game.md → Building). Seconds by building id, else by role, else 20 s per footprint side.
+const BUILD_SECONDS := {"path": 0.0, "entrance": 0.0, "decor": 5.0, "shop": 20.0, "pond": 40.0, "enclosure": 60.0}
+const LEVEL_TIME := [1.0, 1.5, 2.5]  # × build time for building level 1 / upgrading to 2 / to 3
+const BUILDER_SPEED := 0.15
+const BUILDER_NAMES := ["Bo", "Ada", "Kit", "Nell", "Rio", "Pip", "Sol", "June"]
 
 var money: int
 var tick := 0
@@ -51,6 +56,10 @@ var fined: Dictionary = {}          # sender -> fines it paid so far (already in
 var cash_events: Array = []         # guest payments: {tick, origin (gate or shop), amount}; for the money floats
 var arrests: Array = []             # {tick, pos (cell), guard (staff index, -1 = accused), amount, wrongful}
 var _gate: Array = []               # [kind, sender] waiting to enter
+var jobs: Array[Dictionary] = []     # sites: {origin, id, level (being built), left, total (work ticks), paid, builder ("" = waiting)}
+var builders: Array[Dictionary] = [] # one per finished shed: {name, shed (origin), pos (fractional cell), state: home|walk|work}
+var finished: Array[Vector2i] = []   # sites done; the view pops them and clears this
+var _map: ParkMap
 
 var _rng := RandomNumberGenerator.new()
 var _astar := AStarGrid2D.new()
@@ -123,6 +132,8 @@ func _load(map: ParkMap) -> void:
 	_targets.clear()
 	_decor.clear()
 	_appeal = 0.0
+	_map = map
+	_sync_builders()
 	_astar.fill_solid_region(_astar.region)
 	for origin: Vector2i in map.buildings:
 		var role: String = Buildings.get_def(map.buildings[origin])["role"]
@@ -137,6 +148,8 @@ func _load(map: ParkMap) -> void:
 	var decor_appeal := 0.0
 	for origin: Vector2i in map.buildings:
 		var id: String = map.buildings[origin]
+		if not job_at(origin).is_empty():
+			continue  # a site: closed until the builder is done
 		var d: Dictionary = Buildings.leveled(id, map.level(origin))
 		if d["role"] == "decor":
 			decor_appeal += d["appeal"]
@@ -179,6 +192,7 @@ func step() -> void:
 	for o: Vector2i in closed.keys():
 		if closed[o] <= tick:
 			closed.erase(o)
+	_step_builders()
 	if not _gate.is_empty() and tick % SEND_GAP == 0 and _entrance.x >= 0:
 		var p: Array = _gate.pop_front()
 		_spawn(p[0], p[1])
@@ -541,3 +555,125 @@ func _step_staff(s: Dictionary) -> void:
 			best_d = d
 	if best.x >= 0:
 		_go(s, best)
+
+## Work ticks to build `id` (level 1) or to upgrade it to `level`.
+static func build_ticks(id: String, level := 1) -> int:
+	var d := Buildings.get_def(id)
+	var fp: Vector2i = d["footprint"]
+	var s: float = BUILD_SECONDS.get(id, BUILD_SECONDS.get(d["role"], 20.0 * sqrt(fp.x * fp.y)))
+	return roundi(s * LEVEL_TIME[level - 1] * TPS)
+
+## Place `id` and open a site for it (paid now). Paths and gates are instant. False if it doesn't fit or is too dear.
+func build(id: String, cell: Vector2i, rot := 0) -> bool:
+	_map.money = money
+	if not _map.place(id, cell, rot):
+		return false
+	money = _map.money
+	var t := build_ticks(id)
+	if t > 0:
+		jobs.append({"origin": cell, "id": id, "level": 1, "left": t, "total": t, "paid": Buildings.get_def(id)["cost"], "builder": ""})
+	load_map(_map)
+	return true
+
+## Pay for the next level and close the building until a builder has done it. False if not possible or already a site.
+func upgrade(origin: Vector2i) -> bool:
+	var cost := _map.upgrade_cost(origin)
+	if cost < 0 or money < cost or not job_at(origin).is_empty():
+		return false
+	money -= cost
+	_map.money = money
+	var id: String = _map.buildings[origin]
+	var lv := _map.level(origin) + 1
+	var t := build_ticks(id, lv)
+	jobs.append({"origin": origin, "id": id, "level": lv, "left": t, "total": t, "paid": cost, "builder": ""})
+	load_map(_map)
+	return true
+
+## What demolishing gives back: a site refunds everything it was paid (plus the usual half for a building being upgraded).
+func demolish_refund(origin: Vector2i) -> int:
+	var j := job_at(origin)
+	if j.is_empty():
+		return _map.refund(origin)
+	return j["paid"] + (_map.refund(origin) if j["level"] > 1 else 0)
+
+func demolish(origin: Vector2i) -> bool:
+	if not _map.buildings.has(origin):
+		return false
+	var back := demolish_refund(origin)
+	jobs.erase(job_at(origin))
+	_map.money = money
+	_map.remove_at(origin, back)
+	money = _map.money
+	load_map(_map)
+	return true
+
+## The site at `origin`, or {}.
+func job_at(origin: Vector2i) -> Dictionary:
+	for j in jobs:
+		if j["origin"] == origin:
+			return j
+	return {}
+
+## The site `builder` works on, or {}.
+func job_of(builder: Dictionary) -> Dictionary:
+	for j in jobs:
+		if j["builder"] == builder["name"]:
+			return j
+	return {}
+
+## The builder living in the shed at `origin`, or {}.
+func builder_of(shed: Vector2i) -> Dictionary:
+	for b in builders:
+		if b["shed"] == shed:
+			return b
+	return {}
+
+## One builder per finished shed: gone sheds take theirs away (its site waits again), new ones get a name.
+func _sync_builders() -> void:
+	var sheds: Array = _map.buildings.keys().filter(func(o: Vector2i) -> bool:
+		return Buildings.get_def(_map.buildings[o])["role"] == "staff" and job_at(o).is_empty())
+	builders = builders.filter(func(b: Dictionary) -> bool: return b["shed"] in sheds)
+	for o: Vector2i in sheds:
+		if builder_of(o).is_empty():
+			var used := builders.map(func(b: Dictionary) -> String: return b["name"])
+			var free: Array = BUILDER_NAMES.filter(func(n: String) -> bool: return not n in used)
+			builders.append({"name": free[0] if not free.is_empty() else "Bo", "shed": o, "pos": _home(o), "state": "home"})
+	for j in jobs:
+		if j["builder"] != "" and not builders.any(func(b: Dictionary) -> bool: return b["name"] == j["builder"]):
+			j["builder"] = ""
+
+func _home(shed: Vector2i) -> Vector2:
+	return Vector2(shed) + Vector2(0.55, 0.1)  # just in front of the shed's door side
+
+func _site(j: Dictionary) -> Vector2:
+	return Vector2(j["origin"]) + Vector2(_map.size(j["id"], _map.rotation(j["origin"]))) - Vector2(0.4, 0.4)  # front corner
+
+## Waiting sites get free builders (oldest first); builders walk there in a straight line, work, then walk home.
+## ponytail: straight line across grass and buildings; path-finding if builders should look like they use paths.
+func _step_builders() -> void:
+	for j in jobs:
+		if j["builder"] != "":
+			continue
+		for b in builders:
+			if job_of(b).is_empty():
+				j["builder"] = b["name"]
+				break
+	for b in builders:
+		var j := job_of(b)
+		var to: Vector2 = _home(b["shed"]) if j.is_empty() else _site(j)
+		var d: float = b["pos"].distance_to(to)
+		if d > BUILDER_SPEED:
+			b["pos"] += (to - b["pos"]) / d * BUILDER_SPEED
+			b["state"] = "walk"
+			continue
+		b["pos"] = to
+		b["state"] = "home" if j.is_empty() else "work"
+		if j.is_empty():
+			continue
+		j["left"] -= 1
+		if j["left"] <= 0:
+			jobs.erase(j)
+			if j["level"] > 1:
+				_map.levels[j["origin"]] = j["level"]
+			finished.append(j["origin"])
+			load_map(_map)

@@ -51,14 +51,15 @@ func place(id: String, cell: Vector2i, rot := 0) -> bool:
 		occupied[c] = cell
 	return true
 
-## Removes the whole building covering `cell`, refunds half of all it cost (upgrades too). False if the cell is empty.
-func remove_at(cell: Vector2i) -> bool:
+## Removes the whole building covering `cell`, refunds half of all it cost (upgrades too), or `back` if given.
+## False if the cell is empty.
+func remove_at(cell: Vector2i, back := -1) -> bool:
 	if not occupied.has(cell):
 		return false
 	var origin: Vector2i = occupied[cell]
 	for c in cells(origin):
 		occupied.erase(c)
-	money += refund(origin)
+	money += refund(origin) if back < 0 else back
 	buildings.erase(origin)
 	levels.erase(origin)
 	rotations.erase(origin)

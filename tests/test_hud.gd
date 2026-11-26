@@ -21,14 +21,15 @@ func _initialize() -> void:
 		bar.show_tab(t)
 		var ids := bar.visible_ids()
 		if t == "Staff":
-			ok(ids.size() == ParkSim.STAFF.size() and ids.all(func(i: String) -> bool: return i == ""), "Staff tab holds only hiring")
+			ok(ids.count("") == ParkSim.STAFF.size() and ids.filter(func(i: String) -> bool: return i != "").all(
+				func(i: String) -> bool: return Buildings.get_def(i)["role"] == "staff"), "Staff tab holds hiring and the builder shed")
 		else:
 			ok(not ids.is_empty(), "%s tab has items" % t)
 			ok(ids.all(func(i: String) -> bool: return Buildings.get_def(i)["role"] in BuildBar.TABS[t]), "%s tab filters by role: %s" % [t, ids])
 	var all: Array = []
-	for t: String in ["Paths", "Attractions", "Shops", "Decor"]:
+	for t: String in BuildBar.TABS:
 		bar.show_tab(t)
-		all += bar.visible_ids()
+		all += bar.visible_ids().filter(func(i: String) -> bool: return i != "")
 	ok(all.size() == Buildings.ids().size(), "every catalog item sits in some tab")
 	bar.pick("snack_stand")
 	ok(bar.tab == "Shops" and main.zoo.selected == "snack_stand", "pick opens the item's tab")
@@ -39,7 +40,7 @@ func _initialize() -> void:
 	bar.show_tab("Staff")
 	var money := sim.money
 	var staff := sim.staff.size()
-	var b: Button = bar.row.get_children().filter(func(x: Button) -> bool: return x.visible)[0]
+	var b: Button = bar.row.get_children().filter(func(x: Button) -> bool: return x.visible and x.get_meta("id") == "")[0]
 	b.pressed.emit()
 	ok(sim.staff.size() == staff + 1 and sim.money < money, "hire button hires")
 

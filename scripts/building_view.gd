@@ -28,6 +28,13 @@ var fresh := 1.0:  # scale of the flags this level added (pops 0 -> 1 after an u
 		fresh = f
 		queue_redraw()
 
+var site := -1.0:  # under construction: progress 0..1 (scaffold + ring); -1 = done
+	set(s):
+		if s != site:
+			site = s
+			queue_redraw()
+var site_upgrade := false  # the scaffold stands around the existing building instead of replacing it
+
 var turn := 0:  # quarter turns clockwise (0-3), as stored in ParkMap.rotations
 	set(t):
 		turn = t
@@ -90,7 +97,12 @@ func _draw() -> void:
 	for p in parts:
 		top = maxf(top, p["z"] + p["h"])
 	var grow := 1.0
-	if Buildings.upgradable(id) and b["role"] != "decor" and level >= 2:
+	var scaffold := _scaffold(fp, top) if site >= 0.0 else [[], []]
+	for p: Dictionary in scaffold[0]:
+		block(self, Squircle.iso_points(IsoGrid.project(mid + p["at"]), p["half"], 4.0, 24), p["h"], p["z"], p["color"])
+	if site >= 0.0 and not site_upgrade:
+		parts = []  # a new site: only the scaffold
+	elif Buildings.upgradable(id) and b["role"] != "decor" and level >= 2:
 		var c := Vector2(fp) * 0.5 - Vector2(0.2, 0.2)  # just inside the footprint corners
 		var spots := [Vector2(-c.x, -c.y)]  # level 2: a flag at the back
 		if level >= 3:
@@ -104,12 +116,53 @@ func _draw() -> void:
 	for p in parts:
 		var foot := Squircle.iso_points(IsoGrid.project(mid + p["at"] * grow), p["half"] * grow, 4.0, 48)
 		block(self, foot, p["h"] * grow, p["z"] * grow, _tint(p["color"]))
+	for p: Dictionary in scaffold[1]:
+		block(self, Squircle.iso_points(IsoGrid.project(mid + p["at"]), p["half"], 4.0, 24), p["h"], p["z"], p["color"])
+	if site >= 0.0:
+		_ring(IsoGrid.project(mid) + Vector2(0, -_scaffold_h(top) - 20))
 	if label != "":
 		var f := ThemeDB.fallback_font
 		var at := IsoGrid.project(mid) + Vector2(0, -maxf(top, 10.0) * grow - 38)  # clear of the flags
 		var w := f.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x
 		draw_colored_polygon(Squircle.points(at, Vector2(w * 0.5 + 9, 11), 4.0, 32), Palette.BUTTER)
 		draw_string(f, at + Vector2(-w * 0.5, 5), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Palette.INK)
+
+func _scaffold_h(top: float) -> float:
+	return (top if site_upgrade else 14.0) + 8.0
+
+## Wood posts at the footprint corners with beams on top; a SAND tarp (a covered stack on a new site,
+## a sheet on the front-right face of an upgrade). Returns [behind the building, in front of it].
+func _scaffold(fp: Vector2i, top: float) -> Array:
+	var c := Vector2(fp) * 0.5 - Vector2(0.1, 0.1)
+	var h := _scaffold_h(top)
+	var P := Buildings.part
+	var post := Vector2(0.05, 0.05)
+	var back: Array = [
+		P.call(Vector2(-c.x, -c.y), post, h, Palette.WOOD),
+		P.call(Vector2(0, -c.y), Vector2(c.x, 0.04), 3, Palette.WOOD, h - 3),
+		P.call(Vector2(-c.x, 0), Vector2(0.04, c.y), 3, Palette.WOOD, h - 3),
+		P.call(Vector2(c.x, -c.y), post, h, Palette.WOOD),
+		P.call(Vector2(-c.x, c.y), post, h, Palette.WOOD),
+	]
+	var front: Array = []
+	if site_upgrade:
+		front.append(P.call(Vector2(c.x, 0), Vector2(0.03, c.y - 0.06), h * 0.45, Palette.SAND, h * 0.2))
+	else:
+		back.append(P.call(Vector2.ZERO, c * 0.8, h * 0.55, Palette.SAND))
+		back.append(P.call(Vector2.ZERO, c * 0.55, h * 0.2, Palette.shade(Palette.SAND, 0.06), h * 0.55))
+	front += [
+		P.call(Vector2(c.x, c.y), post, h, Palette.WOOD),
+		P.call(Vector2(0, c.y), Vector2(c.x, 0.04), 3, Palette.WOOD, h - 3),
+		P.call(Vector2(c.x, 0), Vector2(0.04, c.y), 3, Palette.WOOD, h - 3),
+	]
+	return [back, front]
+
+## Progress ring on a small CREAM squircle badge: STONE track, MOSS sweep from the top.
+func _ring(at: Vector2) -> void:
+	draw_colored_polygon(Squircle.points(at, Vector2(12, 12), 4.0, 32), Palette.CREAM)
+	draw_arc(at, 7.5, 0.0, TAU, 32, Palette.STONE, 3.5, true)
+	if site > 0.0:
+		draw_arc(at, 7.5, -PI / 2, -PI / 2 + TAU * site, 32, Palette.MOSS, 3.5, true)
 
 func _tint(c: Color) -> Color:
 	return c.lerp(Palette.STONE.lerp(c, 0.2), grey)

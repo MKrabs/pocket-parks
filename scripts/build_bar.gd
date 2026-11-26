@@ -6,7 +6,7 @@ signal picked(id: String)  # "" = back to Select (the pressed item was clicked a
 signal hire(kind: String)
 
 const RADIUS := 14
-const TABS := {"Paths": ["entrance", "path"], "Attractions": ["attraction"], "Shops": ["shop"], "Decor": ["decor"], "Staff": []}
+const TABS := {"Paths": ["entrance", "path"], "Attractions": ["attraction"], "Shops": ["shop"], "Decor": ["decor"], "Staff": ["staff"]}
 
 var row := HBoxContainer.new()  # every item; only the current tab's are visible
 var tabs := HBoxContainer.new()

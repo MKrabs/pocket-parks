@@ -49,8 +49,8 @@ func _initialize() -> void:
 	card.upgrade.pressed.emit()
 	await process_frame
 	await process_frame  # process_frame fires before the nodes' _process
-	ok(zoo.map.level(o) == 2 and main.sim.money == money - 60, "Upgrade upgrades and charges")
-	ok(card.title.text == "Snack Stand · Lv 2", "card updates live: %s" % card.title.text)
+	ok(zoo.map.level(o) == 1 and main.sim.money == money - 60 and not main.sim.job_at(o).is_empty(), "Upgrade charges and opens a site")
+	ok(card.body.text.contains("Upgrading to Lv 2"), "card shows the site live: %s" % card.body.text)
 	main.escape()
 	ok(not card.is_open(), "Esc closes the card")
 	main.select_at(Vector2i(10, 10), Vector2(-9999, -9999))
@@ -63,7 +63,7 @@ func _initialize() -> void:
 	main.select_at(Vector2i(9, 13), Vector2(-9999, -9999))
 	money = main.sim.money
 	card.demolish.pressed.emit()
-	ok(not zoo.map.buildings.has(Vector2i(9, 13)) and main.sim.money == money + 30 and not card.is_open(), "Demolish refunds half")
+	ok(not zoo.map.buildings.has(Vector2i(9, 13)) and main.sim.money == money + 60 and not card.is_open(), "Demolishing a site refunds everything")
 
 	# Person card: accuse works like the old tool.
 	main.send_group("Mia", ["thief"])
