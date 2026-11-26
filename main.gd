@@ -77,7 +77,7 @@ func _ready() -> void:
 	grid.map = zoo.map
 	add_child(grid)
 	if get_tree().current_scene == self and not OS.has_feature("movie"):
-		save_path = SaveGame.PATH
+		save_path = OS.get_environment("PARK_SAVE") if OS.has_environment("PARK_SAVE") else SaveGame.PATH  # a second window on one machine
 	var saved := SaveGame.read(save_path) if save_path != "" else {}
 	if saved.is_empty():
 		_seed()
@@ -86,6 +86,7 @@ func _ready() -> void:
 		sim = SaveGame.restore(saved, zoo.map)
 		hud.day = saved["day"]
 		bar.stolen.assign(saved["stolen"].filter(func(id: Variant) -> bool: return id is String and not Buildings.get_def(id).is_empty()))
+		net.load_state(saved.get("net", {}))
 	zoo.sim = sim
 	_rng.seed = 1
 	zoo.money_changed.connect(_on_map_changed)
@@ -137,6 +138,7 @@ func _ready() -> void:
 		if live:
 			toasts.add("wrecked", "Lost the connection: back home")
 			travel_home())
+	net.stolen.connect(_learn)
 	add_child(net)
 	visit_panel.picked.connect(travel_to)
 	visit_panel.sent.connect(send)
@@ -169,7 +171,7 @@ func _seed() -> void:
 ## Your park to disk (no-op in tests and shots).
 func save() -> void:
 	if save_path != "":
-		SaveGame.write(save_path, SaveGame.pack(zoo.map, sim, hud.day, bar.stolen))
+		SaveGame.write(save_path, SaveGame.pack(zoo.map, sim, hud.day, bar.stolen, net.state()))
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
@@ -194,6 +196,7 @@ func _process(delta: float) -> void:
 	zoo.map.xp = sim.xp
 	if live:
 		_visit_zoo.show_wrecked(net.visit_sim.closed if net.visit_sim else {})
+		visit_panel.show_ledger(net.visit_ledger, sim.money)
 	elif visiting:
 		_visit_zoo.show_wrecked(visits[0]["sim"].closed)
 		visit_panel.show_ledger(visits[0]["sim"].sent_by(Visit.ME), sim.money)
@@ -237,16 +240,17 @@ func step_world() -> void:
 		var owed: int = vs.ledger.get(Visit.ME, 0)
 		sim.money += owed - v["paid"]
 		v["paid"] = owed
-		var got := false
-		for id: String in vs.blueprints.get(Visit.ME, []):
-			if not id in bar.stolen:
-				bar.stolen.append(id)
-				got = true
-		if got:
-			bar.fill()
+		_learn(vs.blueprints.get(Visit.ME, []))
 		var t := vs.sent_by(Visit.ME)
 		if not (visiting and not live and v == visits[0]) and t["guests"] + t["hidden"] + t["wanted"] == 0:
 			visits.erase(v)  # left behind and nobody of ours is inside any more
+
+## Stolen blueprints join the build bar (each id once).
+func _learn(ids: Array) -> void:
+	var fresh := ids.filter(func(id: Variant) -> bool: return id is String and not id in bar.stolen and not Buildings.get_def(id).is_empty())
+	if not fresh.is_empty():
+		bar.stolen.append_array(fresh)
+		bar.fill()
 
 ## visit() behind the cloud transition (the swap happens at full cover).
 func travel_to(offer: Dictionary) -> Tween:
@@ -289,9 +293,9 @@ func _visit_live(offer: Dictionary) -> void:
 	_visit_zoo.sim = net.visit_sim  # construction sites show their scaffold
 	_visit_walkers = WalkerView.new()
 	_visit_walkers.sim = net.visit_sim
-	_enter_visit("%s · %s" % [offer["name"], offer["player"]], false)
+	_enter_visit("%s · %s" % [offer["name"], offer["player"]])
 
-func _enter_visit(title: String, sending := true) -> void:
+func _enter_visit(title: String) -> void:
 	card.close()
 	card.hover("", Vector2.ZERO)
 	bar.clear()
@@ -301,14 +305,19 @@ func _enter_visit(title: String, sending := true) -> void:
 	add_child(_visit_zoo)
 	add_child(_visit_walkers)
 	visiting = true
-	visit_panel.watch(title, sending)
+	visit_panel.watch(title)
 
-## Send one person of `kind` into the park on screen, paid now. False if not visiting or too poor.
+## Send one person of `kind` into the park on screen, paid now. False if not visiting, too poor, or a real park
+## that hasn't answered yet. A real park's host runs the send and judges them under our player name.
 func send(kind: String) -> bool:
-	if not visiting or live or sim.money < Visit.PRICES[kind]:
+	if not visiting or sim.money < Visit.PRICES[kind]:
 		return false
+	if live:
+		if not net.send_person(kind):
+			return false
+	else:
+		visits[0]["sim"].send(kind, Visit.ME)
 	sim.money -= Visit.PRICES[kind]
-	visits[0]["sim"].send(kind, Visit.ME)
 	return true
 
 ## Back to your park; the visited one keeps running while our people are inside.

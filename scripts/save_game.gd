@@ -10,8 +10,10 @@ const KEYS := {"version": TYPE_INT, "theme": TYPE_STRING, "day": TYPE_INT, "stol
 	"money": TYPE_INT, "xp": TYPE_INT, "tick": TYPE_INT, "staff": TYPE_ARRAY, "jobs": TYPE_ARRAY, "builders": TYPE_ARRAY}
 
 ## Everything needed to resume, as plain values (deep copies, so the park can keep running).
-static func pack(map: ParkMap, sim: ParkSim, day: int, stolen: Array) -> Dictionary:
-	return {"version": VERSION, "theme": Buildings.active, "day": day, "stolen": stolen.duplicate(),
+## `net` is Net.state(). The sim's ledger is kept so people sent in by visitors settle after a restart.
+static func pack(map: ParkMap, sim: ParkSim, day: int, stolen: Array, net := {}) -> Dictionary:
+	return {"version": VERSION, "theme": Buildings.active, "day": day, "stolen": stolen.duplicate(), "net": net.duplicate(true),
+		"ledger": sim.ledger.duplicate(true), "blueprints": sim.blueprints.duplicate(true), "fined": sim.fined.duplicate(true),
 		"map": {"buildings": map.buildings, "levels": map.levels, "rotations": map.rotations, "owned": map.owned,
 			"bought": map.bought, "specialties": map.specialties}.duplicate(true),
 		"money": sim.money, "xp": sim.xp, "tick": sim.tick,
@@ -39,6 +41,9 @@ static func restore(d: Dictionary, map: ParkMap) -> ParkSim:
 	sim.tick = d["tick"]
 	sim.jobs.assign(d["jobs"])
 	sim.builders.assign(d["builders"])
+	sim.ledger = d.get("ledger", {})  # optional keys: saves from before NET1 load without them
+	sim.blueprints = d.get("blueprints", {})
+	sim.fined = d.get("fined", {})
 	sim.load_map(map)  # sites stay closed, saved builders keep their sheds
 	for s: Dictionary in d["staff"]:
 		sim.staff.append(sim._walker(s["kind"]))

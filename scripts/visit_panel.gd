@@ -11,8 +11,6 @@ var _choices := VBoxContainer.new()
 var _send := PanelContainer.new()
 var _title := Hud._label(18)
 var _ledger := Hud._label(15)
-var _chip: Control
-var _sends: Array[Button] = []
 
 func _ready() -> void:
 	var pbox := BuildBar.box(Palette.CREAM, 20)
@@ -34,7 +32,6 @@ func _ready() -> void:
 	chip.add_child(_ledger)
 	chip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top.add_child(chip)
-	_chip = chip
 	col.add_child(top)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)
@@ -42,7 +39,6 @@ func _ready() -> void:
 		var b := Hud._button("Send %s\n$%d" % [kind, Visit.PRICES[kind]], sent.emit.bind(kind))
 		b.custom_minimum_size = Vector2(96, 0)
 		row.add_child(b)
-		_sends.append(b)
 	var back := Hud._button("Back\nhome", home.emit)
 	back.add_theme_stylebox_override("normal", BuildBar.box(Palette.BUTTER))
 	back.add_theme_stylebox_override("hover", BuildBar.box(Palette.shade(Palette.BUTTER, 0.04)))
@@ -97,12 +93,9 @@ func _section(text: String) -> Label:
 	l.modulate.a = 0.7
 	return l
 
-## While visiting `name`: show the Send panel; call show_ledger every frame. `sending` false = watch only (Back home).
-func watch(park_name: String, sending := true) -> void:
+## While visiting `name`: show the Send panel; call show_ledger every frame.
+func watch(park_name: String) -> void:
 	_title.text = park_name
-	_chip.visible = sending
-	for b in _sends:
-		b.visible = sending
 	_send.show()
 	show_ledger({"guests": 0, "hidden": 0, "wanted": 0, "earned": 0, "fines": 0}, 0)
 	_send.reset_size()

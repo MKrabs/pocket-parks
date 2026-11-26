@@ -5,9 +5,14 @@ extends Node
 # touches the tree's MultiplayerAPI. Wire: plain Dictionaries through var_to_bytes, reliable.
 #   map  {t, map: {buildings, levels, rotations}}   once on connect, again whenever the layout changes
 #   live {t, tick, guests, staff, builders, jobs, litter, closed, events}   about 10×/s
+#   ledger {t, from, seq, owed, blueprints, inside}   host → one visitor, whenever its entry in sim.ledger changes.
+#        owed and blueprints are running totals; the visitor applies owed minus what it already got from `from`, and
+#        only for a seq newer than the last one it applied, so a replay or a reconnect never pays twice.
+# Visitor → host: hello {t, player} once connected, then send {t, kind} per person (the host runs sim.send).
 
 signal map_changed  # the visited park's layout arrived or changed: rebuild its ZooView
 signal lost         # the visited park went away (host closed, or never answered)
+signal stolen(ids: Array)  # blueprints our spies brought home from the visited park (running list, may repeat)
 
 const GAME_PORT := 24610   # ENet: first free of GAME_PORT .. +19
 const DISCO_PORT := 24600  # UDP: listen on the first free of DISCO_PORT .. +9, announce to all ten
@@ -26,6 +31,12 @@ var udp_port := 0   # our discovery port (0 = not listening)
 var nearby: Dictionary = {}  # announcer id -> {name, player, port, theme, ip, seen (s)}
 var visit_map: ParkMap  # mirror of the park we are visiting (null when home)
 var visit_sim: ParkSim  # only ever written from the wire, never stepped
+var visit_ledger := {}  # sim.sent_by(us) in the park we visit, for the Send panel
+var seq := 0            # host: ledger messages ever sent (saved, so a restart never reuses a number)
+var got := {}           # visitor: host player -> {seq, owed} last applied (saved)
+var _names := {}        # host: visitor peer -> its player name (from hello)
+var _told := {}         # host: visitor peer -> the [owed, blueprints, inside] last sent to it
+var _hello := false
 var _id := ""
 var _time := 0.0
 var _announce_in := 0.0
@@ -63,7 +74,10 @@ func start() -> void:
 	_host.peer_connected.connect(func(peer: int) -> void:
 		_visitors += 1
 		_send(_host, peer, _map_msg()))
-	_host.peer_disconnected.connect(func(_peer: int) -> void: _visitors -= 1)
+	_host.peer_disconnected.connect(func(peer: int) -> void:
+		_visitors -= 1
+		_names.erase(peer)  # their people stay in the park; the ledger waits for the next visit
+		_told.erase(peer))
 	for p in range(DISCO_PORT, DISCO_PORT + DISCO_PORTS):
 		if _udp.bind(p) == OK:
 			udp_port = p
@@ -76,7 +90,11 @@ func poll(delta: float) -> void:
 	if port > 0:
 		_host.poll()
 		while _host.get_available_packet_count() > 0:
-			_host.get_packet()  # ponytail: visitors are read-only for now (NET1 sends people)
+			var from := _host.get_packet_peer()
+			var m: Variant = bytes_to_var(_host.get_packet())
+			if m is Dictionary:
+				_hear(from, m)
+		_tell()
 	_listen()
 	_announce_in -= delta
 	if _announce_in <= 0.0:
@@ -132,12 +150,31 @@ func join(ip: String, game_port: int) -> bool:
 		return false
 	visit_map = ParkMap.new()
 	visit_sim = ParkSim.new(visit_map, 0)
+	visit_ledger = {"guests": 0, "hidden": 0, "wanted": 0, "earned": 0, "fines": 0}
 	return true
+
+## Send one person of `kind` into the park we visit (the caller pays). False until the host has heard our hello.
+func send_person(kind: String) -> bool:
+	if not _hello:
+		return false
+	_send(_client, 1, {"t": "send", "kind": kind})
+	return true
+
+## What the save keeps of us: our name (the sender id in other parks), the host seq and what we were paid.
+func state() -> Dictionary:
+	return {"player": player, "seq": seq, "got": got}
+
+## Before start(): pick up a saved state().
+func load_state(d: Dictionary) -> void:
+	player = str(d.get("player", ""))
+	seq = int(d.get("seq", 0))
+	got = d.get("got", {})
 
 func leave() -> void:
 	if _client:
 		_client.close()
 	_client = null
+	_hello = false
 	visit_map = null
 	visit_sim = null
 
@@ -150,6 +187,9 @@ func _poll_client() -> void:
 		leave()
 		lost.emit()
 		return
+	if status == MultiplayerPeer.CONNECTION_CONNECTED and not _hello:
+		_hello = true
+		_send(_client, 1, {"t": "hello", "player": player})
 	while _client and _client.get_available_packet_count() > 0:
 		var m: Variant = bytes_to_var(_client.get_packet())
 		if m is Dictionary:
@@ -166,18 +206,47 @@ func _send(peer: ENetMultiplayerPeer, to: int, msg: Dictionary) -> void:
 func _map_msg() -> Dictionary:
 	return {"t": "map", "map": {"buildings": map.buildings, "levels": map.levels, "rotations": map.rotations}}
 
-## Only what the views draw: guests [id, kind, pos, state, mood, wanted], staff [kind, pos, walking].
+## Only what the views draw: guests [id, kind, pos, state, mood, wanted], staff [kind, pos, walking, level].
 func _live_msg() -> Dictionary:
 	var robbed := sim.events.filter(func(e: Dictionary) -> bool:
 		return e["kind"] == "robbed" and sim.tick - e["tick"] < ParkSim.ROBBED_TICKS)
 	return {"t": "live", "tick": sim.tick,
 		"guests": sim.guests.map(func(g: Dictionary) -> Array:
 			return [g["id"], g["kind"], g["pos"], g["state"], snappedf(g["mood"], 1.0), g["wanted"]]),
-		"staff": sim.staff.map(func(s: Dictionary) -> Array: return [s["kind"], s["pos"], not s["path"].is_empty()]),
+		"staff": sim.staff.map(func(s: Dictionary) -> Array: return [s["kind"], s["pos"], not s["path"].is_empty(), s["level"]]),
 		"builders": sim.builders, "jobs": sim.jobs, "litter": sim.litter, "closed": sim.closed, "events": robbed}
 
+## Host: a message from visitor `peer`.
+func _hear(peer: int, m: Dictionary) -> void:
+	if m.get("t") == "hello":
+		_names[peer] = str(m.get("player", ""))
+	elif m.get("t") == "send" and _names.has(peer) and sim and m.get("kind") in ParkSim.KINDS:
+		sim.send(m["kind"], _names[peer])
+
+## Host: each visitor whose ledger entry (or people inside) changed gets its new totals.
+func _tell() -> void:
+	if not sim:
+		return
+	for peer: int in _names:
+		var who: String = _names[peer]
+		var now := [sim.ledger.get(who, 0), sim.blueprints.get(who, []), sim.sent_by(who)]
+		if _told.get(peer) == now:
+			continue
+		_told[peer] = now
+		seq += 1
+		_send(_host, peer, {"t": "ledger", "from": player, "seq": seq, "owed": now[0], "blueprints": now[1], "inside": now[2]})
+
 func _apply(m: Dictionary) -> void:
-	if m.get("t") == "map":
+	if m.get("t") == "ledger":
+		var last: Dictionary = got.get(m["from"], {"seq": 0, "owed": 0})
+		if m["seq"] <= last["seq"]:
+			return  # a replay, or older than what we applied
+		if sim:
+			sim.money += m["owed"] - last["owed"]
+		got[m["from"]] = {"seq": m["seq"], "owed": m["owed"]}
+		visit_ledger = m["inside"]
+		stolen.emit(m["blueprints"])
+	elif m.get("t") == "map":
 		var d: Dictionary = m["map"]
 		visit_map.buildings.clear()
 		visit_map.occupied.clear()
@@ -199,7 +268,7 @@ func _apply(m: Dictionary) -> void:
 			return {"id": a[0], "kind": a[1], "pos": a[2], "cell": Vector2i(a[2].round()), "state": a[3], "mood": a[4],
 				"wanted": a[5], "sender": ""}))
 		s.staff.assign(m["staff"].map(func(a: Array) -> Dictionary:
-			return {"kind": a[0], "pos": a[1], "cell": Vector2i(a[1].round()), "path": [0] if a[2] else []}))
+			return {"kind": a[0], "pos": a[1], "cell": Vector2i(a[1].round()), "path": [0] if a[2] else [], "level": a[3]}))
 		s.builders.assign(m["builders"])
 		s.jobs.assign(m["jobs"])
 		s.litter = m["litter"]
