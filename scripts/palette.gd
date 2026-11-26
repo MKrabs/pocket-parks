@@ -14,6 +14,8 @@ const STONE := Color("#D3CCC0")     # rock, walls
 const BUTTER := Color("#EDD898")    # highlight, money
 const CORAL := Color("#E9A99C")     # warnings, invalid placement
 const SKY := Color("#B9CFE6")       # selection, hover
+const CLOUD := Color("#FBF7EF")     # cloud puffs (warm off-white)
+const CLOUD_SHADOW := Color("#E7DFD3")  # underside of a puff
 
 ## Faces of an extruded iso shape: top is the base colour, sides get darker.
 static func shade(c: Color, amount: float) -> Color:

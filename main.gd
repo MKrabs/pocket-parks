@@ -27,6 +27,7 @@ var debug_visit := false  # tests/show_visit.gd: start inside a visit with a few
 var pins := PinView.new()
 var toasts := CrimeToasts.new()
 var cam := IsoCamera.new()
+var transition := CloudTransition.new()
 var accusing := false
 var bots := true  # bot friends send groups into your park (tests switch them off)
 var _acc := 0.0  # sim ticks owed
@@ -74,10 +75,11 @@ func _ready() -> void:
 	offers = Visit.offers(rng)
 	hud.visit_pressed.connect(func() -> void: visit_panel.open(offers))
 	add_child(hud)
-	visit_panel.picked.connect(visit)
+	visit_panel.picked.connect(travel_to)
 	visit_panel.sent.connect(send)
-	visit_panel.home.connect(go_home)
+	visit_panel.home.connect(travel_home)
 	add_child(visit_panel)
+	add_child(transition)
 	toasts.clicked.connect(func(o: Vector2i) -> void: cam.position = IsoGrid.to_screen(o))
 	add_child(toasts)
 
@@ -124,6 +126,14 @@ func step_world() -> void:
 		var t := vs.sent_by(Visit.ME)
 		if not (visiting and v == visits[0]) and t["guests"] + t["hidden"] + t["wanted"] == 0:
 			visits.erase(v)  # left behind and nobody of ours is inside any more
+
+## visit() behind the cloud transition (the swap happens at full cover).
+func travel_to(offer: Dictionary) -> Tween:
+	return transition.play(cam, offer["name"], visit.bind(offer), true)
+
+## go_home() behind the cloud transition, clouds rolling the other way.
+func travel_home() -> Tween:
+	return transition.play(cam, "Home", go_home, false)
 
 ## Swap the view to the offer's park (reusing its sim if we were already there).
 func visit(offer: Dictionary) -> void:
