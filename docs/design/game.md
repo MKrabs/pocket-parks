@@ -100,31 +100,37 @@ below. Bottom centre: build bar with category tabs (Paths, Attractions, Shops, D
 round Visit button. Bottom-left: pause / play / fast. Right side: the info card for whatever is selected
 (building or person). Actions such as Upgrade, Repair, Demolish, Rotate and Accuse live in the cards, not in the bar.
 
-## Roadmap (owner wishlist 2026-11-26, grouped by what each depends on)
-Only the next milestone gets detailed tickets. Later ones stay one-liners until it's done.
+## Visiting in person, limits and the blacklist (Decided by owner 2026-11-27; numbers are Defaults)
+- **You can visit in person** (your character, M5). You can just walk around and interact, or do mischief
+  yourself, with the same crimes as the actors.
+- **Caught fair and square** (a guard saw you strike, or the host accused you after a crime) puts you on that
+  park's **blacklist**:
+  - you can't enter that park in person any more;
+  - sending people there costs more (×2), and fewer people take the job: your send limit for that park is halved.
+- A wrongful accusation never blacklists anyone. It still pays the sender, as today.
+- **Send limit:** how many of your people can be inside one park at once. Default: 3 + your park level, halved while
+  you're blacklisted there. Other conditions can be added later.
+- Open: does a blacklist last forever, until the host lifts it, or for a number of days?
 
-**M3 Depth (single player, next).** Each item is independent.
-- Building upgrades: levels 1–3 per building, more appeal/capacity/price, visible on the model (extra tier, flag, trim).
-- Staff levels: janitors clean faster and see further; guards move faster, catch from further away, and spot hidden bad actors sooner. Paid upgrade.
-- Expandable map: start smaller (about 12×12), buy a few adjacent plots up to about 20×20. "Not by too much."
-- Cinema theme (third pack): ticket booth entrance, screens (attractions), popcorn stand (shop), posters/plants (decor).
-- Staff levels also make guards better at spotting hidden bad actors.
-- Damaged building models: a wrecked or vandalised variant of each building, shown while it needs repair.
+## Roadmap (updated 2026-11-27)
+**Done:** M3 depth (building levels, staff levels, plots, cinema theme, damaged models, builders and specialties,
+park level), M4 local network (discovery, live visits, join by address, saving), M6 sending over the network.
 
-**M4 Local network foundation.** See Decided: networking, below.
-- Each game hosts its own park on the local network; a "Parks nearby" list (UDP broadcast discovery).
-- Identity-lite: a name and a colour.
-- Visit a nearby park live: connect to its owner's game and watch its real day.
+**Next, in order**
+1. **Owner's two-machine test** (GATE4).
+2. **M5 Live social:** your character in the park you visit (walk, interact, mischief in person), presence (who is
+   in your park, who else is where you are), chat (speech bubbles plus a log), identity (choose a name and colour),
+   send limits and the blacklist (above).
+3. **Polish:** the owner's small details, plus: land ownership contrast, the aviary dome, builders using paths, people
+   inside at day end settle instead of vanishing, plot card highlight, a proper toast for a lost connection,
+   in-park markers and pins during live visits, smoother movement in live visits.
+4. **Animals:** enclosures, the aviary and the water tank get animals (ahead of new themes).
+5. **Themes:** amusement park (rollercoasters), conference with booths, the food festival in full.
 
-**M5 Live social** (needs M4)
-- Your own character: walk around the park you're visiting, alongside the guests.
-- Presence: see who is visiting your park right now, and who else is in the park you are visiting.
-- Chat through your character: speech bubbles over it, plus a small log.
-
-**M6 Sending people over the network** (needs M4): the Send mechanic above, between real players.
-Rules to settle then: limits per visit, so nobody gets farmed.
-
-**Later themes:** amusement park, conference, food festival in full.
+**Parked**
+- Lending builders between friends. Edge cases: a dropped connection or a player leaving mid-job. Revisit with a design
+  where the builder never leaves the owner's save (a contract the host runs, paid per finished job).
+- Builder XP and training. Roguelike runs, meta progression, leagues and likes. Sound.
 
 ## Decided: networking (2026-11-26)
 **Peer-to-peer on the local network, no server.** Each player's game is the authority for its own park:
@@ -134,7 +140,3 @@ park I'm visiting"). **Parks whose owner is offline, or on another network, are 
 accepted, not a problem to solve.** Friends elsewhere can join a shared virtual network (e.g. Tailscale);
 that's their setup, not a feature. Cheating isn't a concern (friends only).
 Would reverse it: the game is meant for players who don't know each other.
-
-## Parked
-Roguelike run structure. Meta progression. Saving your own park to disk (small; becomes needed in M4, since your park must survive a restart).
-Sound. Leagues and likes.
