@@ -71,6 +71,35 @@ while, and janitors clean the litter.
 **Both directions:** bot visitors also send mixed groups into *your* park, so defending (guards,
 catching, collecting fines) is playable solo.
 
+## Building (Decided by owner 2026-11-26; numbers are Defaults)
+- **Placing:** a neutral **Select** mode is the default. A build item turns on place mode with a preview; Esc,
+  right-click or the same button again cancels. **R** rotates before placing. Paths and trees stay active for painting;
+  other buildings return to Select after one placement (Shift keeps placing).
+- **Construction and upgrades take time** (game time, since the park only runs while the game is open). The site
+  shows a scaffold and a progress ring and is closed until done. Path instant, tree 5 s, shop 20 s, pond 40 s,
+  enclosure 60 s; upgrades ×1.5 (Lv 2) / ×2.5 (Lv 3). Money is still paid up front.
+- **Builders do the work.** A **builder shed** houses exactly one builder; more sheds mean more parallel jobs. The first
+  shed and builder are free. A job needs a free builder, who walks to the site (a bean with a hard hat).
+- **Specialties:** every builder builds all normal buildings at speed 1. A builder can pick **one specialty**
+  (a **second** at a higher park level). For simplicity, **all specialties are available**: no XP or training for now.
+  Buildings in a specialty are either *specialist-only* (only that specialist can build or upgrade them) or
+  *faster with a specialist* (anyone at 1×, the specialist at 2×). The UI only shows specialties a builder can
+  choose or already has, never locked ones.
+  Zoo specialties: **Landscaper** (trees, hedges, gardens), **Water** (ponds, fountains, water-tank enclosure),
+  **Aviary** (bird enclosures), **Heavy** (reinforced enclosures, stone), **Carpenter** (stalls, fences, decks).
+- **Lending builders** (needs networking): a friend requests one of your builders, and **the owner sets the price**.
+  The builder works in their park. Parked until M4.
+
+## Park level (Decided)
+Guests served and happiness fill an XP ring. Each park level unlocks things: more builder sheds, a higher
+maximum building level, the second specialty, later map plots and themes. One progression thread.
+
+## Screen layout (Default)
+Top-left: park name, level with its XP ring, a thin day bar. Top-right: money, guests, mood face; crime toasts
+below. Bottom centre: build bar with category tabs (Paths, Attractions, Shops, Decor, Staff). Bottom-right: a big
+round Visit button. Bottom-left: pause / play / fast. Right side: the info card for whatever is selected
+(building or person). Actions such as Upgrade, Repair, Demolish, Rotate and Accuse live in the cards, not in the bar.
+
 ## Roadmap (owner wishlist 2026-11-26, grouped by what each depends on)
 Only the next milestone gets detailed tickets. Later ones stay one-liners until it's done.
 
