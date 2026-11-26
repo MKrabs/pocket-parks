@@ -2,8 +2,6 @@ class_name Hud
 extends CanvasLayer
 # Top bar over the running day: clock, money, guests, happiness, speed, hiring. End-of-day card.
 
-signal raid_pressed
-
 var sim: ParkSim
 var speed := 1  # sim steps per tick of game time; 0 = paused
 var day := 1
@@ -50,11 +48,6 @@ func _ready() -> void:
 		row.add_child(b)
 	for kind: String in ParkSim.STAFF:
 		row.add_child(_button("Hire %s\n$%d" % [kind, ParkSim.STAFF[kind]["hire"]], func() -> void: sim.hire(kind)))
-	var raid := _button("Raid", raid_pressed.emit)
-	raid.add_theme_stylebox_override("normal", BuildBar.box(Palette.CORAL))
-	raid.add_theme_stylebox_override("hover", BuildBar.box(Palette.shade(Palette.CORAL, 0.04)))
-	raid.custom_minimum_size = Vector2(64, 0)
-	row.add_child(raid)
 	add_child(bar)
 	bar.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP, Control.PRESET_MODE_MINSIZE, 16)
 	bar.grow_horizontal = Control.GROW_DIRECTION_BOTH

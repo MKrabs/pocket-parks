@@ -4,7 +4,7 @@ extends Node2D
 
 var id: String
 var origin := Vector2i.ZERO
-var wrecked := false:  # closed by a raider: drawn grey and tilted
+var wrecked := false:  # wrecked by a hooligan: drawn grey and tilted
 	set(w):
 		wrecked = w
 		rotation = 0.18 if w else 0.0

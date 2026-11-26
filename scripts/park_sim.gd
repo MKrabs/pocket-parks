@@ -17,31 +17,36 @@ const VISIT_TICKS := {"attraction": 40, "shop": 15}
 const LITTER_CHANCE := 0.3
 const QUEUE_GIVE_UP := 100  # ticks
 const UNHAPPY := 20.0
-# Raids (docs/design/game.md → Raids). Speeds: guest < raider < guard.
-const RAID_TICKS := 60 * TPS
-const RAIDER_SPEED := 0.25
+# Sending people (docs/design/game.md → Sending people). Bad actors are guests with a kind other than "guest".
 const GUARD_SPEED := 0.3
-const RAIDER_GAP := 5          # ticks between raiders entering
 const CATCH_PAUSE := 2 * TPS
-const RAIDER_WORK := {"hooligan": 3 * TPS, "thief": 4 * TPS, "spy": 5 * TPS}
-const LITTER_EVERY := TPS
-const THEFT_SHARE := 0.2       # thieves take this share of the target's money
+const GUARD_SIGHT := 3.0
+const SEND_GAP := 5            # ticks between sent people entering at the gate
+const GUEST_SHARE := 0.2       # sent guests pay their sender this share of what they spend
+const STRIKE_TICKS := 3 * TPS
+const STAY := [0.8, 0.55, 0.3, 0.1]  # stay chance after 1, 2, 3, 4 crimes; then 0
+const WRECK_TICKS := 45 * TPS
+const REPAIR_SHARE := 0.25
+const THEFT_SHARE := 0.15
+const THEFT_CAP := 60
+const BASE_FINE := {"hooligan": 40, "litterbug": 30, "thief": 50, "spy": 60}
+const WRONGFUL_FINE := 40
+const ROBBED_TICKS := 20 * TPS
+const KINDS := ["guest", "hooligan", "litterbug", "thief", "spy"]
 
 var money: int
 var tick := 0
-var guests: Array[Dictionary] = []  # walker + mood (0-100), state: walk|queue|visit|leave
+var guests: Array[Dictionary] = []  # walker + mood (0-100), state: walk|queue|visit|strike|leave; sender, spent, crimes, loot, wanted
 var staff: Array[Dictionary] = []   # walker + kind
 var litter: Dictionary = {}         # path cell -> true
-var closed: Dictionary = {}         # building origin -> true (R1: wrecked by raiders)
+var closed: Dictionary = {}         # wrecked building origin -> tick it reopens
 var income := 0
 var served := 0   # guests who finished at least one visit
 var spawned := 0
-var raiders: Array[Dictionary] = []  # walker + state: go|work|roam|escape, wait, loot, target
-var raiding := false
-var _raid_queue: Array[String] = []
-var _raid_end := 0
-var _raid_litter: Dictionary = {}
-var _raid := {}
+var events: Array = []              # crimes: {tick, kind, origin, amount, witnessed}; never who
+var ledger: Dictionary = {}         # sender -> money owed to it (negative: it owes the host)
+var blueprints: Dictionary = {}     # sender -> Array of building ids its spies brought home
+var _gate: Array = []               # [kind, sender] waiting to enter
 
 var _rng := RandomNumberGenerator.new()
 var _astar := AStarGrid2D.new()
@@ -100,6 +105,7 @@ func new_day() -> void:
 	_wages = 0
 	guests.clear()
 	litter.clear()
+	closed.clear()  # reopen ticks count from the old day's clock
 	for t in _targets:
 		t["inside"] = 0
 	if _entrance.x >= 0:
@@ -165,6 +171,12 @@ func step() -> void:
 	if tick >= DAY_TICKS:
 		return
 	tick += 1
+	for o: Vector2i in closed.keys():
+		if closed[o] <= tick:
+			closed.erase(o)
+	if not _gate.is_empty() and tick % SEND_GAP == 0 and _entrance.x >= 0:
+		var p: Array = _gate.pop_front()
+		_spawn(p[0], p[1])
 	if guests.size() < MAX_GUESTS and _rng.randf() < _appeal * SPAWN_PER_APPEAL:
 		_spawn()
 	var stay: Array[Dictionary] = []
@@ -172,13 +184,12 @@ func step() -> void:
 		if _step_guest(g):
 			_gone_mood += g["mood"]
 			_gone += 1
+			_settle(g)
 		else:
 			stay.append(g)
 	guests = stay
 	for s in staff:
 		_step_staff(s)
-	if raiding:
-		_step_raid()
 	if tick == DAY_TICKS:
 		for s in staff:
 			_wages += STAFF[s["kind"]]["wage"]
@@ -206,14 +217,34 @@ func hire(kind: String) -> bool:
 func _walker(kind: String) -> Dictionary:
 	return {"kind": kind, "cell": _entrance, "pos": Vector2(_entrance), "path": []}
 
-func _spawn() -> void:
-	var g := _walker("guest")
-	g.merge({"id": spawned, "mood": 50.0, "state": "walk", "target": -1, "visits": 0, "wants": _rng.randi_range(2, 4), "wait": 0, "litter_in": 0})
+## A person sent by `sender` joins the gate queue and enters like a guest. kind: one of KINDS.
+func send(kind: String, sender: String) -> void:
+	assert(kind in KINDS, "unknown kind " + kind)
+	_gate.append([kind, sender])
+
+func _spawn(kind := "guest", sender := "") -> void:
+	var g := _walker(kind)
+	# ponytail: actors never stop for "wants"; they leave by the stay table (or by mood)
+	g.merge({"id": spawned, "mood": 50.0, "state": "walk", "target": -1, "visits": 0, "wait": 0, "litter_in": 0,
+		"wants": _rng.randi_range(2, 4) if kind == "guest" else 1 << 20,
+		"sender": sender, "spent": ENTRY_FEE, "crimes": 0, "loot": 0, "spied": [], "wanted": false, "event": {}})
 	guests.append(g)
 	spawned += 1
 	money += ENTRY_FEE
 	income += ENTRY_FEE
 	_pick(g)
+
+## Left through the gate: the sender gets its guest share, or the actor's loot and blueprints.
+## ponytail: people still inside at new_day() are dropped without settling.
+func _settle(g: Dictionary) -> void:
+	var sender: String = g["sender"]
+	if sender == "":
+		return
+	var owed: int = int(g["spent"] * GUEST_SHARE) if g["kind"] == "guest" else g["loot"]
+	money -= owed if g["kind"] == "guest" else 0  # loot already left the host's money at the theft
+	ledger[sender] = ledger.get(sender, 0) + owed
+	if not g["spied"].is_empty():
+		blueprints[sender] = blueprints.get(sender, []) + g["spied"]
 
 func _go(w: Dictionary, to: Vector2i) -> void:
 	var p := _astar.get_id_path(w["cell"], to)
@@ -256,6 +287,10 @@ func _step_guest(g: Dictionary) -> bool:
 			g["wait"] -= 1
 			if g["wait"] <= 0:
 				_finish(g)
+		"strike":
+			g["wait"] -= 1
+			if g["wait"] <= 0:
+				_hide(g)
 		"leave":
 			if _walk(g, GUEST_SPEED):
 				return true
@@ -317,13 +352,16 @@ func _finish(g: Dictionary) -> void:
 	if t["role"] == "shop":
 		money += t["price"]
 		income += t["price"]
+		g["spent"] += t["price"]
 		g["mood"] += 5
 		if _rng.randf() < LITTER_CHANCE:
 			g["litter_in"] = _rng.randi_range(5, 40)  # dropped a few steps down the path
 	else:
 		g["mood"] += t["appeal"] * 1.5
 	g["mood"] = minf(g["mood"], 100.0)
-	if g["visits"] >= g["wants"] or g["mood"] < UNHAPPY:
+	if g["kind"] != "guest" and (g["kind"] != "thief" or t["role"] == "shop"):
+		_strike(g, t)
+	elif g["visits"] >= g["wants"] or g["mood"] < UNHAPPY:
 		_leave(g)
 	else:
 		_pick(g)
@@ -332,15 +370,141 @@ func _leave(g: Dictionary) -> void:
 	g["state"] = "leave"
 	_go(g, _entrance)
 
-func _step_staff(s: Dictionary) -> void:
-	if s["kind"] == "guard" and s.get("pause", 0) > 0:
+## The actor does its crime at the building it just visited, exposed for STRIKE_TICKS.
+func _strike(g: Dictionary, t: Dictionary) -> void:
+	g["state"] = "strike"
+	g["wait"] = STRIKE_TICKS
+	g["crimes"] += 1
+	var origin: Vector2i = t["origin"]
+	var e := {"tick": tick, "kind": "", "origin": origin, "amount": 0, "witnessed": false}
+	match g["kind"]:
+		"hooligan":
+			e["kind"] = "wrecked"
+			closed[origin] = tick + WRECK_TICKS
+		"litterbug":
+			e["kind"] = "littered"
+			var spots: Array[Vector2i] = []
+			for c in ParkMap.footprint(t["id"], origin):
+				for dx in range(-1, 2):
+					for dy in range(-1, 2):
+						var n := c + Vector2i(dx, dy)
+						if n in _paths and not litter.has(n) and not n in spots:
+							spots.append(n)
+			for i in mini(_rng.randi_range(2, 4), spots.size()):
+				litter[spots.pop_at(_rng.randi() % spots.size())] = true
+				e["amount"] += 1
+		"thief":
+			e["kind"] = "robbed"
+			e["amount"] = mini(int(money * THEFT_SHARE), THEFT_CAP)
+			money -= e["amount"]
+			g["loot"] += e["amount"]
+		"spy":
+			e["kind"] = "spied"
+			g["spied"].append(t["id"])
+	g["event"] = e
+	events.append(e)
+
+## Back in the crowd; press its luck for another round, or head for the gate.
+func _hide(g: Dictionary) -> void:
+	var c: int = g["crimes"]
+	if c <= STAY.size() and _rng.randf() < STAY[c - 1]:
+		_pick(g)
+	else:
+		_leave(g)
+
+## Repair a wrecked building now for REPAIR_SHARE of its cost. False if not wrecked or too poor.
+func repair(origin: Vector2i) -> bool:
+	if not closed.has(origin):
+		return false
+	var cost := _repair_cost(origin)
+	if money < cost:
+		return false
+	money -= cost
+	closed.erase(origin)
+	return true
+
+func _repair_cost(origin: Vector2i) -> int:
+	for t in _targets:
+		if t["origin"] == origin:
+			return int(Buildings.get_def(t["id"])["cost"] * REPAIR_SHARE)
+	return 0
+
+## Pin states for a building: wrecked, littered (litter within 1 tile of the footprint), robbed (last 20 s).
+func building_status(origin: Vector2i) -> Array[String]:
+	var out: Array[String] = []
+	if closed.has(origin):
+		out.append("wrecked")
+	for t in _targets:
+		if t["origin"] != origin:
+			continue
+		for c in ParkMap.footprint(t["id"], origin):
+			for dx in range(-1, 2):
+				for dy in range(-1, 2):
+					if litter.has(c + Vector2i(dx, dy)) and not "littered" in out:
+						out.append("littered")
+	for e: Dictionary in events:
+		if e["kind"] == "robbed" and e["origin"] == origin and tick - e["tick"] < ROBBED_TICKS:
+			out.append("robbed")
+			break
+	return out
+
+## The host's manual arrest. An actor with crimes is fined; anyone else is a wrongful arrest the host pays for.
+## Returns {} for an unknown id, else {wrongful, fine, loot} (plus kind when it was a real catch).
+func accuse(person_id: int) -> Dictionary:
+	for g in guests:
+		if g["id"] != person_id:
+			continue
+		if g["crimes"] > 0:
+			return _arrest(g)
+		money -= WRONGFUL_FINE
+		if g["sender"] != "":
+			ledger[g["sender"]] = ledger.get(g["sender"], 0) + WRONGFUL_FINE
+		if g["state"] == "visit":
+			_targets[g["target"]]["inside"] -= 1
+		_leave(g)
+		return {"wrongful": true, "fine": WRONGFUL_FINE, "loot": 0}
+	return {}
+
+## Caught with evidence: the sender is fined BASE_FINE × crimes, the loot goes back to the host.
+func _arrest(g: Dictionary) -> Dictionary:
+	var fine: int = BASE_FINE[g["kind"]] * g["crimes"]
+	money += fine + g["loot"]
+	if g["sender"] != "":
+		ledger[g["sender"]] = ledger.get(g["sender"], 0) - fine
+	if g["state"] == "visit":
+		_targets[g["target"]]["inside"] -= 1
+	guests.erase(g)
+	return {"wrongful": false, "fine": fine, "loot": g["loot"], "kind": g["kind"]}
+
+## Guards mark strikers within sight as wanted, chase the nearest wanted actor and catch it within 1 tile.
+func _step_guard(s: Dictionary) -> void:
+	if s.get("pause", 0) > 0:
 		s["pause"] -= 1
 		return
-	if not _walk(s, GUARD_SPEED if s["kind"] == "guard" else STAFF_SPEED):
-		return
+	var best: Dictionary = {}
+	var best_d := INF
+	for g in guests:
+		var d: float = s["pos"].distance_to(g["pos"])
+		if g["state"] == "strike" and d <= GUARD_SIGHT:
+			g["wanted"] = true
+			g["event"]["witnessed"] = true
+		if g["wanted"] and d < best_d:
+			best = g
+			best_d = d
+	if not best.is_empty() and (s["path"].is_empty() or tick % 5 == 0):
+		_go(s, best["cell"])
+	if _walk(s, GUARD_SPEED) and best.is_empty() and not _paths.is_empty():
+		_go(s, _paths[_rng.randi() % _paths.size()])
+	if not best.is_empty() and s["pos"].distance_to(best["pos"]) <= 1.0:
+		_arrest(best)
+		s["pause"] = CATCH_PAUSE
+		s["path"] = []
+
+func _step_staff(s: Dictionary) -> void:
 	if s["kind"] == "guard":
-		if not _paths.is_empty():
-			_go(s, _paths[_rng.randi() % _paths.size()])
+		_step_guard(s)
+		return
+	if not _walk(s, STAFF_SPEED):
 		return
 	litter.erase(s["cell"])
 	# ponytail: nearest by grid distance, not walk distance; fine on a 16x16 park
@@ -353,128 +517,3 @@ func _step_staff(s: Dictionary) -> void:
 			best_d = d
 	if best.x >= 0:
 		_go(s, best)
-
-## Raiders (hooligan, litterbug, thief, spy) enter at the entrance one by one. Ends after 60 s or when none are left.
-func start_raid(squad: Array[String]) -> void:
-	if _entrance.x < 0:
-		return
-	raiding = true
-	raiders.clear()
-	_raid_queue = squad.duplicate()
-	_raid_end = tick + RAID_TICKS
-	_raid = {"stolen_money": 0, "blueprints": [] as Array[String], "wrecked": 0, "end_happiness": -1.0}
-
-func raid_result() -> Dictionary:
-	var r := _raid.duplicate()
-	if r["end_happiness"] < 0.0:
-		r["end_happiness"] = _happiness_now()
-	r["stars"] = [r["wrecked"] > 0, r["stolen_money"] > 0 or not r["blueprints"].is_empty(),
-		r["end_happiness"] < 50.0] as Array[bool]
-	return r
-
-## Undo the temporary damage: wrecked buildings reopen, raid litter goes.
-func end_raid() -> void:
-	if raiding:
-		_finish_raid()
-	closed.clear()
-	for c: Vector2i in _raid_litter:
-		litter.erase(c)
-	_raid_litter.clear()
-
-func _happiness_now() -> float:
-	if guests.is_empty():
-		return day_report()["happiness"]
-	var m := 0.0
-	for g in guests:
-		m += g["mood"]
-	return m / guests.size()
-
-func _finish_raid() -> void:
-	raiding = false
-	raiders.clear()
-	_raid_queue.clear()
-	_raid["end_happiness"] = _happiness_now()
-
-func _step_raid() -> void:
-	if not _raid_queue.is_empty() and (_raid_end - RAID_TICKS - tick) % RAIDER_GAP == 0:
-		var r := _walker(_raid_queue.pop_front())
-		r.merge({"state": "go", "wait": 0, "loot": 0, "target": -1})
-		raiders.append(r)
-		_raider_next(r)
-	var out: Array[Dictionary] = []
-	for r in raiders:
-		if _step_raider(r):
-			out.append(r)
-	for s in staff:
-		if s["kind"] != "guard" or s.get("pause", 0) > 0:
-			continue
-		for r in raiders:
-			if not r in out and s["pos"].distance_to(r["pos"]) <= 1.0:
-				out.append(r)
-				s["pause"] = CATCH_PAUSE
-				break
-	raiders = raiders.filter(func(r: Dictionary) -> bool: return not r in out)
-	if tick >= _raid_end or (raiders.is_empty() and _raid_queue.is_empty()):
-		_finish_raid()
-
-## Picks the raider's next job: hooligans any open attraction/shop, thieves a shop, spies the top-appeal building.
-func _raider_next(r: Dictionary) -> void:
-	var kind: String = r["kind"]
-	if kind == "litterbug":
-		r["state"] = "roam"
-		if not _paths.is_empty():
-			_go(r, _paths[_rng.randi() % _paths.size()])
-		return
-	var pick: Array[int] = []
-	for i in _targets.size():
-		var t := _targets[i]
-		if kind == "hooligan" and not closed.has(t["origin"]) or kind == "thief" and t["role"] == "shop":
-			pick.append(i)
-		elif kind == "spy" and (pick.is_empty() or Buildings.get_def(t["id"]).get("appeal", 0) > Buildings.get_def(_targets[pick[0]]["id"]).get("appeal", 0)):
-			pick = [i]
-	if pick.is_empty():
-		r["state"] = "escape"
-		_go(r, _entrance)
-		return
-	r["target"] = pick[_rng.randi() % pick.size()]
-	r["state"] = "go"
-	_go(r, _targets[r["target"]]["door"])
-
-## True when the raider leaves the park (escaped with loot or gave up).
-func _step_raider(r: Dictionary) -> bool:
-	match r["state"]:
-		"go":
-			if _walk(r, RAIDER_SPEED):
-				r["state"] = "work"
-				r["wait"] = RAIDER_WORK[r["kind"]]
-		"work":
-			r["wait"] -= 1
-			if r["wait"] > 0:
-				return false
-			var t: Dictionary = _targets[r["target"]]
-			if r["kind"] == "hooligan":
-				if not closed.has(t["origin"]):
-					closed[t["origin"]] = true
-					_raid["wrecked"] += 1
-				_raider_next(r)
-			else:
-				if r["kind"] == "thief":
-					r["loot"] = int(money * THEFT_SHARE)
-				r["state"] = "escape"
-				_go(r, _entrance)
-		"roam":
-			if tick % LITTER_EVERY == 0 and r["cell"] != _entrance and not litter.has(r["cell"]):
-				litter[r["cell"]] = true
-				_raid_litter[r["cell"]] = true
-			if _walk(r, RAIDER_SPEED):
-				_raider_next(r)
-		"escape":
-			if _walk(r, RAIDER_SPEED):
-				if r["kind"] == "thief":
-					var m := mini(r["loot"], money)
-					money -= m
-					_raid["stolen_money"] += m
-				elif r["kind"] == "spy" and r["target"] >= 0:
-					_raid["blueprints"].append(_targets[r["target"]]["id"])
-				return true
-	return false
