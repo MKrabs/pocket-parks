@@ -12,6 +12,7 @@ const BOTS := ["Mia", "Theo"]
 const SEND_EVERY := 30 * ParkSim.TPS
 const PICK_RADIUS := 12.0  # screen px around a person for hover and click in Select mode
 const PAINT_ROLES := ["path", "decor"]  # stay in place mode after placing (paths, trees); others go back to Select
+const AUTOSAVE := 30 * ParkSim.TPS  # sim ticks between saves
 
 var grid := GridView.new()
 var bar := BuildBar.new()
@@ -38,6 +39,8 @@ var bots := true  # bot friends send groups into your park (tests switch them of
 var _acc := 0.0  # sim ticks owed
 var _reported := 0  # sim.events already toasted
 var _rng := RandomNumberGenerator.new()
+var save_path := ""  # set in _ready when this is the real game (not a test, not a ./gd shot)
+var _unsaved := 0  # sim ticks since the last save
 
 ## T cycles the active theme (zoo → festival → cinema); the build bar follows, placed buildings stay.
 ## Esc leaves place mode, or closes the card in Select mode.
@@ -54,6 +57,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		zoo.rotate_ghost(-1 if k.shift_pressed else 1)
 	elif k.physical_keycode == KEY_ESCAPE:
 		escape()
+	elif k.physical_keycode == KEY_F9:
+		hud.confirm_new_park()
 
 func escape() -> void:
 	if zoo.selected != "":
@@ -71,13 +76,16 @@ func _ready() -> void:
 	zoo.map.start_small()
 	grid.map = zoo.map
 	add_child(grid)
-	zoo.map.money = 1 << 30  # seed without running out
-	for s in SEED:
-		zoo.map.place(s[0], s[1])
-	for x in range(5, 16):
-		zoo.map.place("path", Vector2i(x, 11))
-	zoo.map.money = ParkMap.START_MONEY  # the seeded zoo is free
-	sim = ParkSim.new(zoo.map, 1)
+	if get_tree().current_scene == self and not OS.has_feature("movie"):
+		save_path = SaveGame.PATH
+	var saved := SaveGame.read(save_path) if save_path != "" else {}
+	if saved.is_empty():
+		_seed()
+	else:
+		Buildings.use(saved["theme"])
+		sim = SaveGame.restore(saved, zoo.map)
+		hud.day = saved["day"]
+		bar.stolen.assign(saved["stolen"].filter(func(id: Variant) -> bool: return id is String and not Buildings.get_def(id).is_empty()))
 	zoo.sim = sim
 	_rng.seed = 1
 	zoo.money_changed.connect(_on_map_changed)
@@ -116,6 +124,7 @@ func _ready() -> void:
 	rng.seed = 7
 	offers = Visit.offers(rng)
 	hud.visit_pressed.connect(func() -> void: visit_panel.open(offers, net.offers()))
+	hud.new_park.connect(new_park)
 	add_child(hud)
 	net.sim = sim
 	net.map = zoo.map
@@ -146,6 +155,33 @@ func _ready() -> void:
 		visit({"name": "Clover Fields", "theme": "festival", "seed": 7, "size": "small", "guards": 1})
 		for k: String in ["guest", "guest", "thief", "spy", "litterbug", "guest", "hooligan", "guest", "guest", "guest"]:
 			send(k)
+
+## The start park: seeded buildings, free.
+func _seed() -> void:
+	zoo.map.money = 1 << 30  # seed without running out
+	for s in SEED:
+		zoo.map.place(s[0], s[1])
+	for x in range(5, 16):
+		zoo.map.place("path", Vector2i(x, 11))
+	zoo.map.money = ParkMap.START_MONEY  # the seeded zoo is free
+	sim = ParkSim.new(zoo.map, 1)
+
+## Your park to disk (no-op in tests and shots).
+func save() -> void:
+	if save_path != "":
+		SaveGame.write(save_path, SaveGame.pack(zoo.map, sim, hud.day, bar.stolen))
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+		save()
+
+## F9, confirmed: forget the saved park and start over from the seeded one in the default theme.
+func new_park() -> void:
+	if save_path != "":
+		DirAccess.remove_absolute(save_path)
+	save_path = ""  # this instance must not save the old park on its way out
+	Buildings.use("zoo")
+	get_tree().reload_current_scene()
 
 func _process(delta: float) -> void:
 	_acc += delta * ParkSim.TPS
@@ -300,6 +336,10 @@ func advance(ticks: int) -> void:
 			for k in _rng.randi_range(0, 2):
 				kinds.append(ParkSim.KINDS[_rng.randi_range(1, ParkSim.KINDS.size() - 1)])
 			send_group(BOTS[_rng.randi() % BOTS.size()], kinds)
+	_unsaved += ticks
+	if _unsaved >= AUTOSAVE:
+		_unsaved = 0
+		save()
 	for e: Dictionary in sim.events.slice(_reported):
 		toasts.add(e["kind"], _report(e), e["origin"], e)
 	_reported = sim.events.size()
