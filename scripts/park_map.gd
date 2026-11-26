@@ -9,6 +9,10 @@ var buildings: Dictionary = {}  # origin cell (Vector2i) -> building id
 var occupied: Dictionary = {}   # every covered cell -> origin cell
 var levels: Dictionary = {}     # origin cell -> level 2..3 (absent = 1)
 var rotations: Dictionary = {}  # origin cell -> quarter turns 1..3 (absent = 0)
+var xp := 0                     # park XP (ParkLevel); the sim owns it while the day runs, like money
+
+func park_level() -> int:
+	return ParkLevel.of(xp)
 
 ## Footprint size after `rot` quarter turns (3x2 turned once is 2x3).
 static func size(id: String, rot := 0) -> Vector2i:
@@ -78,9 +82,15 @@ func upgrade_cost(origin: Vector2i) -> int:
 		return -1
 	return Buildings.get_def(buildings[origin])["cost"] * level(origin)
 
+## Park level the next upgrade waits for, or 0 if the park level already allows it.
+func upgrade_needs(origin: Vector2i) -> int:
+	if level(origin) < ParkLevel.cap("building_level", park_level()):
+		return 0
+	return ParkLevel.needed("building_level", level(origin) + 1)
+
 func can_upgrade(origin: Vector2i) -> bool:
 	var c := upgrade_cost(origin)
-	return c >= 0 and money >= c
+	return c >= 0 and money >= c and upgrade_needs(origin) == 0
 
 func upgrade(origin: Vector2i) -> bool:
 	if not can_upgrade(origin):

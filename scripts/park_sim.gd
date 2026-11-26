@@ -43,6 +43,7 @@ var closed: Dictionary = {}         # wrecked building origin -> tick it reopens
 var today: Dictionary = {}          # attraction/shop origin -> {guests, income} finished visits today (info card)
 var income := 0
 var served := 0   # guests who finished at least one visit
+var xp: int       # park XP (ParkLevel), carried across days
 var spawned := 0
 var events: Array = []              # crimes: {tick, kind, origin, amount, witnessed}; never who
 var ledger: Dictionary = {}         # sender -> money owed to it (negative: it owes the host)
@@ -66,6 +67,7 @@ var _wages := 0
 func _init(map: ParkMap, seed_value: int) -> void:
 	_rng.seed = seed_value
 	money = map.money
+	xp = map.xp
 	_astar.region = Rect2i(Vector2i.ZERO, IsoGrid.SIZE)
 	_astar.diagonal_mode = AStarGrid2D.DIAGONAL_MODE_NEVER
 	_astar.update()
@@ -189,6 +191,8 @@ func step() -> void:
 		if _step_guest(g):
 			_gone_mood += g["mood"]
 			_gone += 1
+			if g["kind"] == "guest" and g["visits"] > 0 and g["mood"] >= ParkLevel.HAPPY:
+				xp += ParkLevel.XP_HAPPY
 			_settle(g)
 		else:
 			stay.append(g)
@@ -366,6 +370,7 @@ func _finish(g: Dictionary) -> void:
 	g["visits"] += 1
 	if g["visits"] == 1:
 		served += 1
+		xp += ParkLevel.XP_SERVED
 	if t["role"] == "shop":
 		money += t["price"]
 		income += t["price"]

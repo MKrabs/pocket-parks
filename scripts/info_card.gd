@@ -163,6 +163,8 @@ func _building() -> void:
 	upgrade.disabled = not map.can_upgrade(origin)
 	if cost < 0:
 		upgrade.text = "Upgrade · max level"
+	elif map.upgrade_needs(origin) > 0:
+		upgrade.text = "Lv %d unlocks at park level %d" % [map.level(origin) + 1, map.upgrade_needs(origin)]
 	elif map.money < cost:
 		upgrade.text = "Upgrade $%d · need $%d more" % [cost, cost - map.money]
 	else:

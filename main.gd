@@ -135,6 +135,7 @@ func _process(delta: float) -> void:
 	zoo.show_wrecked(sim.closed)
 	toasts.floor_y = card.top() if card.is_open() else INF
 	zoo.map.money = sim.money  # the sim owns money while the day runs; building spends from the map
+	zoo.map.xp = sim.xp
 	if visiting:
 		_visit_zoo.show_wrecked(visits[0]["sim"].closed)
 		visit_panel.show_ledger(visits[0]["sim"].sent_by(Visit.ME), sim.money)
