@@ -45,6 +45,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	if k.physical_keycode == KEY_T:
 		Buildings.use("festival" if Buildings.active == "zoo" else "zoo")
 		bar.fill()
+	elif k.physical_keycode == KEY_R:
+		zoo.rotate_ghost(-1 if k.shift_pressed else 1)
 	elif k.physical_keycode == KEY_ESCAPE:
 		escape()
 

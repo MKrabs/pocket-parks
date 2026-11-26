@@ -8,30 +8,46 @@ var money: int = START_MONEY
 var buildings: Dictionary = {}  # origin cell (Vector2i) -> building id
 var occupied: Dictionary = {}   # every covered cell -> origin cell
 var levels: Dictionary = {}     # origin cell -> level 2..3 (absent = 1)
+var rotations: Dictionary = {}  # origin cell -> quarter turns 1..3 (absent = 0)
 
-static func footprint(id: String, origin: Vector2i) -> Array[Vector2i]:
+## Footprint size after `rot` quarter turns (3x2 turned once is 2x3).
+static func size(id: String, rot := 0) -> Vector2i:
 	var fp: Vector2i = Buildings.get_def(id)["footprint"]
+	return Vector2i(fp.y, fp.x) if rot % 2 == 1 else fp
+
+## Cells covered by `id` turned `rot` times; `origin` stays the min corner.
+static func footprint(id: String, origin: Vector2i, rot := 0) -> Array[Vector2i]:
+	var fp := size(id, rot)
 	var out: Array[Vector2i] = []
 	for x in fp.x:
 		for y in fp.y:
 			out.append(origin + Vector2i(x, y))
 	return out
 
-func fits(id: String, cell: Vector2i) -> bool:
-	for c in footprint(id, cell):
+func rotation(origin: Vector2i) -> int:
+	return rotations.get(origin, 0)
+
+## Cells covered by the building at `origin`.
+func cells(origin: Vector2i) -> Array[Vector2i]:
+	return footprint(buildings[origin], origin, rotation(origin))
+
+func fits(id: String, cell: Vector2i, rot := 0) -> bool:
+	for c in footprint(id, cell, rot):
 		if not IsoGrid.in_bounds(c) or occupied.has(c):
 			return false
 	return true
 
-func can_place(id: String, cell: Vector2i) -> bool:
-	return fits(id, cell) and money >= Buildings.get_def(id)["cost"]
+func can_place(id: String, cell: Vector2i, rot := 0) -> bool:
+	return fits(id, cell, rot) and money >= Buildings.get_def(id)["cost"]
 
-func place(id: String, cell: Vector2i) -> bool:
-	if not can_place(id, cell):
+func place(id: String, cell: Vector2i, rot := 0) -> bool:
+	if not can_place(id, cell, rot):
 		return false
 	money -= Buildings.get_def(id)["cost"]
 	buildings[cell] = id
-	for c in footprint(id, cell):
+	if rot % 4 != 0:
+		rotations[cell] = rot % 4
+	for c in footprint(id, cell, rot):
 		occupied[c] = cell
 	return true
 
@@ -40,11 +56,12 @@ func remove_at(cell: Vector2i) -> bool:
 	if not occupied.has(cell):
 		return false
 	var origin: Vector2i = occupied[cell]
-	for c in footprint(buildings[origin], origin):
+	for c in cells(origin):
 		occupied.erase(c)
 	money += refund(origin)
 	buildings.erase(origin)
 	levels.erase(origin)
+	rotations.erase(origin)
 	return true
 
 ## What removing the building at `origin` gives back: half of all it cost (1×, +1×, +2× per level).
@@ -73,6 +90,6 @@ func upgrade(origin: Vector2i) -> bool:
 	return true
 
 ## Draw order key: x+y of the footprint's front (largest) corner.
-static func depth(id: String, origin: Vector2i) -> int:
-	var fp: Vector2i = Buildings.get_def(id)["footprint"]
+static func depth(id: String, origin: Vector2i, rot := 0) -> int:
+	var fp := size(id, rot)
 	return origin.x + origin.y + fp.x + fp.y - 2
