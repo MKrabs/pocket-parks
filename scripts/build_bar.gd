@@ -12,6 +12,23 @@ var row := HBoxContainer.new()  # every item; only the current tab's are visible
 var tabs := HBoxContainer.new()
 var tab := "Paths"
 var stolen: Array[String] = []  # blueprints spies brought home, offered in every theme
+var map: ParkMap  # your park: shed items show when the park level caps them
+
+## "More sheds at park level N" for ParkMap.shed_needs, "" when not blocked.
+static func shed_text(needs: int) -> String:
+	return "" if needs == 0 else "No more sheds" if needs < 0 else "More sheds at park level %d" % needs
+
+## Shed items wait for the park level: disabled, with the level that unlocks the next one.
+func _process(_delta: float) -> void:
+	if not map:
+		return
+	for b: Button in row.get_children():
+		var id: String = b.get_meta("id")
+		if id == "" or Buildings.get_def(id)["role"] != "staff":
+			continue
+		var why := shed_text(map.shed_needs(id))
+		b.disabled = why != ""
+		b.text = why.replace(" at ", "\nat ") if why != "" else b.get_meta("text")
 
 static func box(c: Color, radius: int = RADIUS) -> StyleBoxFlat:
 	var s := StyleBoxFlat.new()
@@ -117,7 +134,18 @@ func button(text: String, id: String, group: ButtonGroup) -> Button:
 	b.button_group = group
 	b.custom_minimum_size = Vector2(96, 0)
 	b.set_meta("id", id)
+	b.set_meta("text", text)
+	b.add_theme_stylebox_override("disabled", box(Palette.STONE))
+	b.add_theme_color_override("font_disabled_color", Color(Palette.INK, 0.55))
 	b.set_meta("tab", tab_of(id))
+	var need := Specialties.required(id)
+	if need != "":  # specialist-only: the specialty's glyph in the top-right corner
+		var g := Control.new()
+		g.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		g.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+		g.draw.connect(func() -> void: Specialties.glyph(g, Vector2(-5, 5), need, 8.0))
+		b.add_child(g)
+		b.tooltip_text = "Needs a %s builder" % Specialties.ALL[need]["name"]
 	b.toggled.connect(func(on: bool) -> void:
 		if on:
 			picked.emit(id)

@@ -571,6 +571,7 @@ static func build_ticks(id: String, level := 1) -> int:
 ## Place `id` and open a site for it (paid now). Paths and gates are instant. False if it doesn't fit or is too dear.
 func build(id: String, cell: Vector2i, rot := 0) -> bool:
 	_map.money = money
+	_map.xp = xp
 	if not _map.place(id, cell, rot):
 		return false
 	money = _map.money
@@ -653,16 +654,24 @@ func _home(shed: Vector2i) -> Vector2:
 func _site(j: Dictionary) -> Vector2:
 	return Vector2(j["origin"]) + Vector2(_map.size(j["id"], _map.rotation(j["origin"]))) - Vector2(0.4, 0.4)  # front corner
 
-## Waiting sites get free builders (oldest first); builders walk there in a straight line, work, then walk home.
+## Work per tick `b` puts into site `j` (Specialties.speed: 0 = not its specialty, 1, or 2).
+func speed_on(b: Dictionary, j: Dictionary) -> int:
+	return Specialties.speed(_map.specs(b["shed"]), j["id"])
+
+## Waiting sites (oldest first) get the fastest free builder that can build them; builders walk there in a
+## straight line, work, then walk home. Specialist-only sites wait for a matching builder.
 ## ponytail: straight line across grass and buildings; path-finding if builders should look like they use paths.
 func _step_builders() -> void:
 	for j in jobs:
+		if j["builder"] != "" and builders.any(func(b: Dictionary) -> bool: return b["name"] == j["builder"] and speed_on(b, j) == 0):
+			j["builder"] = ""  # its builder dropped the specialty this site needs
 		if j["builder"] != "":
 			continue
+		var best := 0
 		for b in builders:
-			if job_of(b).is_empty():
+			if job_of(b).is_empty() and speed_on(b, j) > best:
+				best = speed_on(b, j)
 				j["builder"] = b["name"]
-				break
 	for b in builders:
 		var j := job_of(b)
 		var to: Vector2 = _home(b["shed"]) if j.is_empty() else _site(j)
@@ -675,7 +684,7 @@ func _step_builders() -> void:
 		b["state"] = "home" if j.is_empty() else "work"
 		if j.is_empty():
 			continue
-		j["left"] -= 1
+		j["left"] -= speed_on(b, j)
 		if j["left"] <= 0:
 			jobs.erase(j)
 			if j["level"] > 1:

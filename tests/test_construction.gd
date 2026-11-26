@@ -11,6 +11,7 @@ func done() -> void:
 func sim_with(sheds: int) -> ParkSim:
 	var m := ParkMap.new()
 	m.money = 1 << 20
+	m.xp = ParkLevel.THRESHOLDS[2]  # park level 3: room for 2 sheds
 	m.place("zoo_gate", Vector2i(0, 7))
 	for x in range(1, 14):
 		m.place("path", Vector2i(x, 7))
@@ -86,6 +87,15 @@ func _init() -> void:
 	ok(sim.builders.size() == 1, "shed site houses nobody")
 	run(sim)
 	ok(sim.builders.size() == 2, "finished shed brings a builder")
+
+	# sheds are capped by park level
+	ok(not sim.build("builder_shed", Vector2i(6, 8)), "a third shed waits for park level 5")
+	ok(sim._map.shed_needs("builder_shed") == 5 and BuildBar.shed_text(5) == "More sheds at park level 5", "says which level")
+	ok(sim._map.shed_needs("snack_stand") == 0, "other buildings aren't capped")
+	sim.xp = ParkLevel.THRESHOLDS[4]
+	ok(sim.build("builder_shed", Vector2i(6, 8)), "park level 5 allows a third")
+	var fresh := ParkMap.new()
+	ok(fresh.place("builder_shed", Vector2i(1, 1)) and not fresh.can_place("builder_shed", Vector2i(3, 3)), "level 1: one shed")
 
 	# upgrade closes and reopens; level only goes up when done
 	sim = sim_with(1)

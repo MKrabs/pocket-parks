@@ -19,6 +19,7 @@ var upgrade := _action("upgrade")
 var repair := _action("repair")
 var demolish := _action("demolish")
 var accuse := _action("accuse")
+var specs := HFlowContainer.new()  # a builder's specialty toggles; only the choosable or chosen ones show
 var warning := Hud._label(13)
 var tip := Hud._label(14)
 var _panel := PanelContainer.new()
@@ -34,7 +35,20 @@ func _ready() -> void:
 	warning.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	warning.add_theme_color_override("font_color", Palette.shade(Palette.CORAL, 0.35))
 	warning.text = "If they're innocent you pay $%d" % ParkSim.WRONGFUL_FINE
-	for c in [title, body, upgrade, repair, demolish, accuse, warning]:
+	specs.add_theme_constant_override("h_separation", 6)
+	specs.add_theme_constant_override("v_separation", 6)
+	for s: String in Specialties.ALL:
+		var b := _action("spec_" + s)
+		b.text = Specialties.ALL[s]["name"]
+		b.toggle_mode = true
+		b.set_meta("spec", s)
+		b.add_theme_font_size_override("font_size", 13)
+		for k in ["pressed", "hover_pressed"]:
+			b.add_theme_stylebox_override(k, BuildBar.box(Specialties.ALL[s]["color"]))
+		for k in ["normal", "hover", "pressed", "hover_pressed"]:
+			(b.get_theme_stylebox(k) as StyleBoxFlat).set_content_margin_all(5)
+		specs.add_child(b)
+	for c in [title, body, specs, upgrade, repair, demolish, accuse, warning]:
 		col.add_child(c)
 	_panel.add_child(col)
 	_panel.visible = false
@@ -127,10 +141,11 @@ func _process(_delta: float) -> void:
 			b.visible = false
 		accuse.visible = true
 		warning.visible = true
+		specs.visible = false
 	elif staff >= 0 and staff < sim.staff.size():
 		title.text = (sim.staff[staff]["kind"] as String).capitalize()
 		body.text = "Your staff"
-		for b in [upgrade, repair, demolish, accuse, warning]:
+		for b in [upgrade, repair, demolish, accuse, warning, specs]:
 			b.visible = false
 	_panel.reset_size()
 	_panel.position.y = _panel.get_viewport_rect().size.y - _panel.size.y - BOTTOM
@@ -162,6 +177,12 @@ func _building() -> void:
 	if j.is_empty():
 		lines.append(_status())
 	body.text = "\n".join(lines)
+	var builder: bool = d["role"] == "staff" and not sim.builder_of(origin).is_empty()
+	specs.visible = builder
+	if builder:
+		for b: Button in specs.get_children():
+			b.visible = b.get_meta("spec") in map.spec_choices(origin)
+			b.set_pressed_no_signal(b.get_meta("spec") in map.specs(origin))
 
 	var cost := map.upgrade_cost(origin)
 	upgrade.visible = Buildings.upgradable(id) and j.is_empty()
@@ -186,7 +207,8 @@ func _building() -> void:
 static func site_line(s: ParkSim, j: Dictionary) -> String:
 	var what := "Building" if j["level"] == 1 else "Upgrading to Lv %d" % j["level"]
 	var pct := roundi(100.0 * (1.0 - float(j["left"]) / j["total"]))
-	var who := "Waiting for a builder"
+	var need := Specialties.required(j["id"])
+	var who := "Waiting for a %s specialist" % Specialties.ALL[need]["name"] if need != "" else "Waiting for a builder"
 	for b in s.builders:
 		if b["name"] == j["builder"]:
 			who = "%s is %s" % [b["name"], "working on it" if b["state"] == "work" else "on the way"]
@@ -198,7 +220,12 @@ func _builder_line() -> String:
 		return "Builder shed · houses one builder"
 	var j := sim.job_of(b)
 	var doing := "resting at home" if j.is_empty() else "building the %s" % Buildings.get_def(j["id"])["name"]
-	return "Builder shed · home of %s\n%s is %s" % [b["name"], b["name"], doing]
+	var have: Array = map.specs(origin).map(func(s: String) -> String: return Specialties.ALL[s]["name"])
+	var free := ParkLevel.cap("specialties", map.park_level()) - have.size()
+	var spec := "Specialty: pick one below" if have.is_empty() else ("Specialties: " if have.size() > 1 else "Specialty: ") + " + ".join(have)
+	if free > 0 and not have.is_empty():
+		spec += " · pick a second"
+	return "Builder shed · home of %s\n%s is %s\n%s" % [b["name"], b["name"], doing, spec]
 
 ## The building's state in words: wrecked (with the reopen countdown), littered, robbed, spied, or open.
 func _status() -> String:

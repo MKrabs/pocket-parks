@@ -77,6 +77,7 @@ func update_ghost() -> void:
 	ghost.z_index = 1000  # above every building and walker
 	ghost.position = IsoGrid.to_screen(hovered)
 	ghost.modulate = Color(Palette.CREAM if map.can_place(selected, hovered, turn) else Palette.CORAL, 0.6)
+	ghost.label = BuildBar.shed_text(map.shed_needs(selected))
 	add_child(ghost)
 
 ## Turn the placement ghost a quarter turn (dir 1 = clockwise, -1 = back).
