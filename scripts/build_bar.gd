@@ -7,6 +7,7 @@ signal picked(id: String)  # "" = eraser
 const RADIUS := 14
 
 var row := HBoxContainer.new()
+var stolen: Array[String] = []  # blueprints from raids, offered in every theme
 
 static func box(c: Color, radius: int = RADIUS) -> StyleBoxFlat:
 	var s := StyleBoxFlat.new()
@@ -34,7 +35,7 @@ func fill() -> void:
 		row.remove_child(c)
 		c.queue_free()
 	var group := ButtonGroup.new()
-	for id: String in Buildings.ids():
+	for id: String in Buildings.ids() + stolen.filter(func(s: String) -> bool: return not s in Buildings.ids()):
 		var b: Dictionary = Buildings.get_def(id)
 		row.add_child(button("%s\n$%d" % [b["name"], b["cost"]], id, group))
 	row.add_child(button("Eraser\n ", "", group))

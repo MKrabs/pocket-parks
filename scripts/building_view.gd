@@ -3,6 +3,12 @@ extends Node2D
 # Draws one catalog building. Node origin = centre of the building's origin cell.
 
 var id: String
+var origin := Vector2i.ZERO
+var wrecked := false:  # closed by a raider: drawn grey and tilted
+	set(w):
+		wrecked = w
+		rotation = 0.18 if w else 0.0
+		queue_redraw()
 
 func _init(building_id: String) -> void:
 	id = building_id
@@ -13,7 +19,8 @@ func _draw() -> void:
 	var mid := Vector2(fp.x - 1, fp.y - 1) * 0.5  # footprint centre in grid coords
 	for p in b["parts"]:
 		var foot := Squircle.iso_points(IsoGrid.project(mid + p["at"]), p["half"], 4.0, 48)
-		block(self, foot, p["h"], p["z"], p["color"])
+		var c: Color = Palette.STONE.lerp(p["color"], 0.2) if wrecked else p["color"]
+		block(self, foot, p["h"], p["z"], c)
 
 ## Extruded squircle: sides for edges facing the viewer, then the top face lifted by z + h.
 static func block(ci: CanvasItem, foot: PackedVector2Array, h: float, z: float, c: Color) -> void:
