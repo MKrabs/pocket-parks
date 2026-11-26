@@ -65,4 +65,31 @@ func _init() -> void:
 	ok(dirty.litter.size() >= 3 and clean.litter.size() < dirty.litter.size(), "janitor reduces litter")
 	ok(r["wages"] == 45, "wages taken at day end")
 	ok(clean.closed.is_empty(), "nothing closed yet")
+
+	# Building mid-day: the sim picks up the new map.
+	var m := park(false)
+	var live := ParkSim.new(m, 5)
+	for i in 300:
+		live.step()
+	var before := live.guests.size()
+	m.money = 1 << 30
+	m.place("enclosure", Vector2i(2, 4))
+	m.remove_at(Vector2i(9, 5))  # the pond goes
+	m.remove_at(Vector2i(12, 7))  # path under someone's feet maybe
+	live.load_map(m)
+	ok(live.guests.size() == before, "guests survive a map change")
+	ok(live._targets.size() == 2, "new enclosure is a target, pond is gone (%d)" % live._targets.size())
+	var cells := {}
+	for o: Vector2i in live._paths:
+		cells[o] = true
+	cells[live._entrance] = true
+	var stuck := 0
+	for g in live.guests:
+		if not cells.has(g["cell"]):
+			stuck += 1
+	ok(stuck == 0, "nobody left standing off the path")
+	var r2 := run(live)
+	ok(r2["served"] > 0, "day goes on after the change")
+	live.new_day()
+	ok(live.tick == 0 and live.guests.is_empty() and live.litter.is_empty(), "new day resets")
 	done()
