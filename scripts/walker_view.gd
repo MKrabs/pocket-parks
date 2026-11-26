@@ -6,8 +6,10 @@ extends Node2D
 const GUEST_COLORS := [Palette.SKY, Palette.BUTTER, Palette.CLAY, Palette.WATER, Palette.WOOD]
 const CAPS := {"janitor": Palette.SAND, "guard": Palette.SKY}
 const LIFT := 3.0  # path tile height in px
+const MARKS := {"guest": Palette.MOSS, "hooligan": Palette.CLAY, "litterbug": Palette.WOOD, "thief": Palette.INK, "spy": Palette.WATER}
 
 var sim: ParkSim
+var me := ""  # sender whose people get a dot above the bean (only we can see them)
 var _layers: Array[Node2D] = []
 var _rows: Array = []  # per depth: [[kind, item], ...]
 var _time := 0.0
@@ -61,7 +63,16 @@ func _draw_row(ci: Node2D, d: int) -> void:
 				var jitter := Vector2(sin(id * 12.9898), cos(id * 78.233)) * 0.22
 				var base: Color = GUEST_COLORS[id % GUEST_COLORS.size()]
 				var col := base.lerp(Palette.CORAL, clampf((60.0 - g["mood"]) / 40.0, 0.0, 1.0))
-				_bean(ci, g["pos"] + jitter, id, Vector2(4.0, 4.8), col, Color(Palette.INK, 0.0), g["state"] != "queue")
+				var p: Vector2 = g["pos"] + jitter
+				_bean(ci, p, id, Vector2(4.0, 4.8), col, Color(Palette.INK, 0.0), g["state"] != "queue")
+				var head := IsoGrid.project(p) - Vector2(0, LIFT + 15.0)
+				if me != "" and g["sender"] == me:
+					ci.draw_colored_polygon(Squircle.points(head, Vector2(4.4, 4.4), 4.0, 16), Palette.CREAM)
+					ci.draw_colored_polygon(Squircle.points(head, Vector2(3.0, 3.0), 4.0, 12), MARKS[g["kind"]])
+					head.y -= 7.0
+				if g["wanted"]:  # a "!": bar over dot
+					ci.draw_colored_polygon(Squircle.points(head - Vector2(0, 4.0), Vector2(1.2, 3.0), 4.0, 12), Palette.CORAL)
+					ci.draw_colored_polygon(Squircle.points(head + Vector2(0, 1.0), Vector2(1.2, 1.2), 4.0, 12), Palette.CORAL)
 
 ## Squircle bean standing on the path, soft shadow, optional cap and chest mark. `half` in px.
 func _bean(ci: Node2D, p: Vector2, phase: int, half: Vector2, col: Color, cap: Color, walking: bool, mark := Color(Palette.INK, 0.0)) -> void:
