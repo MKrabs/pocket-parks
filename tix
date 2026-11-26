@@ -1,0 +1,169 @@
+#!/usr/bin/env python3
+"""tix: file-based ticket queue. Tickets are tickets/<ID>.md with a key: value header.
+
+Lifecycle:  todo -> doing (claimed by an agent) -> review -> done (human approves)
+            any -> blocked (needs a human), review -> todo (rejected)
+A ticket is READY when status=todo, all deps are done, and human is not true.
+Backpressure: claim refuses when `doing` >= WIP_LIMIT or `review` >= REVIEW_LIMIT.
+"""
+import fcntl, os, shutil, subprocess, sys, time
+from datetime import datetime
+from pathlib import Path
+
+ROOT = Path(os.environ.get("TIX_DIR", Path(__file__).resolve().parent / "tickets"))
+WIP_LIMIT = int(os.environ.get("TIX_WIP", 3))
+REVIEW_LIMIT = int(os.environ.get("TIX_REVIEW", 4))
+FIELDS = ["id", "title", "status", "deps", "area", "parent", "human", "owner", "since"]
+ORDER = ["doing", "review", "blocked", "todo", "done"]
+
+
+def load(path):
+    head, _, body = path.read_text().partition("\n---\n")
+    meta = {}
+    for line in head.splitlines():
+        if ":" in line and line != "---":
+            k, _, v = line.partition(":")
+            meta[k.strip()] = v.strip()
+    meta["deps"] = [d.strip() for d in meta.get("deps", "").split(",") if d.strip()]
+    return meta, body
+
+
+def save(meta, body):
+    lines = ["---"] + [f"{k}: {', '.join(meta[k]) if k == 'deps' else meta.get(k, '')}" for k in FIELDS]
+    (ROOT / f"{meta['id']}.md").write_text("\n".join(lines) + "\n---\n" + body)
+
+
+def all_tickets():
+    return {m["id"]: (m, b) for m, b in (load(p) for p in sorted(ROOT.glob("*.md")))}
+
+
+def is_ready(m, ts):
+    return (m["status"] == "todo" and m.get("human") != "true"
+            and all(ts.get(d, ({"status": "?"},))[0]["status"] == "done" for d in m["deps"]))
+
+
+def log(msg):
+    with open(ROOT / "log.txt", "a") as f:
+        f.write(f"{datetime.now():%Y-%m-%d %H:%M:%S}  {msg}\n")
+
+
+def locked(fn):  # ponytail: one global flock, fine for a handful of agents on one machine
+    def wrap(*a):
+        with open(ROOT / ".lock", "w") as lk:
+            fcntl.flock(lk, fcntl.LOCK_EX)
+            return fn(*a)
+    return wrap
+
+
+def ago(since):
+    if not since:
+        return ""
+    s = int(time.time() - datetime.fromisoformat(since).timestamp())
+    return f"{s // 3600}h{s % 3600 // 60:02d}m" if s >= 3600 else f"{s // 60}m"
+
+
+def board():
+    ts = all_tickets()
+    width = shutil.get_terminal_size((120, 40)).columns
+    counts = {s: sum(m["status"] == s for m, _ in ts.values()) for s in ORDER}
+    print(f"WIP {counts['doing']}/{WIP_LIMIT}  review {counts['review']}/{REVIEW_LIMIT}  "
+          f"blocked {counts['blocked']}  todo {counts['todo']}  done {counts['done']}\n")
+    wide = width >= 90  # area column only when there is room (the wall's left pane is narrow)
+    print(f"{'ID':<7}{'STATUS':<9}{'':<7}" + (f"{'AREA':<12}" if wide else "") + f"{'FOR':<7}TITLE")
+    for m, _ in sorted(ts.values(), key=lambda t: (ORDER.index(t[0]["status"]), not is_ready(t[0], ts), t[0]["id"])):
+        flag = "READY" if is_ready(m, ts) else "HUMAN" if m.get("human") == "true" and m["status"] == "todo" else ""
+        line = (f"{m['id']:<7}{m['status']:<9}{flag:<7}" + (f"{m.get('area', ''):<12}" if wide else "")
+                + f"{ago(m.get('since')):<7}{m['title']}")
+        print(line[:width])
+
+
+@locked
+def claim(agent, want=None):
+    ts = all_tickets()
+    doing = sum(m["status"] == "doing" for m, _ in ts.values())
+    review = sum(m["status"] == "review" for m, _ in ts.values())
+    if doing >= WIP_LIMIT:
+        return print(f"BACKPRESSURE: WIP {doing}/{WIP_LIMIT}") or 2
+    if review >= REVIEW_LIMIT:
+        return print(f"BACKPRESSURE: review queue {review}/{REVIEW_LIMIT}, waiting for a human") or 2
+    ready = [i for i, (m, _) in ts.items() if is_ready(m, ts) and (want in (None, i))]
+    if not ready:
+        return print("NOTHING READY") or 1
+    m, b = ts[ready[0]]
+    m.update(status="doing", owner=f"{agent}-{m['id']}", since=datetime.now().isoformat(timespec="seconds"))
+    save(m, b)
+    log(f"{m['id']} claimed by {m['owner']}")
+    print(m["id"])
+    return 0
+
+
+@locked
+def move(tid, frm, to, note=""):
+    ts = all_tickets()
+    if tid not in ts:
+        return print(f"no ticket {tid}") or 1
+    m, b = ts[tid]
+    if frm and m["status"] not in frm:
+        return print(f"{tid} is {m['status']}, expected {'/'.join(frm)}") or 1
+    m["status"] = to
+    m["since"] = datetime.now().isoformat(timespec="seconds")
+    if to == "todo":
+        m["owner"] = ""
+    if note:
+        b = b.rstrip() + f"\n\n> **{to} {m['since']}:** {note}\n"
+    save(m, b)
+    log(f"{tid} -> {to}" + (f": {note}" if note else ""))
+    return 0
+
+
+def merge(tid):
+    """On approve: merge branch t/<ID> into the current branch, then drop its worktree."""
+    repo, br = ROOT.parent, f"t/{tid}"
+    git = lambda *c: subprocess.run(["git", "-C", str(repo), *c], capture_output=True, text=True)
+    if git("rev-parse", "--verify", "-q", br).returncode:
+        return 0  # nothing to merge (doc-only or human ticket)
+    r = git("merge", "--no-ff", "-m", f"Merge {br}", br)
+    if r.returncode:
+        git("merge", "--abort")
+        print(f"merge of {br} failed, ticket stays in review:\n{r.stdout}{r.stderr}")
+        return 1
+    git("worktree", "remove", "--force", str(repo / ".claude" / "worktrees" / tid))
+    git("branch", "-d", br)
+    return 0
+
+
+def main(argv):
+    cmd, *a = argv or ["board"]
+    note = " ".join(a[1:])
+    if cmd == "board":
+        while True:
+            if "-w" in a:
+                os.system("clear")
+            board()
+            if "-w" not in a:
+                return 0
+            time.sleep(3)
+    if cmd == "ready":
+        ts = all_tickets()
+        return print("\n".join(i for i, (m, _) in ts.items() if is_ready(m, ts))) or 0
+    if cmd == "status":
+        return print(all_tickets()[a[0]][0]["status"]) or 0
+    if cmd == "approve" and merge(a[0]):
+        return 1
+    if cmd == "claim":
+        return claim(a[0], a[1] if len(a) > 1 else None)
+    cmds = {  # cmd: (allowed from-states, to-state)
+        "submit": (["doing"], "review"), "approve": (["review"], "done"),
+        "reject": (["review"], "todo"), "release": (["doing"], "todo"),
+        "block": (None, "blocked"), "unblock": (["blocked"], "todo"),
+        "done": (None, "done"),  # human override, e.g. for human-only tickets
+    }
+    if cmd in cmds:
+        return move(a[0], *cmds[cmd], note)
+    print(__doc__ + "\nusage: tix [board [-w] | ready | claim AGENT [ID] | status ID | "
+          "submit|approve|reject|release|block|unblock|done ID [note]]")
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

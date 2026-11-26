@@ -1,0 +1,151 @@
+#!/usr/bin/env python3
+"""wall: tmux view of the factory. Ticket board + a shell on the left, one live Claude Code
+pane per running worker on the right, tiled into a grid that adds columns as the window widens.
+
+  ./wall           start (or re-attach to) the tmux session and run the dispatcher in it
+  ./wall layout    recompute the grid (factory calls this when workers come and go)
+
+Inside tmux: click a pane to focus it and type to that worker; Ctrl-b z zooms a pane;
+Ctrl-b d detaches (everything keeps running); window 1 shows the dispatcher log.
+"""
+import math, os, subprocess, sys
+from pathlib import Path
+
+SESSION = os.environ.get("WALL_SESSION", "factory")
+ROOT = Path(__file__).resolve().parent
+MIN_CELL_W = 80   # Claude Code needs roughly this many columns to look right
+SHELL_H = 12
+
+
+# Don't leak the launching Claude session into the tmux server (and so into every pane).
+ENV = {k: v for k, v in os.environ.items() if not k.startswith("CLAUDE") or k == "CLAUDE_CONFIG_DIR"}
+
+
+def tmux(*args):
+    return subprocess.run(["tmux", *args], capture_output=True, text=True, env=ENV).stdout.strip()
+
+
+def sizes(total, k):
+    """Split `total` cells into k parts, leaving 1-cell borders between them."""
+    base, rem = divmod(total - (k - 1), k)
+    return [base + (i < rem) for i in range(k)]
+
+
+def box(w, h, x, y, kids, horizontal):
+    """tmux layout node: a leaf when kids is a pane id, else a {side-by-side} or [stacked] container."""
+    if isinstance(kids, str):
+        return f"{w}x{h},{x},{y},{kids.lstrip('%')}"
+    if len(kids) == 1:
+        return kids[0]
+    o, c = "{}" if horizontal else "[]"
+    return f"{w}x{h},{x},{y}{o}{','.join(kids)}{c}"
+
+
+def column(w, h, x, y, panes):  # panes stacked top to bottom with given heights: [(id, h)]
+    out, yy = [], y
+    for pid, ph in panes:
+        out.append(box(w, ph, x, yy, pid, True))
+        yy += ph + 1
+    return box(w, h, x, y, out, False)
+
+
+def layout_string(W, H, board, shell, workers):
+    n = len(workers)
+    left_w = W if n == 0 else max(40, min(70, W // 4))
+    left_panes = [(board, H - SHELL_H - 1), (shell, SHELL_H)] if shell else [(board, H)]
+    left = column(left_w, H, 0, 0, left_panes)
+    if n == 0:
+        return left
+    rx, rw = left_w + 1, W - left_w - 1
+    cols = max(1, min(n, (rw + 1) // (MIN_CELL_W + 1)))
+    rows = math.ceil(n / cols)
+    row_nodes, y = [], 0
+    for r, rh in enumerate(sizes(H, rows)):
+        cells, x = [], rx
+        row = workers[r * cols:(r + 1) * cols]
+        for pid, cw in zip(row, sizes(rw, len(row))):
+            cells.append(box(cw, rh, x, y, pid, True))
+            x += cw + 1
+        row_nodes.append(box(rw, rh, rx, y, cells, True))
+        y += rh + 1
+    right = box(rw, H, rx, 0, row_nodes, False)
+    return box(W, H, 0, 0, [left, right], True)
+
+
+def checksum(s):  # tmux's layout_checksum
+    c = 0
+    for ch in s:
+        c = ((c >> 1) + ((c & 1) << 15) + ord(ch)) & 0xFFFF
+    return f"{c:04x}"
+
+
+def layout():
+    W, H = map(int, tmux("display", "-p", "-t", f"{SESSION}:0", "#{window_width} #{window_height}").split())
+    board = shell = None
+    workers = []
+    for line in tmux("list-panes", "-t", f"{SESSION}:0", "-F", "#{pane_id} #{@role} #{@ticket}").splitlines():
+        pid, *rest = line.split(" ")
+        role = rest[0] if rest else ""
+        if role == "board":
+            board = pid
+        elif role == "shell":
+            shell = pid
+        else:
+            workers.append(pid)
+    if not board:
+        return 1
+    # tmux fills layout slots in pane-index order, so put panes in board, shell, workers order first
+    want = [board] + ([shell] if shell else []) + workers
+    for i, pid in enumerate(want):
+        cur = tmux("list-panes", "-t", f"{SESSION}:0", "-F", "#{pane_id}").split()
+        if cur[i] != pid:
+            tmux("swap-pane", "-d", "-s", pid, "-t", cur[i])
+    s = layout_string(W, H, board, shell, workers)
+    r = subprocess.run(["tmux", "select-layout", "-t", f"{SESSION}:0", f"{checksum(s)},{s}"],
+                       capture_output=True, text=True)
+    if r.returncode:
+        print(f"layout failed: {r.stderr.strip()}  ({W}x{H}, {len(workers)} workers)", file=sys.stderr)
+    return r.returncode
+
+
+def start():
+    if subprocess.run(["tmux", "has-session", "-t", SESSION], capture_output=True).returncode:
+        me, root = str(ROOT / "wall"), str(ROOT)
+        board = tmux("new-session", "-d", "-s", SESSION, "-n", "wall", "-c", root, "-x", "240", "-y", "60",
+                     "-P", "-F", "#{pane_id}", f"{root}/tix", "board", "-w")
+        tmux("set", "-p", "-t", board, "@role", "board")
+        shell = tmux("split-window", "-d", "-v", "-t", board, "-c", root, "-P", "-F", "#{pane_id}")
+        tmux("set", "-p", "-t", shell, "@role", "shell")
+        tmux("new-window", "-d", "-t", f"{SESSION}:1", "-n", "dispatcher", "-c", root,
+             "env", f"FACTORY_WALL={SESSION}", "bash", "-c", "./factory; echo; echo 'factory stopped'; exec bash")
+        for opt in [("mouse", "on"), ("pane-border-status", "top"),
+                    ("pane-border-format", " #{?@ticket,#[bold]worker-#{@ticket}#[nobold],#{?#{==:#{@role},board},tickets,shell}} ")]:
+            tmux("set", "-t", SESSION, *opt)
+        for hook in ["client-attached", "client-resized"]:
+            tmux("set-hook", "-t", SESSION, hook, f"run-shell '{me} layout'")
+        layout()
+    cmd = "switch-client" if os.environ.get("TMUX") else "attach"
+    os.execvpe("tmux", ["tmux", cmd, "-t", SESSION], ENV)
+
+
+if __name__ == "__main__":
+    if sys.argv[1:] == ["layout"]:
+        sys.exit(layout())
+    if sys.argv[1:] == ["test"]:  # self-check: apply real layouts in a throwaway detached tmux session
+        SESSION = "walltest"
+        tmux("kill-session", "-t", SESSION)
+        b = tmux("new-session", "-d", "-s", SESSION, "-x", "300", "-y", "70", "-P", "-F", "#{pane_id}", "sleep", "60")
+        tmux("set", "-p", "-t", b, "@role", "board")
+        tmux("set", "-p", "-t", tmux("split-window", "-d", "-t", b, "-P", "-F", "#{pane_id}", "sleep", "60"), "@role", "shell")
+        for n in range(1, 8):
+            tmux("split-window", "-d", "-t", b, "-P", "-F", "#{pane_id}", "sleep", "60")
+            tmux("select-layout", "-t", f"{SESSION}:0", "even-vertical")  # make room for the next split
+            assert layout() == 0, f"layout failed with {n} workers"
+            geo = tmux("list-panes", "-t", f"{SESSION}:0", "-F", "#{@role}:#{pane_width}x#{pane_height}").split()
+            ws = [int(g.split(":")[1].split("x")[0]) for g in geo if not g.startswith(("board", "shell"))]
+            assert len(ws) == n and (min(ws) >= MIN_CELL_W or n == 1), geo
+            print(n, "workers:", " ".join(geo))
+        tmux("kill-session", "-t", SESSION)
+        print("ok")
+        sys.exit(0)
+    start()

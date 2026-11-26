@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+# factory: dispatcher. Claims ready tickets (up to TIX_WIP at once) and runs one `worker`
+# agent per ticket in its own git worktree.
+# Usage: ./factory            headless workers (hard $/turn caps), exits when idle
+#        ./factory P1         run just that ticket (must be ready)
+#        ./wall               same, but each worker is a live interactive Claude pane in tmux;
+#                             there the dispatcher never exits, it waits for humans to unblock work
+set -uo pipefail
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+cd "$ROOT"
+export TIX_DIR="$ROOT/tickets"
+BUDGET="${FACTORY_BUDGET_USD:-3}"     # per run
+TURNS="${FACTORY_MAX_TURNS:-80}"
+TIMEOUT="${FACTORY_TIMEOUT:-45m}"
+ONLY="${1:-}"
+WALL="${FACTORY_WALL:-}"   # tmux session name when started by ./wall
+GRACE=10                   # seconds a finished worker pane stays visible
+[ -x ./tix ] || { echo "factory: ./tix missing or not executable" >&2; exit 3; }
+# ponytail: tight allowlist. ./gd is the only way to run Godot (check + offscreen screenshot).
+ALLOW=(Read Edit Write Glob Grep "Bash(./tix *)" "Bash(./gd *)" "Bash(git add *)" "Bash(git commit *)"
+       "Bash(git status*)" "Bash(git diff*)" "Bash(git log*)" "Bash(jq *)" "Bash(ls *)")
+DENY=("Edit(tickets/**)" "Write(tickets/**)")
+mkdir -p logs
+# Workers must be independent sessions: drop session vars inherited from whatever Claude launched us
+# (keeps CLAUDE_CONFIG_DIR). tmux panes get their env from the tmux server, so pass these as `env -u`.
+CLEAN=(); for v in $(compgen -e | grep -E '^CLAUDE' | grep -v '^CLAUDE_CONFIG_DIR$'); do CLEAN+=(-u "$v"); unset "$v"; done
+
+exec 9>"$ROOT/logs/.factory.lock"
+flock -n 9 || { echo "another factory is running"; exit 1; }
+
+# One dispatcher at a time, so anything still `doing` is an orphan of a crashed run.
+for id in $(grep -l '^status: doing' tickets/*.md 2>/dev/null | xargs -r -n1 basename | sed 's/\.md$//'); do
+  ./tix block "$id" "orphaned claim from a previous factory run; check logs/ then unblock"
+done
+
+worktree() {  # ensure .claude/worktrees/$1 exists on branch t/$1 (reused after reject/unblock)
+  local wt="$ROOT/.claude/worktrees/$1"
+  [ -d "$wt" ] || git worktree add -q "$wt" "t/$1" 2>/dev/null || git worktree add -q -b "t/$1" "$wt" 2>/dev/null
+  [ -d "$wt" ] || { ./tix block "$1" "could not create worktree $wt"; return 1; }
+}
+
+prompt() { printf 'Your ticket is %s. Full ticket:\n\n%s' "$1" "$(cat "$TIX_DIR/$1.md")"; }
+
+run_wall() {  # one live interactive worker in a tmux pane; closes it once the ticket leaves `doing`
+  local id="$1" pane
+  worktree "$id" || return
+  pane="$(tmux split-window -d -t "$WALL:0" -c "$ROOT/.claude/worktrees/$id" -P -F '#{pane_id}' \
+     env "${CLEAN[@]}" TIX_DIR="$TIX_DIR" timeout --foreground "$TIMEOUT" claude "$(prompt "$id")" \
+     --agent worker -n "worker-$id" --permission-mode acceptEdits \
+     --allowedTools "${ALLOW[@]}" --disallowedTools "${DENY[@]}")" \
+    || { ./tix block "$id" "could not open a tmux pane"; return; }
+  tmux set -p -t "$pane" @ticket "$id"; ./wall layout
+  while [ "$(./tix status "$id")" = doing ] && tmux display -p -t "$pane" '' >/dev/null 2>&1; do sleep 5; done
+  if [ "$(./tix status "$id")" = doing ]; then
+    ./tix block "$id" "worker pane closed without handing back (quit, crash or $TIMEOUT timeout)"
+  else
+    sleep "$GRACE"
+  fi
+  tmux kill-pane -t "$pane" 2>/dev/null; ./wall layout
+  echo "$(date '+%F %T')  $id wall worker finished: $(./tix status "$id")" >>"$TIX_DIR/log.txt"
+}
+
+run() {  # one headless worker, hard-capped by budget and turns
+  local id="$1" wt="$ROOT/.claude/worktrees/$1" ts log rc
+  ts="$(date +%Y%m%d-%H%M%S)"; log="$ROOT/logs/$id-$ts.jsonl"
+  worktree "$id" || return
+  (cd "$wt" && timeout "$TIMEOUT" claude -p "$(prompt "$id")" \
+     --agent worker -n "worker-$id" \
+     --permission-mode acceptEdits --permission-prompts none \
+     --allowedTools "${ALLOW[@]}" --disallowedTools "${DENY[@]}" \
+     --max-turns "$TURNS" --max-budget-usd "$BUDGET" \
+     --output-format stream-json --verbose >"$log" 2>&1)
+  rc=$?
+  cost="$(tail -n 50 "$log" | jq -rs 'map(select(.type=="result")) | last | .total_cost_usd // "?"' 2>/dev/null)"
+  echo "$(date '+%F %T')  $id worker exited rc=$rc cost=\$$cost log=logs/$(basename "$log")" >>"$TIX_DIR/log.txt"
+  if [ "$(./tix status "$id")" = doing ]; then
+    ./tix block "$id" "worker exited (rc=$rc) without handing back; see logs/$(basename "$log")"
+  fi
+}
+
+while :; do
+  out="$(./tix claim "worker" $ONLY)"; rc=$?
+  [ $rc -gt 2 ] && { echo "factory: tix claim failed (rc=$rc): $out" >&2; break; }
+  if [ $rc -eq 0 ]; then
+    echo "$(date +%T) → $out"
+    if [ -n "$WALL" ]; then run_wall "$out" & else run "$out" & fi
+    [ -n "$ONLY" ] && break
+    sleep 2; continue
+  fi
+  running="$(jobs -rp | wc -l)"
+  # Nothing running means nothing changes until a human acts (approve/unblock/new tickets).
+  if [ "$running" -eq 0 ] && [ -z "$WALL" ]; then echo "idle: $out — waiting on humans (./tix board)"; break; fi
+  sleep 15
+done
+wait
+./tix board
