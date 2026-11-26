@@ -17,7 +17,9 @@ const BOUNCE := 1.08  # bounce: grow by this, then settle back
 const BOUNCE_TIME := 0.3
 # Gameplay feedback (scripts/feedback.gd and the views it pokes):
 const CRIME_SHAKE := 3.0  # px
-const TILT_TIME := 0.5  # wrecked: grey tilt eases in
+const CRUMBLE_TIME := 0.5  # wrecked: top parts drop off with a bounce, rubble appears
+const MEND_TIME := 0.45  # repaired / reopened: parts hop back into place
+const MEND_HOP := 10.0  # px the falling / mending parts arc up mid-flight
 const DEBRIS := 3  # wrecked: small puffs around the base
 const DEBRIS_SIZE := 18.0
 const LITTER_PUFF := 14.0
