@@ -10,6 +10,7 @@ const SQUISH := Vector2(1.18, 0.82)  # squash, then the inverse stretch
 const SHAKE_TIME := 0.3
 const SHAKE_STEPS := 6
 const FLY_TIME := 0.5
+const SLIDE_TIME := 0.3  # info card slides in from the right
 const PUFF_TIME := 0.6  # puff_at: pop, then grow and fade
 const PUFF_GROW := 1.25
 const BOUNCE := 1.08  # bounce: grow by this, then settle back
@@ -80,6 +81,12 @@ static func shake(node: CanvasItem, strength: float) -> Tween:
 		var k := strength * (1.0 - float(i) / SHAKE_STEPS)
 		t.tween_property(node, "position", p + Vector2(randf_range(-k, k), randf_range(-k, k)), SHAKE_TIME / (SHAKE_STEPS + 1))
 	t.tween_property(node, "position", p, SHAKE_TIME / (SHAKE_STEPS + 1))
+	return t
+
+## Glide a UI node sideways to `to_x` with a slight overshoot (the info card sliding in).
+static func slide(node: CanvasItem, to_x: float) -> Tween:
+	var t := node.create_tween()
+	t.tween_property(node, "position:x", to_x, SLIDE_TIME).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	return t
 
 static func fly_to(node: CanvasItem, to_pos: Vector2, then := Callable()) -> Tween:

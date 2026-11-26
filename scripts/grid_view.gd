@@ -9,6 +9,10 @@ const SLAB := 18.0  # depth of the ground slab in px
 const NONE := Vector2i(-1, -1)
 
 var hovered := NONE
+var tile_hover := false:  # tint the hovered tile (place mode only; Select mode lifts buildings instead)
+	set(on):
+		tile_hover = on
+		queue_redraw()
 
 func _process(_delta: float) -> void:
 	var c := IsoGrid.to_cell(get_local_mouse_position())
@@ -40,6 +44,6 @@ func _draw() -> void:
 		for y in IsoGrid.SIZE.y:
 			var cell := Vector2i(x, y)
 			var col := Palette.GRASS if (x + y) % 2 == 0 else Palette.GRASS_DARK
-			if cell == hovered:
+			if cell == hovered and tile_hover:
 				col = Palette.SKY
 			draw_colored_polygon(Squircle.iso_points(IsoGrid.to_screen(cell), Vector2(0.47, 0.47), 6.0, 48), col)

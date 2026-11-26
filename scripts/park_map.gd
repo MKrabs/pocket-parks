@@ -40,15 +40,17 @@ func remove_at(cell: Vector2i) -> bool:
 	if not occupied.has(cell):
 		return false
 	var origin: Vector2i = occupied[cell]
-	var id: String = buildings[origin]
-	for c in footprint(id, origin):
+	for c in footprint(buildings[origin], origin):
 		occupied.erase(c)
-	var cost: int = Buildings.get_def(id)["cost"]
-	var paid := cost * (1 + (level(origin) - 1) * level(origin) / 2)  # 1×, +1×, +2×
+	money += refund(origin)
 	buildings.erase(origin)
 	levels.erase(origin)
-	money += paid / 2
 	return true
+
+## What removing the building at `origin` gives back: half of all it cost (1×, +1×, +2× per level).
+func refund(origin: Vector2i) -> int:
+	var cost: int = Buildings.get_def(buildings[origin])["cost"]
+	return cost * (1 + (level(origin) - 1) * level(origin) / 2) / 2
 
 func level(origin: Vector2i) -> int:
 	return levels.get(origin, 1)

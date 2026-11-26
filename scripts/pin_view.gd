@@ -114,7 +114,7 @@ func _draw() -> void:
 		var p := pins[hovered]
 		var text: String = TEXT[p["kind"]]
 		if p["kind"] == "wrecked":
-			text += "\nClick to repair now: $%d" % sim._repair_cost(p["origin"])
+			text += "\nClick to repair: $%d" % sim.repair_cost(p["origin"])
 		var font := ThemeDB.fallback_font
 		var size := font.get_multiline_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 14)
 		draw_set_transform(_head(hovered) + Vector2(HEAD + 8, -size.y * 0.5) * s, 0.0, Vector2(s, s))

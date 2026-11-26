@@ -2,10 +2,9 @@ class_name BuildBar
 extends CanvasLayer
 # Bottom bar: one button per catalog building plus an eraser. Money lives in the Hud.
 
-signal picked(id: String)  # "" = eraser, UPGRADE = upgrade tool, "accuse" = the accuse tool
+signal picked(id: String)  # "" = back to Select (the pressed item was clicked again)
 
 const RADIUS := 14
-const UPGRADE := "@upgrade"
 
 var row := HBoxContainer.new()
 var stolen: Array[String] = []  # blueprints spies brought home, offered in every theme
@@ -30,22 +29,31 @@ func _ready() -> void:
 	bar.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	fill()
 
-## (Re)build the buttons for the active theme and select the first one.
+## (Re)build the buttons for the active theme, none pressed (Select mode).
 func fill() -> void:
 	for c in row.get_children():
 		row.remove_child(c)
 		c.queue_free()
 	var group := ButtonGroup.new()
+	group.allow_unpress = true
 	for id: String in Buildings.ids() + stolen.filter(func(s: String) -> bool: return not s in Buildings.ids()):
 		var b: Dictionary = Buildings.get_def(id)
 		row.add_child(button("%s\n$%d" % [b["name"], b["cost"]], id, group))
-	row.add_child(button("Eraser\n ", "", group))
-	row.add_child(button("Upgrade\n ", UPGRADE, group))
-	row.add_child(button("Accuse\n ", "accuse", group))
 	var bar := row.get_parent() as Control
 	bar.reset_size()
 	bar.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM, Control.PRESET_MODE_MINSIZE, 16)
-	(row.get_child(0) as Button).button_pressed = true
+	picked.emit("")
+
+## Back to Select: unpress whatever item is pressed (emits picked("")).
+func clear() -> void:
+	for b: Button in row.get_children():
+		b.button_pressed = false
+
+## Press the item for `id` (emits picked(id)), as a click on it would.
+func pick(id: String) -> void:
+	for b: Button in row.get_children():
+		if b.get_meta("id") == id:
+			b.button_pressed = true
 
 func button(text: String, id: String, group: ButtonGroup) -> Button:
 	var b := Button.new()
@@ -60,7 +68,10 @@ func button(text: String, id: String, group: ButtonGroup) -> Button:
 	b.add_theme_stylebox_override("hover_pressed", box(Palette.SKY))
 	for k in ["font_color", "font_hover_color", "font_pressed_color", "font_hover_pressed_color"]:
 		b.add_theme_color_override(k, Palette.INK)
+	b.set_meta("id", id)
 	b.toggled.connect(func(on: bool) -> void:
 		if on:
-			picked.emit(id))
+			picked.emit(id)
+		elif group.get_pressed_button() == null:
+			picked.emit(""))
 	return b
