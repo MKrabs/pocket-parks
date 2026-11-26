@@ -8,7 +8,7 @@ func _init(building_id: String) -> void:
 	id = building_id
 
 func _draw() -> void:
-	var b: Dictionary = Buildings.CATALOG[id]
+	var b: Dictionary = Buildings.get_def(id)
 	var fp: Vector2i = b["footprint"]
 	var mid := Vector2(fp.x - 1, fp.y - 1) * 0.5  # footprint centre in grid coords
 	for p in b["parts"]:

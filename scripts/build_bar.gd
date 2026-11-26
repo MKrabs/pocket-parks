@@ -7,6 +7,7 @@ signal picked(id: String)  # "" = eraser
 const RADIUS := 14
 
 var money_label := Label.new()
+var row := HBoxContainer.new()
 
 static func box(c: Color, radius: int = RADIUS) -> StyleBoxFlat:
 	var s := StyleBoxFlat.new()
@@ -29,18 +30,26 @@ func _ready() -> void:
 
 	var bar := PanelContainer.new()
 	bar.add_theme_stylebox_override("panel", box(Palette.STONE, 20))
-	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)
 	bar.add_child(row)
-	var group := ButtonGroup.new()
-	for id: String in Buildings.CATALOG:
-		var b: Dictionary = Buildings.CATALOG[id]
-		row.add_child(button("%s\n$%d" % [b["name"], b["cost"]], id, group))
-	row.add_child(button("Eraser\n ", "", group))
 	add_child(bar)
-	bar.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM, Control.PRESET_MODE_MINSIZE, 16)
 	bar.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	bar.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	fill()
+
+## (Re)build the buttons for the active theme and select the first one.
+func fill() -> void:
+	for c in row.get_children():
+		row.remove_child(c)
+		c.queue_free()
+	var group := ButtonGroup.new()
+	for id: String in Buildings.ids():
+		var b: Dictionary = Buildings.get_def(id)
+		row.add_child(button("%s\n$%d" % [b["name"], b["cost"]], id, group))
+	row.add_child(button("Eraser\n ", "", group))
+	var bar := row.get_parent() as Control
+	bar.reset_size()
+	bar.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM, Control.PRESET_MODE_MINSIZE, 16)
 	(row.get_child(0) as Button).button_pressed = true
 
 func button(text: String, id: String, group: ButtonGroup) -> Button:
