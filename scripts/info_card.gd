@@ -143,12 +143,33 @@ func _process(_delta: float) -> void:
 		warning.visible = true
 		specs.visible = false
 	elif staff >= 0 and staff < sim.staff.size():
-		title.text = (sim.staff[staff]["kind"] as String).capitalize()
-		body.text = "Your staff"
-		for b in [upgrade, repair, demolish, accuse, warning, specs]:
+		var s: Dictionary = sim.staff[staff]
+		title.text = "%s · Lv %d" % [(s["kind"] as String).capitalize(), s["level"]]
+		var cost := sim.staff_upgrade_cost(staff)
+		var lines := [staff_effect(s), "Wage $%d a day" % ParkSim.stat(s, "wage")]
+		if cost >= 0:
+			lines.append("Next, Lv %d: %s · $%d a day" % [s["level"] + 1, staff_effect(s, 1), ParkSim.stat({"kind": s["kind"], "level": s["level"] + 1}, "wage")])
+		body.text = "\n".join(lines)
+		upgrade.visible = true
+		upgrade.disabled = cost < 0 or sim.money < cost
+		if cost < 0:
+			upgrade.text = "Upgrade · max level"
+		elif sim.money < cost:
+			upgrade.text = "Upgrade $%d · need $%d more" % [cost, cost - sim.money]
+		else:
+			upgrade.text = "Upgrade to Lv %d · $%d" % [s["level"] + 1, cost]
+		for b in [repair, demolish, accuse, warning, specs]:
 			b.visible = false
 	_panel.reset_size()
 	_panel.position.y = _panel.get_viewport_rect().size.y - _panel.size.y - BOTTOM
+
+## What staff member `s` does at its level (+ `ahead` levels), in words.
+static func staff_effect(s: Dictionary, ahead := 0) -> String:
+	var n := {"kind": s["kind"], "level": s["level"] + ahead}
+	if s["kind"] == "janitor":
+		return "Looks for litter %d tiles around, cleans a spot in %.1f s" % [ParkSim.stat(n, "reach"), ParkSim.stat(n, "clean") / float(ParkSim.TPS)]
+	var out := "Sees crimes %d tiles away, catches within %.1f tiles" % [ParkSim.stat(n, "sight"), ParkSim.stat(n, "catch")]
+	return out + ", spots hidden troublemakers" if ParkSim.stat(n, "spot") > 0.0 else out
 
 func _guest() -> Dictionary:
 	for g in sim.guests:

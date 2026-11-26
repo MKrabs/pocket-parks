@@ -68,7 +68,14 @@ func _draw_row(ci: Node2D, d: int) -> void:
 			"staff":
 				var s: Dictionary = e[1]
 				var cap: Color = CAPS[s["kind"]]
-				_bean(ci, s["pos"], 0, Vector2(5.5, 6.5), Palette.shade(cap, 0.3), cap, not s["path"].is_empty(), Color(Palette.INK, 0.0), e[2])
+				var walking: bool = not s["path"].is_empty()
+				_bean(ci, s["pos"], 0, Vector2(5.5, 6.5), Palette.shade(cap, 0.3), cap, walking, Color(Palette.INK, 0.0), e[2])
+				# level mark: 1-3 thin upright stripes across the cap front (same bob and hop as the bean)
+				var top := IsoGrid.project(s["pos"]) - Vector2(0, LIFT + 12.5 + e[2] + (absf(sin(_time * 9.0)) * 1.5 if walking else 0.0))
+				var n: int = s["level"]
+				for k in n:
+					var at := top + Vector2((k - (n - 1) * 0.5) * 2.6, 0)
+					ci.draw_colored_polygon(Squircle.points(at, Vector2(0.6, 1.7), 4.0, 10), Palette.shade(cap, 0.45))
 			"builder":  # overalls and a BUTTER hard hat; bobs while walking or hammering
 				var b: Dictionary = e[1]
 				_bean(ci, b["pos"], 3, Vector2(5.5, 6.5), Palette.shade(Palette.SKY, 0.2), Palette.BUTTER, b["state"] != "home")

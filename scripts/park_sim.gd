@@ -9,8 +9,20 @@ const ENTRY_FEE := 3
 const SPAWN_PER_APPEAL := 0.0025 # spawn chance per tick per point of park appeal
 const MAX_GUESTS := 80
 const GUEST_SPEED := 0.2  # tiles per tick
-const STAFF_SPEED := 0.15
-const STAFF := {"janitor": {"hire": 50, "wage": 20}, "guard": {"hire": 40, "wage": 25}}
+# Staff levels: hire price, then per level (index 0 = Lv 1) the upgrade cost to reach it and the day's wage.
+# Janitor: speed (tiles/tick), clean (ticks per litter spot), reach (grid tiles it looks for litter in).
+# Guard: speed, sight (tiles it witnesses crimes in), catch (tiles), spot (chance per second to notice a hidden
+# actor with crimes within sight and mark it wanted).
+const STAFF := {
+	"janitor": {"hire": 50, "levels": [
+		{"cost": 0, "wage": 20, "speed": 0.15, "clean": 15, "reach": 5},
+		{"cost": 60, "wage": 28, "speed": 0.2, "clean": 9, "reach": 8},
+		{"cost": 120, "wage": 36, "speed": 0.25, "clean": 5, "reach": 12}]},
+	"guard": {"hire": 40, "levels": [
+		{"cost": 0, "wage": 25, "speed": 0.3, "sight": 3.0, "catch": 1.0, "spot": 0.0},
+		{"cost": 60, "wage": 35, "speed": 0.36, "sight": 4.0, "catch": 1.3, "spot": 0.0},
+		{"cost": 120, "wage": 45, "speed": 0.42, "sight": 5.0, "catch": 1.6, "spot": 0.1}]},
+}
 const SHOP_APPEAL := 3  # shops have no appeal in the packs; this weights them as a target
 const SHOP_CAPACITY := 2
 const VISIT_TICKS := {"attraction": 40, "shop": 15}
@@ -18,9 +30,7 @@ const LITTER_CHANCE := 0.3
 const QUEUE_GIVE_UP := 100  # ticks
 const UNHAPPY := 20.0
 # Sending people (docs/design/game.md → Sending people). Bad actors are guests with a kind other than "guest".
-const GUARD_SPEED := 0.3
 const CATCH_PAUSE := 2 * TPS
-const GUARD_SIGHT := 3.0
 const SEND_GAP := 5            # ticks between sent people entering at the gate
 const GUEST_SHARE := 0.2       # sent guests pay their sender this share of what they spend
 const STRIKE_TICKS := 3 * TPS
@@ -42,7 +52,7 @@ const BUILDER_NAMES := ["Bo", "Ada", "Kit", "Nell", "Rio", "Pip", "Sol", "June"]
 var money: int
 var tick := 0
 var guests: Array[Dictionary] = []  # walker + mood (0-100), state: walk|queue|visit|strike|leave; sender, spent, crimes, loot, wanted
-var staff: Array[Dictionary] = []   # walker + kind
+var staff: Array[Dictionary] = []   # walker + kind, level (1-3); janitors: work (ticks left on a spot)
 var litter: Dictionary = {}         # path cell -> true
 var closed: Dictionary = {}         # wrecked building origin -> tick it reopens
 var today: Dictionary = {}          # attraction/shop origin -> {guests, income} finished visits today (info card)
@@ -215,7 +225,7 @@ func step() -> void:
 		_step_staff(s)
 	if tick == DAY_TICKS:
 		for s in staff:
-			_wages += STAFF[s["kind"]]["wage"]
+			_wages += stat(s, "wage")
 		money -= _wages
 
 func day_time() -> float:
@@ -235,6 +245,25 @@ func hire(kind: String) -> bool:
 		return false
 	money -= STAFF[kind]["hire"]
 	staff.append(_walker(kind))
+	staff[-1]["level"] = 1
+	return true
+
+## A staff member's number for its level (see STAFF).
+static func stat(s: Dictionary, key: String) -> Variant:
+	return STAFF[s["kind"]]["levels"][s["level"] - 1][key]
+
+## Price of staff member i's next level, or -1 at the top.
+func staff_upgrade_cost(i: int) -> int:
+	var lv: Array = STAFF[staff[i]["kind"]]["levels"]
+	return lv[staff[i]["level"]]["cost"] if staff[i]["level"] < lv.size() else -1
+
+## Pay for staff member i's next level. False at the top or too poor.
+func upgrade_staff(i: int) -> bool:
+	var cost := staff_upgrade_cost(i)
+	if cost < 0 or money < cost:
+		return false
+	money -= cost
+	staff[i]["level"] += 1
 	return true
 
 func _walker(kind: String) -> Dictionary:
@@ -519,40 +548,53 @@ func _arrest(g: Dictionary, guard := -1) -> Dictionary:
 	guests.erase(g)
 	return {"wrongful": false, "fine": fine, "loot": g["loot"], "kind": g["kind"]}
 
-## Guards mark strikers within sight as wanted, chase the nearest wanted actor and catch it within 1 tile.
+## Guards mark strikers within sight as wanted (from Lv 3 they may also notice a hidden actor with crimes),
+## chase the nearest wanted actor and catch it within their catch radius. Nobody without a crime is ever wanted.
 func _step_guard(s: Dictionary) -> void:
 	if s.get("pause", 0) > 0:
 		s["pause"] -= 1
 		return
+	var sight: float = stat(s, "sight")
+	var spot: float = stat(s, "spot") / TPS
 	var best: Dictionary = {}
 	var best_d := INF
 	for g in guests:
 		var d: float = s["pos"].distance_to(g["pos"])
-		if g["state"] == "strike" and d <= GUARD_SIGHT:
+		if g["state"] == "strike" and d <= sight:
 			g["wanted"] = true
 			g["event"]["witnessed"] = true
+		elif spot > 0.0 and g["crimes"] > 0 and not g["wanted"] and d <= sight and _rng.randf() < spot:
+			g["wanted"] = true
 		if g["wanted"] and d < best_d:
 			best = g
 			best_d = d
 	if not best.is_empty() and (s["path"].is_empty() or tick % 5 == 0):
 		_go(s, best["cell"])
-	if _walk(s, GUARD_SPEED) and best.is_empty() and not _paths.is_empty():
+	if _walk(s, stat(s, "speed")) and best.is_empty() and not _paths.is_empty():
 		_go(s, _paths[_rng.randi() % _paths.size()])
-	if not best.is_empty() and s["pos"].distance_to(best["pos"]) <= 1.0:
+	if not best.is_empty() and s["pos"].distance_to(best["pos"]) <= stat(s, "catch"):
 		_arrest(best, staff.find(s))
 		s["pause"] = CATCH_PAUSE
 		s["path"] = []
 
+## Janitors spend `clean` ticks on a littered spot, then head for the nearest litter within `reach`, else wander.
 func _step_staff(s: Dictionary) -> void:
 	if s["kind"] == "guard":
 		_step_guard(s)
 		return
-	if not _walk(s, STAFF_SPEED):
+	if s.get("work", 0) > 0:
+		s["work"] -= 1
+		if s["work"] == 0:
+			litter.erase(s["cell"])
 		return
-	litter.erase(s["cell"])
+	if not _walk(s, stat(s, "speed")):
+		return
+	if litter.has(s["cell"]):
+		s["work"] = stat(s, "clean")
+		return
 	# ponytail: nearest by grid distance, not walk distance; fine on a 16x16 park
 	var best := Vector2i(-1, -1)
-	var best_d := 1 << 30
+	var best_d: int = stat(s, "reach") + 1
 	for c: Vector2i in litter:
 		var d := absi(c.x - s["cell"].x) + absi(c.y - s["cell"].y)
 		if d < best_d:
@@ -560,6 +602,8 @@ func _step_staff(s: Dictionary) -> void:
 			best_d = d
 	if best.x >= 0:
 		_go(s, best)
+	elif not litter.is_empty() and not _paths.is_empty():
+		_go(s, _paths[_rng.randi() % _paths.size()])  # litter somewhere, out of reach: wander to find it
 
 ## Work ticks to build `id` (level 1) or to upgrade it to `level`.
 static func build_ticks(id: String, level := 1) -> int:
