@@ -46,6 +46,7 @@ var spawned := 0
 var events: Array = []              # crimes: {tick, kind, origin, amount, witnessed}; never who
 var ledger: Dictionary = {}         # sender -> money owed to it (negative: it owes the host)
 var blueprints: Dictionary = {}     # sender -> Array of building ids its spies brought home
+var fined: Dictionary = {}          # sender -> fines it paid so far (already inside ledger)
 var _gate: Array = []               # [kind, sender] waiting to enter
 
 var _rng := RandomNumberGenerator.new()
@@ -221,6 +222,17 @@ func _walker(kind: String) -> Dictionary:
 func send(kind: String, sender: String) -> void:
 	assert(kind in KINDS, "unknown kind " + kind)
 	_gate.append([kind, sender])
+
+## What `sender` has in this park: guests / hidden (actors not wanted) / wanted, counting the gate queue,
+## plus earned (guest share, loot, wrongful-arrest pay) and fines paid.
+func sent_by(sender: String) -> Dictionary:
+	var out := {"guests": 0, "hidden": 0, "wanted": 0, "fines": fined.get(sender, 0)}
+	out["earned"] = ledger.get(sender, 0) + out["fines"]
+	var people: Array = _gate.map(func(p: Array) -> Dictionary: return {"kind": p[0], "sender": p[1], "wanted": false})
+	for g in people + guests:
+		if g["sender"] == sender:
+			out["guests" if g["kind"] == "guest" else "wanted" if g["wanted"] else "hidden"] += 1
+	return out
 
 func _spawn(kind := "guest", sender := "") -> void:
 	var g := _walker(kind)
@@ -471,6 +483,7 @@ func _arrest(g: Dictionary) -> Dictionary:
 	money += fine + g["loot"]
 	if g["sender"] != "":
 		ledger[g["sender"]] = ledger.get(g["sender"], 0) - fine
+		fined[g["sender"]] = fined.get(g["sender"], 0) + fine
 	if g["state"] == "visit":
 		_targets[g["target"]]["inside"] -= 1
 	guests.erase(g)
