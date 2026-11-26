@@ -7,10 +7,12 @@ signal clicked(origin: Vector2i, kind: String)
 
 const COLORS := {"wrecked": Palette.CORAL, "littered": Palette.SAND, "robbed": Palette.BUTTER, "spied": Palette.SKY,
 	"caught": Palette.MOSS, "wrongful": Palette.CORAL, "repaired": Palette.MOSS}
-const TEXT := {"wrecked": "Wrecked: needs rebuilding", "littered": "Littered: needs cleaning", "robbed": "Robbed"}
-const HEAD := 14.0  # pin head half size, screen px
-const RISE := 32.0  # tail tip to head centre, screen px
-const GAP := 34.0   # between pins on the same building
+const WORD := {"wrecked": "Repair", "littered": "Clean", "robbed": "Robbed", "spied": "Spied"}
+const HEAD := 12.0  # pin head half size, screen px
+const RISE := 30.0  # tail tip to head centre, screen px
+const GAP := 30.0   # between pins on the same building
+const FONT := 14
+const OPEN_TIME := 0.16  # s for a hovered pin to widen into its pill
 
 var sim: ParkSim
 var map: ParkMap
@@ -20,6 +22,7 @@ var hovered := -1
 var _time := 0.0
 var _born: Dictionary = {}  # pin key -> time it appeared (pops in)
 var _gone: Array[Dictionary] = []  # pins that went, still vanishing
+var _open: Dictionary = {}  # pin key -> 0..1, how far it has widened into a pill
 
 func _ready() -> void:
 	z_index = 1500  # above buildings, walkers and the ghost
@@ -42,6 +45,7 @@ func _process(delta: float) -> void:
 	for p: Dictionary in old:  # pins that just went vanish
 		if not p["key"] in live:
 			_born.erase(p["key"])
+			_open.erase(p["key"])
 			p["gone"] = _time
 			_gone.append(p)
 	_gone.assign(_gone.filter(func(p: Dictionary) -> bool: return _time - p["gone"] < Motion.VANISH_TIME))
@@ -50,12 +54,26 @@ func _process(delta: float) -> void:
 		p["scale"] = lerpf(1.0, Motion.VANISH_SCALE, k)
 		p["fade"] = 1.0 - k
 		pins.append(p)
-	hovered = -1
 	var m := get_local_mouse_position()
+	var was: String = pins[hovered]["key"] if hovered >= 0 and hovered < pins.size() else ""
+	hovered = -1
 	for i in pins.size():
-		if m.distance_to(_head(i)) < HEAD * 1.3 / _zoom():
+		var d := (m - _head(i)) * _zoom()
+		if absf(d.x) < half_width(i) + 2 and absf(d.y) < HEAD * 1.3 and (hovered < 0 or pins[i]["key"] == was):
 			hovered = i
+	for i in pins.size():
+		var key: String = pins[i]["key"]
+		_open[key] = move_toward(_open.get(key, 0.0), 1.0 if i == hovered else 0.0, delta / OPEN_TIME)
 	queue_redraw()
+
+## Eased 0..1 widening of pin i.
+func openness(i: int) -> float:
+	return smoothstep(0.0, 1.0, _open.get(pins[i]["key"], 0.0))
+
+## Half width of pin i's head in screen px: HEAD when calm, the full pill (glyph + word) when open.
+func half_width(i: int) -> float:
+	var w := ThemeDB.fallback_font.get_string_size(WORD.get(pins[i]["kind"], ""), HORIZONTAL_ALIGNMENT_LEFT, -1, FONT).x
+	return HEAD + openness(i) * (w + 8) * 0.5
 
 ## World point just above a building's tallest part, over its footprint centre.
 static func top(id: String, origin: Vector2i) -> Vector2:
@@ -92,7 +110,12 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _draw() -> void:
 	var s := 1.0 / _zoom()
-	for i in pins.size():
+	var order := range(pins.size())
+	if hovered >= 0:  # the open pill on top of its neighbours
+		order.erase(hovered)
+		order.append(hovered)
+	var font := ThemeDB.fallback_font
+	for i: int in order:
 		var p := pins[i]
 		var c: Color = COLORS[p["kind"]]
 		var a: float = p["alpha"] * p.get("fade", 1.0)
@@ -100,53 +123,49 @@ func _draw() -> void:
 		var k: float = s * p["scale"]
 		if k < 0.01:
 			continue
+		var hw := half_width(i)
+		var o := openness(i)
+		if o > 0.0:
+			a = lerpf(a, 1.0, o)  # a faded robbed pin reads fully while hovered
 		draw_set_transform(head, 0.0, Vector2(k, k))
 		var tip: Vector2 = (p["at"] - head) / k
-		var tail := PackedVector2Array([Vector2(-HEAD * 0.45, HEAD * 0.6), Vector2(HEAD * 0.45, HEAD * 0.6), tip])
-		var outline := Color(Palette.shade(c, 0.25), a)
-		draw_colored_polygon(Squircle.points(Vector2.ZERO, Vector2.ONE * (HEAD + 1.5), 4.0, 32), outline)
+		var tail := PackedVector2Array([Vector2(-HEAD * 0.4, HEAD * 0.6), Vector2(HEAD * 0.4, HEAD * 0.6), tip])
+		var outline := Color(Palette.shade(c, 0.18), a)
+		var n := lerpf(4.0, 6.0, o)  # flatter ends as it widens, so the pill keeps a soft squircle feel
+		draw_colored_polygon(Squircle.points(Vector2.ZERO, Vector2(hw, HEAD) + Vector2.ONE * 1.5, n, 48), outline)
 		draw_colored_polygon(PackedVector2Array([tail[0] + Vector2(-1.5, 0), tail[1] + Vector2(1.5, 0), tip + Vector2(0, 2)]), outline)
 		draw_colored_polygon(tail, Color(c, a))
-		draw_colored_polygon(Squircle.points(Vector2.ZERO, Vector2.ONE * HEAD, 4.0, 32), Color(c, a))
-		glyph(self, p["kind"], Vector2.ZERO, 1.2, a)
+		draw_colored_polygon(Squircle.points(Vector2.ZERO, Vector2(hw, HEAD), n, 48), Color(c, a))
+		var g := Vector2(HEAD - hw, 0)  # glyph slides to the left end of the pill
+		glyph(self, p["kind"], g, 1.0, a)
+		if o > 0.05:
+			var y := (font.get_ascent(FONT) - font.get_descent(FONT)) * 0.5
+			draw_string(font, g + Vector2(HEAD - 2, y), WORD.get(p["kind"], ""), HORIZONTAL_ALIGNMENT_LEFT, -1, FONT,
+				Color(Palette.shade(c, 0.6), a * o * o))
 	draw_set_transform(Vector2.ZERO)
-	if hovered >= 0:
-		var p := pins[hovered]
-		var text: String = TEXT[p["kind"]]
-		if p["kind"] == "wrecked":
-			text += "\nClick to repair: $%d" % sim.repair_cost(p["origin"])
-		var font := ThemeDB.fallback_font
-		var size := font.get_multiline_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 14)
-		draw_set_transform(_head(hovered) + Vector2(HEAD + 8, -size.y * 0.5) * s, 0.0, Vector2(s, s))
-		var box := Squircle.points(size * 0.5, size * 0.5 + Vector2(10, 7), 5.0, 40)
-		draw_colored_polygon(box, Palette.CREAM)
-		box.append(box[0])
-		draw_polyline(box, Color(Palette.INK, 0.25), 1.5, true)
-		draw_multiline_string(font, Vector2(0, font.get_ascent(14)), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, -1, Palette.INK)
-		draw_set_transform(Vector2.ZERO)
 
-## Status icon in a box of about ±7 px × k around `at`: crack, specks, coin, eye.
+## Status icon in a box of about ±7 px × k around `at`: hammer, broom, coin with a minus, eye (other kinds: coin).
 static func glyph(ci: CanvasItem, kind: String, at: Vector2, k := 1.0, alpha := 1.0) -> void:
 	var c := Color(Palette.shade(COLORS[kind], 0.45), alpha)
 	var light := Color(Palette.CREAM, alpha)
 	match kind:
-		"wrecked":  # a block split by a zigzag crack
-			var left := PackedVector2Array([Vector2(-7, -5), Vector2(-0.5, -5), Vector2(-2.5, -1), Vector2(0.5, 2), Vector2(-1.5, 6), Vector2(-7, 6)])
-			var right := PackedVector2Array([Vector2(1.5, -5), Vector2(7, -5), Vector2(7, 6), Vector2(0.5, 6), Vector2(2.5, 2), Vector2(-0.5, -1)])
-			ci.draw_colored_polygon(_xf(left, at + Vector2(-0.8, 0.6) * k, k), c)
-			ci.draw_colored_polygon(_xf(right, at + Vector2(0.8, -0.6) * k, k), c)
-		"littered":  # specks
-			for p: Vector2 in [Vector2(-4, 2), Vector2(2, -3), Vector2(4, 3), Vector2(-1, -1)]:
-				ci.draw_colored_polygon(Squircle.points(at + p * k, Vector2(2.0, 1.6) * k, 4.0, 12), c)
-		"spied":  # almond eye with a pupil
-			ci.draw_colored_polygon(Squircle.points(at, Vector2(7, 4) * k, 2.4, 24), c)
-			ci.draw_colored_polygon(Squircle.points(at, Vector2(2.6, 2.6) * k, 4.0, 16), light)
+		"wrecked":  # hammer, head up-left, tilted
+			var xf := Transform2D(-0.7, Vector2(k, k), 0.0, at)
+			ci.draw_colored_polygon(xf * Squircle.points(Vector2(0, 2.5), Vector2(1.3, 6.0), 4.0, 20), c)
+			ci.draw_colored_polygon(xf * Squircle.points(Vector2(-0.8, -4.5), Vector2(5.0, 2.4), 4.0, 24), c)
+		"littered":  # broom, bristles down-left, tilted
+			var xf := Transform2D(0.6, Vector2(k, k), 0.0, at + Vector2(0.5, -0.5) * k)
+			ci.draw_colored_polygon(xf * Squircle.points(Vector2(0, -3.5), Vector2(1.1, 4.8), 4.0, 20), c)
+			ci.draw_colored_polygon(xf * Squircle.points(Vector2(0, 1.8), Vector2(2.8, 1.0), 4.0, 16), c)
+			ci.draw_colored_polygon(xf * PackedVector2Array([Vector2(-2.8, 3.2), Vector2(2.8, 3.2), Vector2(4.6, 7.6),
+				Vector2(-4.6, 7.6)]), c)
+		"spied":  # almond eye: dark rim, light white, dark pupil
+			ci.draw_colored_polygon(Squircle.points(at, Vector2(7.5, 4.8) * k, 2.2, 32), c)
+			ci.draw_colored_polygon(Squircle.points(at, Vector2(6.0, 3.4) * k, 2.2, 32), light)
+			ci.draw_colored_polygon(Squircle.points(at, Vector2(2.4, 2.4) * k, 3.0, 20), c)
+		"robbed":  # coin with a minus
+			ci.draw_colored_polygon(Squircle.points(at, Vector2(6.5, 6.5) * k, 3.0, 28), c)
+			ci.draw_colored_polygon(Squircle.points(at, Vector2(3.6, 1.2) * k, 4.0, 16), light)
 		_:  # coin
 			ci.draw_colored_polygon(Squircle.points(at, Vector2(6.5, 6.5) * k, 3.0, 24), c)
 			ci.draw_colored_polygon(Squircle.points(at, Vector2(1.6, 3.6) * k, 4.0, 16), Color(Palette.shade(COLORS[kind], 0.1), alpha))
-
-static func _xf(pts: PackedVector2Array, at: Vector2, k: float) -> PackedVector2Array:
-	var out := PackedVector2Array()
-	for p in pts:
-		out.append(at + p * k)
-	return out
