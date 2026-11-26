@@ -32,11 +32,11 @@ const HOP_TIME := 0.3
 const DUST_SIZE := 34.0  # placing / removing a building
 # Cloud transition (scripts/cloud_transition.gd), seconds from its start:
 const TRAVEL_ZOOM := 0.75 / 0.92  # zoom factor at the widest point (0.92 → 0.75 at the default zoom)
-const TRAVEL_ZOOM_TIME := 0.3  # zoom out, ease in
-const COVER_AT := 0.15  # clouds start rolling in
-const COVER_TIME := 0.35
-const HOLD_TIME := 0.2  # full cover with the name; the park swap happens halfway
-const PART_TIME := 0.45  # clouds part while the camera zooms back with a slight overshoot
+const TRAVEL_ZOOM_TIME := 0.4  # zoom out, ease in
+const COVER_AT := 0.2  # clouds start rolling in
+const COVER_TIME := 0.5
+const HOLD_TIME := 0.3  # full cover with the name; the park swap happens halfway
+const PART_TIME := 0.6  # clouds part while the camera zooms back with a slight overshoot
 const CLOUD_LAYERS := 3
 const LAYER_TRAVEL := [1.6, 1.9, 2.2]  # screen widths each layer travels on the way in, back → front (parallax)
 const LAYER_DARK := 0.05  # each layer further back is shaded this much more

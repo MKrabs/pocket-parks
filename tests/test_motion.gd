@@ -33,7 +33,7 @@ func _init() -> void:
 	ok(swap_at[0] >= covered and swap_at[0] <= covered + Motion.HOLD_TIME + 0.02, "swap at the hold: %.2f" % swap_at[0])
 	ok(absf(min_zoom - z0 * Motion.TRAVEL_ZOOM) < 0.01, "zoomed out to %.3f" % min_zoom)
 	ok(absf(cam.zoom.x - z0) < 0.001 and not tr.visible, "ends at normal zoom, hidden")
-	ok(t[0] < 1.6, "about 1.2 s: %.2f" % t[0])
+	ok(t[0] < 2.1, "about 1.6 s: %.2f" % t[0])
 
 	# Skip partway: still exactly one swap, camera back to normal.
 	swaps[0] = 0
