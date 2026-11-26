@@ -72,7 +72,7 @@ func openness(i: int) -> float:
 
 ## Half width of pin i's head in screen px: HEAD when calm, the full pill (glyph + word) when open.
 func half_width(i: int) -> float:
-	var w := ThemeDB.fallback_font.get_string_size(WORD.get(pins[i]["kind"], ""), HORIZONTAL_ALIGNMENT_LEFT, -1, FONT).x
+	var w := Palette.FONT.get_string_size(WORD.get(pins[i]["kind"], ""), HORIZONTAL_ALIGNMENT_LEFT, -1, FONT).x
 	return HEAD + openness(i) * (w + 8) * 0.5
 
 ## World point just above a building's tallest part, over its footprint centre.
@@ -114,7 +114,7 @@ func _draw() -> void:
 	if hovered >= 0:  # the open pill on top of its neighbours
 		order.erase(hovered)
 		order.append(hovered)
-	var font := ThemeDB.fallback_font
+	var font := Palette.FONT
 	for i: int in order:
 		var p := pins[i]
 		var c: Color = COLORS[p["kind"]]

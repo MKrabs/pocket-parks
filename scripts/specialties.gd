@@ -30,7 +30,7 @@ static func glyph(ci: CanvasItem, at: Vector2, spec: String, r := 9.0) -> void:
 	var c: Color = ALL[spec]["color"]
 	ci.draw_colored_polygon(Squircle.points(at, Vector2(r, r) + Vector2.ONE, 4.0, 32), Palette.shade(c, 0.22))
 	ci.draw_colored_polygon(Squircle.points(at, Vector2(r, r), 4.0, 32), c)
-	var f := ThemeDB.fallback_font
+	var f := Palette.FONT
 	var size := roundi(r * 1.3)
 	var w := f.get_string_size(ALL[spec]["glyph"], HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
 	ci.draw_string(f, at + Vector2(-w * 0.5, size * 0.36), ALL[spec]["glyph"], HORIZONTAL_ALIGNMENT_LEFT, -1, size, Palette.INK)

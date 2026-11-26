@@ -11,10 +11,7 @@ var _title := Label.new()
 func _ready() -> void:
 	layer = 100
 	add_child(_clouds)
-	var font := SystemFont.new()
-	font.font_names = ["Nunito", "Quicksand", "Varela Round", "Comfortaa", "Arial Rounded MT Bold", "sans-serif"]
-	font.font_weight = 800
-	_title.add_theme_font_override("font", font)
+	_title.add_theme_font_override("font", Palette.FONT_BOLD)
 	_title.add_theme_font_size_override("font_size", Motion.TITLE_SIZE)
 	_title.add_theme_color_override("font_color", Palette.INK)
 	_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

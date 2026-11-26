@@ -20,3 +20,13 @@ const CLOUD_SHADOW := Color("#E7DFD3")  # underside of a puff
 ## Faces of an extruded iso shape: top is the base colour, sides get darker.
 static func shade(c: Color, amount: float) -> Color:
 	return c.darkened(amount)
+
+## The one UI font (Nunito, OFL, assets/fonts/). Semi-bold reads best on pastel. Also the project's default theme font.
+static var FONT: FontVariation = _font(650)
+static var FONT_BOLD: FontVariation = _font(800)
+
+static func _font(weight: int) -> FontVariation:
+	var f := FontVariation.new()
+	f.base_font = load("res://assets/fonts/Nunito.ttf")
+	f.variation_opentype = {TextServerManager.get_primary_interface().name_to_tag("wght"): weight}
+	return f

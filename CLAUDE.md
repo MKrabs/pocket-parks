@@ -55,7 +55,7 @@ Godot binary: `$GODOT`, default `~/Downloads/Godot_v4.6.2-stable_linux.x86_64`.
   file uses it. Keep pure logic (grid math, rules, the simulation) free of nodes so tests can reach it.
 - Tests: `tests/test_<thing>.gd`, extending `SceneTree`. Copy the `ok()`/`done()` pattern
   from `tests/test_palette.gd`. Every non-trivial piece of logic gets at least one check.
-- Draw with `_draw()` and polygons (no image assets in this phase).
+- Draw with `_draw()` and polygons (no image assets in this phase). The one font is Nunito (`assets/fonts/`, OFL): use `Palette.FONT` / `Palette.FONT_BOLD`, never `ThemeDB.fallback_font`.
 
 ## Look
 - **Colours:** natural, slightly pastel, only from `scripts/palette.gd` (no Color

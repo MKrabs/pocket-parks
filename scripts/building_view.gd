@@ -121,7 +121,7 @@ func _draw() -> void:
 	if site >= 0.0:
 		_ring(IsoGrid.project(mid) + Vector2(0, -_scaffold_h(top) - 20))
 	if label != "":
-		var f := ThemeDB.fallback_font
+		var f := Palette.FONT
 		var at := IsoGrid.project(mid) + Vector2(0, -maxf(top, 10.0) * grow - 38)  # clear of the flags
 		var w := f.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x
 		draw_colored_polygon(Squircle.points(at, Vector2(w * 0.5 + 9, 11), 4.0, 32), Palette.BUTTER)

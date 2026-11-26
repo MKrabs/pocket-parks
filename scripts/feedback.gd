@@ -71,7 +71,7 @@ func _float(o: Vector2i, amount: int) -> void:
 		return
 	var text := "+$%d" % amount
 	var l := shape(func(ci: Node2D) -> void:
-		var f := ThemeDB.fallback_font
+		var f := Palette.FONT
 		var w := f.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 12).x
 		ci.draw_colored_polygon(Squircle.points(Vector2.ZERO, Vector2(w * 0.5 + 7, 9), 4.0, 32), Palette.BUTTER)
 		ci.draw_string(f, Vector2(-w * 0.5, 4), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Palette.INK))

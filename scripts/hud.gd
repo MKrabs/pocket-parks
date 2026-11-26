@@ -233,7 +233,7 @@ func _draw_badge() -> void:
 		for i in roundi(steps * progress) + 1:
 			part.append(ring[(i + steps * 3 / 4) % steps])
 		_badge.draw_polyline(part, Palette.shade(Palette.BUTTER, 0.22), 4.0, true)
-	var font := ThemeDB.fallback_font
+	var font := Palette.FONT
 	var t := "Lv %d" % level
 	var w := font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x
 	_badge.draw_string(font, c + Vector2(-w * 0.5, 5), t, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Palette.INK)
