@@ -7,7 +7,7 @@ signal picked(id: String)  # "" = eraser
 const RADIUS := 14
 
 var row := HBoxContainer.new()
-var stolen: Array[String] = []  # blueprints from raids, offered in every theme
+var stolen: Array[String] = []  # blueprints spies brought home, offered in every theme
 
 static func box(c: Color, radius: int = RADIUS) -> StyleBoxFlat:
 	var s := StyleBoxFlat.new()

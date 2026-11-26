@@ -1,5 +1,5 @@
 class_name BotPark
-# Pure generator for raid-target parks: entrance on the west edge, a path spine with branches,
+# Pure generator for parks to visit: entrance on the west edge, a path spine with branches,
 # attractions and shops touching the paths, decor on free cells. Same seed -> same park.
 
 const SIZES := {

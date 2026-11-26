@@ -31,7 +31,7 @@ func rebuild() -> void:
 	update_ghost()
 	money_changed.emit(map.money)
 
-## Raid view: grey out the buildings the sim has closed.
+## Grey out the buildings the sim has closed (wrecked by a hooligan).
 func show_wrecked(closed: Dictionary) -> void:
 	for v: BuildingView in get_children():
 		if v != ghost and v.wrecked != closed.has(v.origin):

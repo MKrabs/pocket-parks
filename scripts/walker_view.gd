@@ -6,7 +6,6 @@ extends Node2D
 const GUEST_COLORS := [Palette.SKY, Palette.BUTTER, Palette.CLAY, Palette.WATER, Palette.WOOD]
 const CAPS := {"janitor": Palette.SAND, "guard": Palette.SKY}
 const LIFT := 3.0  # path tile height in px
-const MARKS := {"hooligan": Palette.CORAL, "litterbug": Palette.SAND, "thief": Palette.INK, "spy": Palette.SKY}
 
 var sim: ParkSim
 var _layers: Array[Node2D] = []
@@ -34,8 +33,6 @@ func _process(delta: float) -> void:
 	for g in sim.guests:
 		if g["state"] != "visit":  # inside the building
 			_row(g["pos"]).append(["guest", g])
-	for r in sim.raiders:
-		_row(r["pos"]).append(["raider", r])
 	for l in _layers:
 		l.queue_redraw()
 
@@ -65,9 +62,6 @@ func _draw_row(ci: Node2D, d: int) -> void:
 				var base: Color = GUEST_COLORS[id % GUEST_COLORS.size()]
 				var col := base.lerp(Palette.CORAL, clampf((60.0 - g["mood"]) / 40.0, 0.0, 1.0))
 				_bean(ci, g["pos"] + jitter, id, Vector2(4.0, 4.8), col, Color(Palette.INK, 0.0), g["state"] != "queue")
-			"raider":
-				var r: Dictionary = e[1]
-				_bean(ci, r["pos"], 3, Vector2(5.5, 7.0), Palette.shade(Palette.STONE, 0.4), Color(Palette.INK, 0.0), r["state"] != "work", MARKS[r["kind"]])
 
 ## Squircle bean standing on the path, soft shadow, optional cap and chest mark. `half` in px.
 func _bean(ci: Node2D, p: Vector2, phase: int, half: Vector2, col: Color, cap: Color, walking: bool, mark := Color(Palette.INK, 0.0)) -> void:
