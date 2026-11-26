@@ -48,12 +48,41 @@ else's park mid-day with a squad of troublemakers: one short fight, one finish c
 - **One finish card, 3 stars:** ★ wrecked at least one building, ★ stole money or a blueprint,
   ★ the target's average happiness ended below 50. You keep loot and stolen blueprints.
 
-## Parked
-Roguelike run structure (seasons or ladders of raids). Real multiplayer and async snapshots
-of real players (bot parks stand in). Social features (visits, likes, leagues). Meta
-progression. Saving. Sound. Themes beyond zoo + the festival proof.
+## Roadmap (owner wishlist 2026-11-26, grouped by what each depends on)
+Only the next milestone gets detailed tickets. Later ones stay one-liners until it's done.
 
-## Open
-- Does raiding cost more than money (cooldown, reputation)?
-- How does a defender learn they were raided (a log or a replay)?
-- Roguelike: per-raid upgrades, or runs of raids?
+**M3 Depth (single player, next).** Each item is independent.
+- Building upgrades: levels 1–3 per building, more appeal/capacity/price, visible on the model (extra tier, flag, trim).
+- Staff levels: janitors clean faster and see further; guards move faster, catch from further away, and spot raiders sooner. Paid upgrade.
+- Expandable map: start smaller (about 12×12), buy a few adjacent plots up to about 20×20. "Not by too much."
+- Cinema theme (third pack): ticket booth entrance, screens (attractions), popcorn stand (shop), posters/plants (decor).
+- Kick raiders by hand: click a raider in your park to throw it out (costs a moment of your attention, guards do it automatically).
+- Raider readability: bigger beans and clearer role marks (from the GATE2 review).
+
+**M4 Online foundation.** The big fork; see Decision needed below.
+- Server that hosts every park's day sim (the same `ParkSim` code, headless Godot). Your park keeps running while you're away.
+- Identity-lite: a name and a colour, no passwords at first (friends only).
+- Visit any park live: you watch its real day.
+
+**M5 Live social** (needs M4)
+- Your own character: walk around the park you're visiting, alongside the guests.
+- Presence: see who is visiting your park right now, and who else is in the park you are visiting.
+- Chat through your character: speech bubbles over it, plus a small log.
+
+**M6 Live raids** (needs M4, best after M5)
+- Raid any park whenever you want, live, no matchmaking or shields (unlike Clash of Clans). You send raiders from inside the park you're visiting.
+- The defender, if online, sees it happen and can kick raiders by hand. Otherwise only their guards defend.
+- Rules to settle then: cooldowns or limits per target, so nobody gets farmed.
+
+**Later themes:** amusement park, conference, food festival in full.
+
+## Decision needed before M4
+Live presence (M5) and live raids (M6) need parks that exist on a server in real time. The async
+snapshots this doc assumed can't show who's visiting right now. **Proposed:** one small authoritative
+server (Godot headless, Godot's high-level multiplayer over WebSocket/ENet) runs all park sims; clients
+only render and send intents. `ParkSim` is already pure and deterministic, so it moves to the server as is.
+Open: where it's hosted, and how many players to plan for (friends ≈ 10, or public).
+
+## Parked
+Roguelike run structure. Meta progression. Saving (until M4 makes the server the save).
+Sound. Leagues and likes.
