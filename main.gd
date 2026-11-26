@@ -99,6 +99,7 @@ func _ready() -> void:
 		if id != "":
 			card.close())
 	bar.hire.connect(func(kind: String) -> void: sim.hire(kind))
+	bar.map = zoo.map
 	add_child(bar)
 	card.sim = sim
 	card.map = zoo.map
@@ -344,6 +345,9 @@ func _on_pin_clicked(origin: Vector2i, _kind: String) -> void:
 
 func _on_card_action(what: String) -> void:
 	var o := card.origin
+	if what.begins_with("spec_"):
+		zoo.map.toggle_specialty(o, what.trim_prefix("spec_"))
+		return
 	match what:
 		"upgrade":
 			zoo.upgrade(o)

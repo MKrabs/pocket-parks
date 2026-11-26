@@ -10,9 +10,36 @@ var occupied: Dictionary = {}   # every covered cell -> origin cell
 var levels: Dictionary = {}     # origin cell -> level 2..3 (absent = 1)
 var rotations: Dictionary = {}  # origin cell -> quarter turns 1..3 (absent = 0)
 var xp := 0                     # park XP (ParkLevel); the sim owns it while the day runs, like money
+var specialties: Dictionary = {}  # builder shed origin -> Array of Specialties ids its builder picked
 
 func park_level() -> int:
 	return ParkLevel.of(xp)
+
+## Park level a new building `id` waits for (more builder sheds), or 0 if it may be placed.
+func shed_needs(id: String) -> int:
+	if Buildings.get_def(id)["role"] != "staff":
+		return 0
+	var n := buildings.values().filter(func(b: String) -> bool: return Buildings.get_def(b)["role"] == "staff").size()
+	return 0 if n < ParkLevel.cap("sheds", park_level()) else ParkLevel.needed("sheds", n + 1)
+
+func specs(shed: Vector2i) -> Array:
+	return specialties.get(shed, [])
+
+## Specialties the builder at `shed` may show: the ones it has, plus all others while a slot is free. Never locked ones.
+func spec_choices(shed: Vector2i) -> Array:
+	var free := specs(shed).size() < ParkLevel.cap("specialties", park_level())
+	return Specialties.ALL.keys().filter(func(s: String) -> bool: return free or s in specs(shed))
+
+## Pick `s` for the builder at `shed`, or drop it if it already has it. False if no slot is free.
+func toggle_specialty(shed: Vector2i, s: String) -> bool:
+	var have: Array = specialties.get_or_add(shed, [])
+	if s in have:
+		have.erase(s)
+		return true
+	if not s in spec_choices(shed):
+		return false
+	have.append(s)
+	return true
 
 ## Footprint size after `rot` quarter turns (3x2 turned once is 2x3).
 static func size(id: String, rot := 0) -> Vector2i:
@@ -42,7 +69,7 @@ func fits(id: String, cell: Vector2i, rot := 0) -> bool:
 	return true
 
 func can_place(id: String, cell: Vector2i, rot := 0) -> bool:
-	return fits(id, cell, rot) and money >= Buildings.get_def(id)["cost"]
+	return fits(id, cell, rot) and money >= Buildings.get_def(id)["cost"] and shed_needs(id) == 0
 
 func place(id: String, cell: Vector2i, rot := 0) -> bool:
 	if not can_place(id, cell, rot):
@@ -67,6 +94,7 @@ func remove_at(cell: Vector2i, back := -1) -> bool:
 	buildings.erase(origin)
 	levels.erase(origin)
 	rotations.erase(origin)
+	specialties.erase(origin)
 	return true
 
 ## What removing the building at `origin` gives back: half of all it cost (1×, +1×, +2× per level).
