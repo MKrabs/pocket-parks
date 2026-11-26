@@ -20,6 +20,7 @@ func _init() -> void:
 	var main: Node = load("res://main.tscn").instantiate()
 	root.add_child.call_deferred(main)
 	await process_frame  # main._ready has run
+	main.bots = false  # N3's bot senders would move our money too
 	var home: ParkSim = main.sim
 	home._appeal = 0.0  # no walk-in crowd at home, so only the visit moves our money
 	home.guests.clear()
