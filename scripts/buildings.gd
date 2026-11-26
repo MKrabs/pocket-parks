@@ -41,7 +41,7 @@ static func enclosure() -> Array:
 	var seg := PackedFloat32Array()
 	var total := 0.0
 	for i in ring.size():
-		seg.append(Squircle.to_screen(ring[i]).distance_to(Squircle.to_screen(ring[i - 1])))
+		seg.append(IsoGrid.project(ring[i]).distance_to(IsoGrid.project(ring[i - 1])))
 		total += seg[i]
 	var gap := total / roundf(total / 13.0)  # ~13 screen px between posts, evenly divided
 	var walked := gap

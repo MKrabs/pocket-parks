@@ -23,7 +23,7 @@ func _init() -> void:
 	# n=4 bulges past the ellipse at the diagonal
 	var d := Squircle.points(Vector2.ZERO, Vector2.ONE, 4.0, 8)[1]
 	ok(d.x > cos(PI / 4) + 0.05, "n=4 is squarer than a circle")
-	ok(Squircle.to_screen(Vector2(1, 0)) == Vector2(32, 16), "iso 2:1 projection")
+	ok(Squircle.iso_points(Vector2.ZERO, Vector2.ONE, 4.0, 4)[0].is_equal_approx(Vector2(32, 16)), "iso 2:1 projection")
 	ok(Buildings.CATALOG.size() == 5, "5 buildings")
 	for id in Buildings.CATALOG:
 		var b: Dictionary = Buildings.CATALOG[id]

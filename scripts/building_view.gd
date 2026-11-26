@@ -12,7 +12,7 @@ func _draw() -> void:
 	var fp: Vector2i = b["footprint"]
 	var mid := Vector2(fp.x - 1, fp.y - 1) * 0.5  # footprint centre in grid coords
 	for p in b["parts"]:
-		var foot := Squircle.iso_points(Squircle.to_screen(mid + p["at"]), p["half"], 4.0, 48)
+		var foot := Squircle.iso_points(IsoGrid.project(mid + p["at"]), p["half"], 4.0, 48)
 		block(self, foot, p["h"], p["z"], p["color"])
 
 ## Extruded squircle: sides for edges facing the viewer, then the top face lifted by z + h.

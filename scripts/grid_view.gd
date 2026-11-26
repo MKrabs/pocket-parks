@@ -16,8 +16,7 @@ func _process(_delta: float) -> void:
 		c = NONE
 	if c != hovered:
 		hovered = c
-		if c != NONE:
-			cell_hovered.emit(c)
+		cell_hovered.emit(c)  # NONE when the mouse leaves the grid
 		queue_redraw()
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -25,21 +24,11 @@ func _unhandled_input(event: InputEvent) -> void:
 	if mb and mb.pressed and hovered != NONE:
 		cell_clicked.emit(hovered, mb.button_index)
 
-## Squircle (n=6) centred at cell-space point c with half-size r, projected to screen.
-func _squircle(c: Vector2, r: Vector2, n: float = 6.0, steps: int = 48) -> PackedVector2Array:
-	var pts := PackedVector2Array()
-	for i in steps:
-		var t := TAU * i / steps
-		var u := signf(cos(t)) * pow(absf(cos(t)), 2.0 / n)
-		var v := signf(sin(t)) * pow(absf(sin(t)), 2.0 / n)
-		pts.append(IsoGrid.project(c + Vector2(u * r.x, v * r.y)))
-	return pts
-
 func _draw() -> void:
 	var half := Vector2(IsoGrid.SIZE) / 2.0
 	var mid := half - Vector2(0.5, 0.5)
 	# Slab: extrude every outline segment downward; the top face drawn last hides the back ones.
-	var top := _squircle(mid, half + Vector2(0.12, 0.12), 60.0, 240)
+	var top := Squircle.iso_points(IsoGrid.project(mid), half + Vector2(0.12, 0.12), 60.0, 240)
 	var down := Vector2(0, SLAB)
 	for i in top.size():
 		var a := top[i]
@@ -53,4 +42,4 @@ func _draw() -> void:
 			var col := Palette.GRASS if (x + y) % 2 == 0 else Palette.GRASS_DARK
 			if cell == hovered:
 				col = Palette.SKY
-			draw_colored_polygon(_squircle(Vector2(cell), Vector2(0.47, 0.47)), col)
+			draw_colored_polygon(Squircle.iso_points(IsoGrid.to_screen(cell), Vector2(0.47, 0.47), 6.0, 48), col)
