@@ -1,9 +1,10 @@
-# project-szm: zoo builder
+# project-szm: Pocket Parks
 
-Isometric zoo builder in Godot 4.6 (GDScript). Long-term idea: a roguelike where you fight
-other people's zoos, with upgrade paths, money and a social layer. **Current phase: a
-prototype that answers whether the agent factory can build a Godot game.** Only the grid,
-placement and sample buildings are in scope. Everything else is Parked.
+Isometric park builder in Godot 4.6 (GDScript). You build and run a park; themes (zoo,
+festival, ...) are data packs. Fights are short raids on other parks. **The game definition
+lives in `docs/design/game.md`. Read it before any gameplay ticket.** Current phase:
+prototype 2, the park day simulation and raids against bot parks. Everything that doc marks
+Parked stays parked.
 
 ## Roles
 - **Owner (human):** decides direction, judges look and feel, approves merges.
@@ -42,8 +43,7 @@ Godot binary: `$GODOT`, default `~/Downloads/Godot_v4.6.2-stable_linux.x86_64`.
   implementation, no scaffolding for later tickets, no addons or dependencies.
 - **Product decisions belong to the owner.** Implementation details are yours: guess,
   and name the guess in the handoff.
-- **Parked means don't design it or scaffold for it:** combat, roguelike runs, upgrades,
-  economy beyond a money counter, multiplayer/social, saving, sound.
+- **Parked means don't design it or scaffold for it.** See `docs/design/game.md` → Parked.
 - New ideas become one-line tickets right away, so nothing lives only in chat.
 
 ## Godot conventions
@@ -52,7 +52,7 @@ Godot binary: `$GODOT`, default `~/Downloads/Godot_v4.6.2-stable_linux.x86_64`.
   `main.gd` or in the scripts it creates). Text-merging `.tscn` files across worktrees
   goes badly.
 - Scripts live in `scripts/`, one concept per file, with `class_name` when another
-  file uses it. Keep pure logic (grid math, rules) free of nodes so tests can reach it.
+  file uses it. Keep pure logic (grid math, rules, the simulation) free of nodes so tests can reach it.
 - Tests: `tests/test_<thing>.gd`, extending `SceneTree`. Copy the `ok()`/`done()` pattern
   from `tests/test_palette.gd`. Every non-trivial piece of logic gets at least one check.
 - Draw with `_draw()` and polygons (no image assets in this phase).
