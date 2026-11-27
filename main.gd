@@ -47,6 +47,9 @@ var _unsaved := 0  # sim ticks since the last save
 var follow := true  # F: the camera follows your character while it walks
 const FOLLOW_RATE := 3.0  # camera catch-up per second
 var _chasing := false
+var _ban_told := false  # this visit's "you're blacklisted here" toast is out
+var _struck := false    # we did a crime in person this (live) visit: Back home walks out through the gate first
+var _walking_out := false
 
 ## T cycles the active theme (zoo → festival → cinema); the build bar follows, placed buildings stay.
 ## Esc leaves place mode, or closes the card in Select mode.
@@ -184,10 +187,11 @@ func _ready() -> void:
 			_hear(name, color, text))
 	chat.typed.connect(say)
 	add_child(net)  # net.player is set from here on
-	sim.join_avatar(net.shown(), net.color)
+	sim.join_avatar(net.player, net.color, net.shown())
 	visit_panel.picked.connect(travel_to)
 	visit_panel.sent.connect(send)
-	visit_panel.home.connect(travel_home)
+	visit_panel.home.connect(leave_park)
+	visit_panel.crime.connect(strike)
 	add_child(visit_panel)
 	add_child(transition)
 	toasts.clicked.connect(func(o: Vector2i) -> void: cam.position = IsoGrid.to_screen(o))
@@ -244,6 +248,17 @@ func _process(delta: float) -> void:
 	if visiting:
 		_visit_zoo.show_wrecked((net.visit_sim.closed if net.visit_sim else {}) if live else visits[0]["sim"].closed)
 		visit_panel.show_ledger(_inside(), sim.money)
+		visit_panel.show_crimes(here().crimes_for(net.player) if here() else [])
+		var days := _banned()
+		if days > 0 and not _ban_told:
+			_ban_told = true
+			toasts.add("wrecked", "Blacklisted here for %d day%s: your character went home" % [days, "" if days == 1 else "s"])
+			sim.join_avatar(net.player, net.color, net.shown())
+			_walking_out = false
+		var me_ := my_avatar()
+		if _walking_out and (me_.is_empty() or me_["cell"] == here()._entrance and me_["path"].is_empty()):
+			_walking_out = false
+			travel_home()
 	else:
 		_hover(get_global_mouse_position(), get_viewport().get_mouse_position())
 	var me := my_avatar()
@@ -307,7 +322,7 @@ func step_world() -> void:
 		if vs.tick >= ParkSim.DAY_TICKS:
 			vs.new_day()  # ponytail: bot parks loop their day; our people still inside are dropped
 		_collect(v)
-		_learn(vs.blueprints.get(Visit.ME, []))
+		_learn(vs.blueprints.get(Visit.ME, []) + vs.blueprints.get(net.player, []))
 		var t := vs.sent_by(Visit.ME)
 		if not (visiting and not live and v == visits[0]) and t["guests"] + t["hidden"] + t["wanted"] == 0:
 			visits.erase(v)  # left behind and nobody of ours is inside any more
@@ -347,7 +362,7 @@ func visit(offer: Dictionary) -> void:
 	_visit_walkers = WalkerView.new()
 	_visit_walkers.sim = v["sim"]
 	_visit_walkers.me = Visit.ME
-	(v["sim"] as ParkSim).join_avatar(net.shown(), net.color)
+	(v["sim"] as ParkSim).join_avatar(net.player, net.color, net.shown())
 	_enter_visit(offer["name"])
 
 ## The identity card, filled with who we are now (a first start suggests the login as the name).
@@ -400,7 +415,29 @@ func _enter_visit(title: String) -> void:
 	add_child(_visit_zoo)
 	add_child(_visit_walkers)
 	visiting = true
+	_ban_told = false
+	_struck = false
+	_walking_out = false
 	visit_panel.watch(title)
+
+## Days we're still blacklisted in the park on screen (0 = not). A real host tells us with our ledger.
+func _banned() -> int:
+	return int(net.visit_ledger.get("banned", 0)) if live else int(visits[0]["sim"].blacklist.get(net.player, 0))
+
+## Our character does `kind` (ParkSim.CRIMES) at the building beside it, in the park on screen.
+func strike(kind: String) -> bool:
+	if not visiting:
+		return false
+	_struck = _struck or live
+	return net.strike(kind) if live else here().avatar_strike(net.player, kind)
+
+## Back home: after a crime in a real park our character first walks out through the gate, so the host hands over
+## the loot while we're still connected (a bot park settles at once in go_home).
+func leave_park() -> void:
+	if live and _struck and not my_avatar().is_empty() and walk_to(net.visit_sim._entrance):
+		_walking_out = true
+	else:
+		travel_home()
 
 ## Send one person of `kind` into the park on screen. False if not visiting, too poor, at the send limit, or a real
 ## park that hasn't answered yet. The park charges the price through its ledger (send_paid): a bot park's is paid
@@ -422,7 +459,7 @@ func _inside() -> Dictionary:
 
 ## Money a bot park's ledger moved since we last looked comes into (or out of) our sim.
 func _collect(v: Dictionary) -> void:
-	var owed: int = v["sim"].ledger.get(Visit.ME, 0)
+	var owed: int = v["sim"].ledger.get(Visit.ME, 0) + v["sim"].ledger.get(net.player, 0)  # our people + our character
 	sim.money += owed - v["paid"]
 	v["paid"] = owed
 
@@ -433,7 +470,7 @@ func go_home() -> void:
 	visiting = false
 	if not live:
 		(visits[0]["sim"] as ParkSim).leave_avatar(net.player)
-	sim.join_avatar(net.shown(), net.color)  # back at our gate
+	sim.join_avatar(net.player, net.color, net.shown())  # back at our gate
 	grid.map = zoo.map
 	live = false
 	net.leave()
@@ -498,11 +535,29 @@ func accuse(person_id: int) -> Dictionary:
 	zoo.map.money = sim.money
 	return r
 
+## Accuse another player's character: caught after a crime (fined, blacklisted for `days`) or wrongful (we pay).
+func accuse_visitor(name: String, days: int) -> Dictionary:
+	var r := sim.accuse_avatar(name, days)
+	if r.is_empty():
+		return r
+	if r["wrongful"]:
+		toasts.add("wrongful", "Wrongful accusation: you paid %s $%d" % [name, r["fine"]])
+	else:
+		toasts.add("caught", "Caught %s: +$%d, blacklisted for %d day%s" % [name, r["fine"] + r["loot"], r["days"], "" if r["days"] == 1 else "s"])
+	zoo.map.money = sim.money
+	return r
+
 ## Id of the nearest guest drawn within PICK_RADIUS screen px of a world point, or -1.
 func person_at(world: Vector2) -> int:
 	var drawn := sim.guests.filter(func(g: Dictionary) -> bool: return g["state"] != "visit")  # inside = not drawn
 	var i := _nearest(world, drawn.map(func(g: Dictionary) -> Vector2: return WalkerView.spot(g)))
 	return drawn[i]["id"] if i >= 0 else -1
+
+## Name of the nearest other player's character within PICK_RADIUS screen px, or "".
+func visitor_at(world: Vector2) -> String:
+	var others := sim.avatars.filter(func(a: Dictionary) -> bool: return a["name"] != net.player)
+	var i := _nearest(world, others.map(func(a: Dictionary) -> Vector2: return a["pos"]))
+	return others[i]["name"] if i >= 0 else ""
 
 ## Index of the nearest staff member within PICK_RADIUS screen px, or -1.
 func staff_at(world: Vector2) -> int:
@@ -537,7 +592,10 @@ func _on_cell_clicked(cell: Vector2i, button: MouseButton, shift := false) -> vo
 func select_at(cell: Vector2i, world: Vector2) -> void:
 	var g := person_at(world)
 	var s := staff_at(world)
-	if g >= 0:
+	var v := visitor_at(world)
+	if v != "":
+		card.show_visitor(v)
+	elif g >= 0:
 		card.show_person(g)
 	elif s >= 0:
 		card.show_staff(s)
@@ -577,7 +635,10 @@ func _on_card_action(what: String) -> void:
 				toasts.add("repaired", "Repaired %s: −$%d" % [_name(o), before - sim.money], o)
 				zoo.map.money = sim.money
 		"accuse":
-			accuse(card.person)
+			if card.visitor != "":
+				accuse_visitor(card.visitor, card.days)
+			else:
+				accuse(card.person)
 			card.close()
 
 ## ZooView rebuilt after a place/remove: the map paid for it, hand money and layout back to the sim.

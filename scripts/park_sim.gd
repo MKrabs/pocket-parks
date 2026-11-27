@@ -44,6 +44,10 @@ const WRONGFUL_FINE := 40
 const ROBBED_TICKS := 20 * TPS
 const KINDS := ["guest", "hooligan", "litterbug", "thief", "spy"]
 const SEND_BASE := 3  # send limit = SEND_BASE + the sender's park level
+# In person (docs/design/game.md → Visiting in person): a character's crimes, by the actor kind whose effect it has.
+const CRIMES := {"hooligan": "Wreck", "litterbug": "Litter", "thief": "Steal", "spy": "Spy"}
+const BAN_DAYS := 3     # guard catches blacklist for the host's default (ban_days), starting here
+const BAN_MAX := 7
 # Construction (docs/design/game.md → Building). Seconds by building id, else by role, else 20 s per footprint side.
 const BUILD_SECONDS := {"path": 0.0, "entrance": 0.0, "decor": 5.0, "shop": 20.0, "pond": 40.0, "enclosure": 60.0}
 const LEVEL_TIME := [1.0, 1.5, 2.5]  # × build time for building level 1 / upgrading to 2 / to 3
@@ -74,7 +78,10 @@ var _gate: Array = []               # [kind, sender] waiting to enter
 var jobs: Array[Dictionary] = []     # sites: {origin, id, level (being built), left, total (work ticks), paid, builder ("" = waiting)}
 var builders: Array[Dictionary] = [] # one per finished shed: {name, shed (origin), pos (fractional cell), state: home|walk|work}
 var finished: Array[Vector2i] = []   # sites done; the view pops them and clears this
-var avatars: Array[Dictionary] = []  # player characters, not guests (no spending, mood, accusing): {name, color, cell, pos, path}
+var avatars: Array[Dictionary] = []  # player characters, not guests (no spending, mood): {name, color, cell, pos, path}
+                                     # + like an actor: sender (= name), kind (worst crime so far), crimes, loot, spied, event, strike (ticks)
+var blacklist: Dictionary = {}       # player name -> in-game days left (counts down in new_day)
+var ban_days := BAN_DAYS             # the host's default ban for guard catches
 var _map: ParkMap
 
 var _rng := RandomNumberGenerator.new()
@@ -137,6 +144,10 @@ func new_day() -> void:
 	guests.clear()
 	litter.clear()
 	closed.clear()  # reopen ticks count from the old day's clock
+	for n: String in blacklist.keys():
+		blacklist[n] -= 1
+		if blacklist[n] <= 0:
+			blacklist.erase(n)
 	for t in _targets:
 		t["inside"] = 0
 	if _entrance.x >= 0:
@@ -279,13 +290,14 @@ func send(kind: String, sender: String) -> void:
 	assert(kind in KINDS, "unknown kind " + kind)
 	_gate.append([kind, sender])
 
-## Most people of `sender` inside at once (docs/design/game.md → Send limit). SOC5's blacklist halves it here.
+## Most people of `sender` inside at once (docs/design/game.md → Send limit), halved while blacklisted here.
 func send_limit(sender: String) -> int:
-	return SEND_BASE + sender_levels.get(sender, 1)
+	var n: int = SEND_BASE + sender_levels.get(sender, 1)
+	return n / 2 if blacklist.has(sender) else n
 
-## What one `kind` costs `sender`. SOC5's blacklist doubles it here.
-func send_cost(_sender: String, kind: String) -> int:
-	return Visit.PRICES[kind]
+## What one `kind` costs `sender`: double while blacklisted here.
+func send_cost(sender: String, kind: String) -> int:
+	return Visit.PRICES[kind] * (2 if blacklist.has(sender) else 1)
 
 ## A send from a remote park at `level`: refused (false, nothing charged) at its limit; otherwise queued and
 ## charged through the ledger, so the price reaches the sender with its next ledger message.
@@ -303,7 +315,8 @@ func send_paid(kind: String, sender: String, level: int) -> bool:
 ## What `sender` has in this park: guests / hidden (actors not wanted) / wanted, counting the gate queue,
 ## plus earned (guest share, loot, wrongful-arrest pay, not counting send prices), fines paid and its send limit.
 func sent_by(sender: String) -> Dictionary:
-	var out := {"guests": 0, "hidden": 0, "wanted": 0, "fines": fined.get(sender, 0), "limit": send_limit(sender)}
+	var out := {"guests": 0, "hidden": 0, "wanted": 0, "fines": fined.get(sender, 0), "limit": send_limit(sender),
+		"banned": blacklist.get(sender, 0)}
 	out["earned"] = ledger.get(sender, 0) + out["fines"] + charged.get(sender, 0)
 	var people: Array = _gate.map(func(p: Array) -> Dictionary: return {"kind": p[0], "sender": p[1], "wanted": false})
 	for g in people + guests:
@@ -336,28 +349,94 @@ func _settle(g: Dictionary) -> void:
 	if not g["spied"].is_empty():
 		blueprints[sender] = blueprints.get(sender, []) + g["spied"]
 
-## A player's character enters at the gate (back to the gate if already here).
-func join_avatar(name: String, color: Color) -> void:
+## A player's character enters at the gate (back to the gate if already here). False (and not here) while blacklisted.
+func join_avatar(name: String, color: Color, label := "") -> bool:
 	leave_avatar(name)
-	avatars.append({"name": name, "color": color, "cell": _entrance, "pos": Vector2(_entrance), "path": []})
-
-func leave_avatar(name: String) -> void:
-	avatars.assign(avatars.filter(func(a: Dictionary) -> bool: return a["name"] != name))
-
-## Walk `name`'s character along the paths to `cell`. False if it isn't here or the cell isn't walkable.
-func move_avatar(name: String, cell: Vector2i) -> bool:
-	if not _astar.is_in_boundsv(cell) or _astar.is_point_solid(cell):
+	if blacklist.has(name):
 		return false
+	avatars.append({"name": name, "label": label if label != "" else name, "color": color, "cell": _entrance, "pos": Vector2(_entrance), "path": [],
+		"sender": name, "kind": "", "crimes": 0, "loot": 0, "spied": [], "event": {}, "strike": 0})
+	return true
+
+## The character leaves the park (Back home, disconnect); what it carries is delivered.
+func leave_avatar(name: String) -> void:
+	var a := avatar(name)
+	if not a.is_empty():
+		_settle_avatar(a)
+		avatars.erase(a)
+
+func avatar(name: String) -> Dictionary:
 	for a in avatars:
 		if a["name"] == name:
-			_go(a, cell)
-			return true
-	return false
+			return a
+	return {}
+
+## Walk `name`'s character along the paths to `cell`. False if it isn't here, is striking, or the cell isn't walkable.
+func move_avatar(name: String, cell: Vector2i) -> bool:
+	var a := avatar(name)
+	if a.is_empty() or a.get("strike", 0) > 0 or not _astar.is_in_boundsv(cell) or _astar.is_point_solid(cell):
+		return false
+	_go(a, cell)
+	return true
 
 ## One tick of every character's walk. Separate from step() so they walk while the day is paused or over.
+## A character at the gate hands over what it carries (loot is delivered when you leave through the gate).
 func step_avatars() -> void:
 	for a in avatars:
 		_walk(a, AVATAR_SPEED)
+		a["strike"] = maxi(a.get("strike", 0) - 1, 0)
+		if a["cell"] == _entrance:
+			_settle_avatar(a)
+
+func _settle_avatar(a: Dictionary) -> void:
+	if a.get("loot", 0) > 0 or not a.get("spied", []).is_empty():
+		_settle(a)
+		a["loot"] = 0
+		a["spied"] = []
+
+## The open attraction or shop right beside `cell`, or {}.
+func _beside(cell: Vector2i) -> Dictionary:
+	for t in _targets:
+		if closed.has(t["origin"]):
+			continue
+		for c: Vector2i in t["cells"]:
+			if absi(c.x - cell.x) + absi(c.y - cell.y) == 1:
+				return t
+	return {}
+
+## Crimes (CRIMES keys) `name`'s character can do where it stands; [] while walking or striking, or nowhere near.
+func crimes_for(name: String) -> Array:
+	var a := avatar(name)
+	if a.is_empty() or not a["path"].is_empty() or a.get("strike", 0) > 0:
+		return []
+	var t := _beside(a["cell"])
+	if t.is_empty():
+		return []
+	return CRIMES.keys().filter(func(k: String) -> bool: return k != "thief" or t["role"] == "shop")
+
+## `name`'s character does `kind` at the building beside it, exposed for STRIKE_TICKS. False if it can't here.
+func avatar_strike(name: String, kind: String) -> bool:
+	if not kind in crimes_for(name):
+		return false
+	var a := avatar(name)
+	a["strike"] = STRIKE_TICKS
+	_crime(a, kind, _beside(a["cell"]))
+	return true
+
+## The host accuses a visitor's character: after a crime it's caught, fined and blacklisted for `days` (1–BAN_MAX);
+## with no crime it's a wrongful accusation the host pays for, and nobody is banned. {} if it isn't here.
+func accuse_avatar(name: String, days: int) -> Dictionary:
+	var a := avatar(name)
+	if a.is_empty():
+		return {}
+	return _ban(a, days) if a["crimes"] > 0 else _wrongful(a)
+
+## Caught fair and square: fined like an actor, loot back, out of the park and blacklisted.
+func _ban(a: Dictionary, days: int, guard := -1) -> Dictionary:
+	var r := _arrest(a, guard)
+	blacklist[a["name"]] = clampi(days, 1, BAN_MAX)
+	r["days"] = blacklist[a["name"]]
+	return r
 
 func _go(w: Dictionary, to: Vector2i) -> void:
 	var p := _astar.get_id_path(w["cell"], to)
@@ -492,10 +571,16 @@ func _leave(g: Dictionary) -> void:
 func _strike(g: Dictionary, t: Dictionary) -> void:
 	g["state"] = "strike"
 	g["wait"] = STRIKE_TICKS
+	_crime(g, g["kind"], t)
+
+## `who` (an actor or a character) does the crime of actor kind `kind` at target `t`: the effect, the report, the loot.
+func _crime(g: Dictionary, kind: String, t: Dictionary) -> void:
 	g["crimes"] += 1
+	if BASE_FINE[kind] > BASE_FINE.get(g["kind"], 0):
+		g["kind"] = kind  # a character is fined at its worst crime's base
 	var origin: Vector2i = t["origin"]
 	var e := {"tick": tick, "kind": "", "origin": origin, "amount": 0, "witnessed": false}
-	match g["kind"]:
+	match kind:
 		"hooligan":
 			e["kind"] = "wrecked"
 			closed[origin] = tick + WRECK_TICKS
@@ -574,15 +659,19 @@ func accuse(person_id: int) -> Dictionary:
 			continue
 		if g["crimes"] > 0:
 			return _arrest(g)
-		money -= WRONGFUL_FINE
-		arrests.append({"tick": tick, "pos": g["pos"], "guard": -1, "amount": -WRONGFUL_FINE, "wrongful": true})
-		if g["sender"] != "":
-			ledger[g["sender"]] = ledger.get(g["sender"], 0) + WRONGFUL_FINE
 		if g["state"] == "visit":
 			_targets[g["target"]]["inside"] -= 1
 		_leave(g)
-		return {"wrongful": true, "fine": WRONGFUL_FINE, "loot": 0}
+		return _wrongful(g)
 	return {}
+
+## The host pays for accusing `g` (a guest or a character) without evidence; its sender gets the money.
+func _wrongful(g: Dictionary) -> Dictionary:
+	money -= WRONGFUL_FINE
+	arrests.append({"tick": tick, "pos": g["pos"], "guard": -1, "amount": -WRONGFUL_FINE, "wrongful": true})
+	if g["sender"] != "":
+		ledger[g["sender"]] = ledger.get(g["sender"], 0) + WRONGFUL_FINE
+	return {"wrongful": true, "fine": WRONGFUL_FINE, "loot": 0}
 
 ## Caught with evidence: the sender is fined BASE_FINE × crimes, the loot goes back to the host.
 func _arrest(g: Dictionary, guard := -1) -> Dictionary:
@@ -592,9 +681,10 @@ func _arrest(g: Dictionary, guard := -1) -> Dictionary:
 	if g["sender"] != "":
 		ledger[g["sender"]] = ledger.get(g["sender"], 0) - fine
 		fined[g["sender"]] = fined.get(g["sender"], 0) + fine
-	if g["state"] == "visit":
+	if g.get("state") == "visit":
 		_targets[g["target"]]["inside"] -= 1
 	guests.erase(g)
+	avatars.erase(g)
 	return {"wrongful": false, "fine": fine, "loot": g["loot"], "kind": g["kind"]}
 
 ## Guards mark strikers within sight as wanted (from Lv 3 they may also notice a hidden actor with crimes),
@@ -617,6 +707,11 @@ func _step_guard(s: Dictionary) -> void:
 		if g["wanted"] and d < best_d:
 			best = g
 			best_d = d
+	for a in avatars:  # a character seen striking is caught on the spot and blacklisted for the default days
+		if a.get("strike", 0) > 0 and s["pos"].distance_to(a["pos"]) <= sight:
+			a["event"]["witnessed"] = true
+			_ban(a, ban_days, staff.find(s))
+			break
 	if not best.is_empty() and (s["path"].is_empty() or tick % 5 == 0):
 		_go(s, best["cell"])
 	if _walk(s, stat(s, "speed")) and best.is_empty() and not _paths.is_empty():

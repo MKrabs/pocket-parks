@@ -42,6 +42,9 @@ var level_card := PanelContainer.new()
 var _level_text := _label(16)
 var _level_title := _label(24)
 var new_card := PanelContainer.new()  # F9: start a new park?
+var blacklist_open := false  # the Blacklist chip under the park name, unfolded
+var _bl := VBoxContainer.new()
+var _bl_drawn: Array = []  # [open, ban_days, blacklist] it was last built for
 
 ## Mood face for an average happiness (0..100).
 static func face_for(happiness: float) -> int:
@@ -99,8 +102,16 @@ func _ready() -> void:
 	lcol.add_child(drow)
 	lrow.add_child(lcol)
 	left.add_child(lrow)
-	add_child(left)
-	left.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT, Control.PRESET_MODE_MINSIZE, MARGIN)
+	var tl := VBoxContainer.new()
+	tl.add_theme_constant_override("separation", 8)
+	tl.add_child(left)
+	var bl := _panel()
+	bl.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	_bl.add_theme_constant_override("separation", 6)
+	bl.add_child(_bl)
+	tl.add_child(bl)
+	add_child(tl)
+	tl.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT, Control.PRESET_MODE_MINSIZE, MARGIN)
 
 	# top-right: money, guests, mood
 	var right := _panel()
@@ -235,6 +246,47 @@ func _process(delta: float) -> void:
 		_card.reset_size()
 		_card.set_anchors_and_offsets_preset(Control.PRESET_CENTER, Control.PRESET_MODE_MINSIZE)
 	_card.visible = over
+	var now := [blacklist_open, sim.ban_days, sim.blacklist.duplicate()]
+	if now != _bl_drawn:
+		_bl_drawn = now
+		_fill_blacklist()
+
+## The Blacklist chip: folded, its name and count; unfolded, the guard-catch default and each name with days left
+## and a Lift button (docs/design/game.md → Visiting in person).
+func _fill_blacklist() -> void:
+	for c in _bl.get_children():
+		_bl.remove_child(c)
+		c.queue_free()
+	var n := sim.blacklist.size()
+	var head := _button("Blacklist · %d" % n if n > 0 else "Blacklist", func() -> void: blacklist_open = not blacklist_open)
+	head.add_theme_font_size_override("font_size", 14)
+	_bl.add_child(head)
+	if not blacklist_open:
+		return
+	var def := HBoxContainer.new()
+	def.add_theme_constant_override("separation", 6)
+	var l := _label(14)
+	l.text = "Guard catches: %d day%s" % [sim.ban_days, "" if sim.ban_days == 1 else "s"]
+	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	def.add_child(l)
+	def.add_child(_button("−", func() -> void: sim.ban_days = maxi(sim.ban_days - 1, 1)))
+	def.add_child(_button("+", func() -> void: sim.ban_days = mini(sim.ban_days + 1, ParkSim.BAN_MAX)))
+	_bl.add_child(def)
+	if n == 0:
+		var none := _label(14)
+		none.text = "Nobody is banned"
+		none.modulate.a = 0.7
+		_bl.add_child(none)
+	for who: String in sim.blacklist:
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 6)
+		var w := _label(14)
+		var d: int = sim.blacklist[who]
+		w.text = "%s · %d day%s left" % [who, d, "" if d == 1 else "s"]
+		w.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(w)
+		row.add_child(_button("Lift", func() -> void: sim.blacklist.erase(who)))
+		_bl.add_child(row)
 
 ## Park name and colour chip in the top-left.
 func set_identity(park: String, c: Color) -> void:

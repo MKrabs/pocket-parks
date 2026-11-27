@@ -60,12 +60,16 @@ func _init() -> void:
 	guest.sim = ParkSim.new(ParkMap.new(), 1)
 	guest.map = ParkMap.new()
 	guest.colour = "CLAY"
+	guest.nick = "Sam"
 	guest.start()
 	ok(guest.join("127.0.0.1", host.port), "client socket opens")
 	ok(pump(host, guest, func() -> bool: return guest.visit_sim != null and guest.visit_sim.avatars.size() == 2),
 		"both avatars appear in the client's live state")
 	var mine := find(sim, guest.player)
 	ok(not mine.is_empty() and mine["cell"] == gate and mine["color"] == Palette.CLAY, "host added the visitor at its gate, in its colour")
+	ok(not mine.is_empty() and mine["label"] == "Sam", "the host labels the character with the chosen name, keyed by the stable id")
+	ok(guest.visit_sim.avatars.any(func(a: Dictionary) -> bool: return a["name"] == guest.player and a["label"] == "Sam"),
+		"visitors see the label too")
 	ok(not find(guest.visit_sim, host.player).is_empty(), "the client sees the host's own character")
 
 	ok(guest.move_avatar(far), "client sends a move")

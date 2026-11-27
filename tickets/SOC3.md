@@ -1,13 +1,13 @@
 ---
 id: SOC3
 title: Presence: who's here
-status: todo
+status: doing
 deps: SOC1, SOC2
 area: social
 parent: M5
 human: false
-owner: 
-since: 
+owner: worker-SOC3
+since: 2026-11-27T01:21:00
 ---
 ## Goal
 `docs/design/game.md` → M5 presence.
@@ -21,3 +21,4 @@ In-process test: two clients join one host, and each sees the other in "also her
 everyone. Shots of the chip and the visit title row. `./gd check` ok.
 
 > **note:** SOC1 + SOC2 merged: show `net.shown()` names (nick, else id) and `IdentityCard.colour_of(colour)` everywhere in presence. The host keys avatars and chat by the shown name (`_shown[peer]`) and ledgers by the stable id (`_names[peer]`). Never show the id when a nick exists.
+> **correction (after SOC5 merged):** avatars are keyed by the stable id (`a["name"]` = player id) and carry `a["label"]` = the chosen name. Show `label`, match players by `name`.

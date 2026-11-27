@@ -14,6 +14,10 @@ var origin := GridView.NONE  # building on the card
 var person := -1  # guest id on the card
 var staff := -1  # staff index on the card
 var plot := GridView.NONE  # land plot for sale on the card (plot coords)
+var visitor := ""  # another player's character on the card (its name)
+var days := ParkSim.BAN_DAYS  # blacklist days an accusation of the visitor asks for (1–7)
+var ban_row := HBoxContainer.new()
+var _days := Hud._label(15)
 var title := Hud._label(22)
 var body := Hud._label(16)
 var upgrade := _action("upgrade")
@@ -50,7 +54,13 @@ func _ready() -> void:
 		for k in ["normal", "hover", "pressed", "hover_pressed"]:
 			(b.get_theme_stylebox(k) as StyleBoxFlat).set_content_margin_all(5)
 		specs.add_child(b)
-	for c in [title, body, specs, upgrade, repair, demolish, accuse, buy, warning]:
+	ban_row.add_theme_constant_override("separation", 8)
+	ban_row.add_child(Hud._button("−", func() -> void: days = maxi(days - 1, 1)))
+	_days.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_days.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	ban_row.add_child(_days)
+	ban_row.add_child(Hud._button("+", func() -> void: days = mini(days + 1, ParkSim.BAN_MAX)))
+	for c in [title, body, specs, upgrade, repair, demolish, ban_row, accuse, buy, warning]:
 		col.add_child(c)
 	_panel.add_child(col)
 	_panel.visible = false
@@ -80,6 +90,7 @@ func show_building(o: Vector2i) -> void:
 	person = -1
 	staff = -1
 	plot = GridView.NONE
+	visitor = ""
 	_open()
 
 func show_person(guest_id: int) -> void:
@@ -87,6 +98,7 @@ func show_person(guest_id: int) -> void:
 	person = guest_id
 	staff = -1
 	plot = GridView.NONE
+	visitor = ""
 	_open()
 
 func show_staff(i: int) -> void:
@@ -94,6 +106,7 @@ func show_staff(i: int) -> void:
 	person = -1
 	staff = i
 	plot = GridView.NONE
+	visitor = ""
 	_open()
 
 func show_plot(p: Vector2i) -> void:
@@ -101,6 +114,17 @@ func show_plot(p: Vector2i) -> void:
 	person = -1
 	staff = -1
 	plot = p
+	visitor = ""
+	_open()
+
+## Another player's character: accuse it, with the blacklist days to ask for if it did something.
+func show_visitor(name: String) -> void:
+	origin = GridView.NONE
+	person = -1
+	staff = -1
+	plot = GridView.NONE
+	visitor = name
+	days = sim.ban_days
 	_open()
 
 func close() -> void:
@@ -108,6 +132,7 @@ func close() -> void:
 	person = -1
 	staff = -1
 	plot = GridView.NONE
+	visitor = ""
 	_panel.visible = false
 
 func _open() -> void:
@@ -178,6 +203,19 @@ func _process(_delta: float) -> void:
 			close()
 			return
 		_plot()
+	elif visitor != "":
+		if sim.avatar(visitor).is_empty():
+			close()
+			return
+		title.text = visitor
+		body.text = "Visiting your park in person"
+		_days.text = "Ban for %d day%s" % [days, "" if days == 1 else "s"]
+		accuse.text = "Accuse"
+		for b in [upgrade, repair, demolish, buy, specs]:
+			b.visible = false
+		accuse.visible = true
+		warning.visible = true
+	ban_row.visible = visitor != ""
 	_panel.reset_size()
 	_panel.position.y = _panel.get_viewport_rect().size.y - _panel.size.y - BOTTOM
 
