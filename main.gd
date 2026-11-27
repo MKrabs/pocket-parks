@@ -203,12 +203,10 @@ func _process(delta: float) -> void:
 	toasts.floor_y = card.top() if card.is_open() else INF
 	zoo.map.money = sim.money  # the sim owns money while the day runs; building spends from the map
 	zoo.map.xp = sim.xp
-	if live:
-		_visit_zoo.show_wrecked(net.visit_sim.closed if net.visit_sim else {})
-		visit_panel.show_ledger(net.visit_ledger, sim.money)
-	elif visiting:
-		_visit_zoo.show_wrecked(visits[0]["sim"].closed)
-		visit_panel.show_ledger(visits[0]["sim"].sent_by(Visit.ME), sim.money)
+	net.level = ParkLevel.of(sim.xp)
+	if visiting:
+		_visit_zoo.show_wrecked((net.visit_sim.closed if net.visit_sim else {}) if live else visits[0]["sim"].closed)
+		visit_panel.show_ledger(_inside(), sim.money)
 	else:
 		_hover(get_global_mouse_position(), get_viewport().get_mouse_position())
 
@@ -246,9 +244,7 @@ func step_world() -> void:
 		vs.step()
 		if vs.tick >= ParkSim.DAY_TICKS:
 			vs.new_day()  # ponytail: bot parks loop their day; our people still inside are dropped
-		var owed: int = vs.ledger.get(Visit.ME, 0)
-		sim.money += owed - v["paid"]
-		v["paid"] = owed
+		_collect(v)
 		_learn(vs.blueprints.get(Visit.ME, []))
 		var t := vs.sent_by(Visit.ME)
 		if not (visiting and not live and v == visits[0]) and t["guests"] + t["hidden"] + t["wanted"] == 0:
@@ -337,18 +333,29 @@ func _enter_visit(title: String) -> void:
 	visiting = true
 	visit_panel.watch(title)
 
-## Send one person of `kind` into the park on screen, paid now. False if not visiting, too poor, or a real park
-## that hasn't answered yet. A real park's host runs the send and judges them under our player name.
+## Send one person of `kind` into the park on screen. False if not visiting, too poor, at the send limit, or a real
+## park that hasn't answered yet. The park charges the price through its ledger (send_paid): a bot park's is paid
+## here at once, a real host's arrives with its next ledger message, and a send the host refuses costs nothing.
 func send(kind: String) -> bool:
-	if not visiting or sim.money < Visit.PRICES[kind]:
+	if not visiting or sim.money < Visit.PRICES[kind] or not VisitPanel.can_send(_inside()):
 		return false
 	if live:
-		if not net.send_person(kind):
-			return false
-	else:
-		visits[0]["sim"].send(kind, Visit.ME)
-	sim.money -= Visit.PRICES[kind]
+		return net.send_person(kind)
+	var v: Dictionary = visits[0]
+	if not v["sim"].send_paid(kind, Visit.ME, ParkLevel.of(sim.xp)):
+		return false
+	_collect(v)
 	return true
+
+## What we have inside the park on screen, with our send limit there.
+func _inside() -> Dictionary:
+	return net.visit_ledger if live else visits[0]["sim"].sent_by(Visit.ME)
+
+## Money a bot park's ledger moved since we last looked comes into (or out of) our sim.
+func _collect(v: Dictionary) -> void:
+	var owed: int = v["sim"].ledger.get(Visit.ME, 0)
+	sim.money += owed - v["paid"]
+	v["paid"] = owed
 
 ## Back to your park; the visited one keeps running while our people are inside.
 func go_home() -> void:

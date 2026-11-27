@@ -43,6 +43,7 @@ const BASE_FINE := {"hooligan": 40, "litterbug": 30, "thief": 50, "spy": 60}
 const WRONGFUL_FINE := 40
 const ROBBED_TICKS := 20 * TPS
 const KINDS := ["guest", "hooligan", "litterbug", "thief", "spy"]
+const SEND_BASE := 3  # send limit = SEND_BASE + the sender's park level
 # Construction (docs/design/game.md → Building). Seconds by building id, else by role, else 20 s per footprint side.
 const BUILD_SECONDS := {"path": 0.0, "entrance": 0.0, "decor": 5.0, "shop": 20.0, "pond": 40.0, "enclosure": 60.0}
 const LEVEL_TIME := [1.0, 1.5, 2.5]  # × build time for building level 1 / upgrading to 2 / to 3
@@ -64,6 +65,8 @@ var events: Array = []              # crimes: {tick, kind, origin, amount, witne
 var ledger: Dictionary = {}         # sender -> money owed to it (negative: it owes the host)
 var blueprints: Dictionary = {}     # sender -> Array of building ids its spies brought home
 var fined: Dictionary = {}          # sender -> fines it paid so far (already inside ledger)
+var charged: Dictionary = {}        # sender -> send prices it paid through send_paid (already inside ledger)
+var sender_levels: Dictionary = {}  # sender -> its park level, as told in hello and each send
 var cash_events: Array = []         # guest payments: {tick, origin (gate or shop), amount}; for the money floats
 var arrests: Array = []             # {tick, pos (cell), guard (staff index, -1 = accused), amount, wrongful}
 var _gate: Array = []               # [kind, sender] waiting to enter
@@ -274,11 +277,32 @@ func send(kind: String, sender: String) -> void:
 	assert(kind in KINDS, "unknown kind " + kind)
 	_gate.append([kind, sender])
 
+## Most people of `sender` inside at once (docs/design/game.md → Send limit). SOC5's blacklist halves it here.
+func send_limit(sender: String) -> int:
+	return SEND_BASE + sender_levels.get(sender, 1)
+
+## What one `kind` costs `sender`. SOC5's blacklist doubles it here.
+func send_cost(_sender: String, kind: String) -> int:
+	return Visit.PRICES[kind]
+
+## A send from a remote park at `level`: refused (false, nothing charged) at its limit; otherwise queued and
+## charged through the ledger, so the price reaches the sender with its next ledger message.
+func send_paid(kind: String, sender: String, level: int) -> bool:
+	sender_levels[sender] = level
+	var t := sent_by(sender)
+	if t["guests"] + t["hidden"] + t["wanted"] >= send_limit(sender):
+		return false
+	var cost := send_cost(sender, kind)
+	ledger[sender] = ledger.get(sender, 0) - cost
+	charged[sender] = charged.get(sender, 0) + cost
+	send(kind, sender)
+	return true
+
 ## What `sender` has in this park: guests / hidden (actors not wanted) / wanted, counting the gate queue,
-## plus earned (guest share, loot, wrongful-arrest pay) and fines paid.
+## plus earned (guest share, loot, wrongful-arrest pay, not counting send prices), fines paid and its send limit.
 func sent_by(sender: String) -> Dictionary:
-	var out := {"guests": 0, "hidden": 0, "wanted": 0, "fines": fined.get(sender, 0)}
-	out["earned"] = ledger.get(sender, 0) + out["fines"]
+	var out := {"guests": 0, "hidden": 0, "wanted": 0, "fines": fined.get(sender, 0), "limit": send_limit(sender)}
+	out["earned"] = ledger.get(sender, 0) + out["fines"] + charged.get(sender, 0)
 	var people: Array = _gate.map(func(p: Array) -> Dictionary: return {"kind": p[0], "sender": p[1], "wanted": false})
 	for g in people + guests:
 		if g["sender"] == sender:
