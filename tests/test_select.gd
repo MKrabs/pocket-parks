@@ -43,7 +43,7 @@ func _initialize() -> void:
 	var o := Vector2i(12, 12)
 	main.select_at(o, Vector2(-9999, -9999))
 	ok(card.is_open() and card.origin == o, "clicking a building opens its card")
-	ok(card.title.text == "Snack Stand · Lv 1", "card title %s" % card.title.text)
+	ok(card.title.text == "Snack Cart · Lv 1", "card title %s" % card.title.text)
 	ok(card.body.text.contains("Shop · sells at $5"), "role line: %s" % card.body.text)
 	await process_frame
 	await process_frame

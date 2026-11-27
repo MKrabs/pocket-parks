@@ -20,12 +20,32 @@ static func catalog() -> Dictionary:
 				B.part(Vector2.ZERO, Vector2(0.14, 0.14), 0, Palette.WATER, 21),
 				B.part(Vector2.ZERO, Vector2(0.04, 0.04), 9, Palette.WATER, 21),
 			]},
-		"snack_stand": {"name": "Snack Stand", "role": "shop", "price": 5, "footprint": Vector2i(1, 1), "cost": 60,
-			"specialty": "carpenter", "mode": "faster",
+		"snack_stand": {"name": "Snack Cart", "role": "shop", "price": 5, "capacity": 2, "footprint": Vector2i(1, 1), "cost": 60,
+			"specialty": "carpenter", "mode": "faster", "variants": ["snack_stand", "hotdog_stand", "burger_diner"],
 			"parts": [
 				B.part(Vector2.ZERO, Vector2(0.3, 0.3), 20, Palette.WOOD),
 				B.part(Vector2.ZERO, Vector2(0.42, 0.42), 7, Palette.CLAY, 20),
 				B.part(Vector2.ZERO, Vector2(0.24, 0.24), 5, Palette.CLAY, 27),
+			]},
+		"hotdog_stand": {"name": "Hot-dog Stand", "role": "shop", "price": 8, "capacity": 4, "footprint": Vector2i(2, 1), "cost": 110,
+			"specialty": "carpenter", "mode": "faster",
+			"parts": [
+				B.part(Vector2.ZERO, Vector2(0.8, 0.32), 16, Palette.WOOD),
+				B.part(Vector2(0, 0.34), Vector2(0.62, 0.05), 3, Palette.STONE, 9),  # counter
+				B.part(Vector2.ZERO, Vector2(0.92, 0.44), 5, Palette.CLAY, 16),  # awning
+				B.part(Vector2.ZERO, Vector2(0.44, 0.16), 6, Palette.BUTTER, 21),  # bun
+				B.part(Vector2.ZERO, Vector2(0.54, 0.09), 6, Palette.CORAL, 26),  # sausage
+			]},
+		"burger_diner": {"name": "Burger Diner", "role": "shop", "price": 12, "capacity": 7, "footprint": Vector2i(2, 2), "cost": 190,
+			"specialty": "carpenter", "mode": "faster",
+			"parts": [
+				B.part(Vector2.ZERO, Vector2(0.82, 0.82), 22, Palette.CLOUD),
+				B.part(Vector2(0.84, 0), Vector2(0.03, 0.56), 8, Palette.SKY, 8),  # windows
+				B.part(Vector2(0, 0.84), Vector2(0.56, 0.03), 8, Palette.SKY, 8),
+				B.part(Vector2.ZERO, Vector2(0.92, 0.92), 6, Palette.CLAY, 22),
+				B.part(Vector2.ZERO, Vector2(0.3, 0.3), 5, Palette.BUTTER, 28),  # the burger sign
+				B.part(Vector2.ZERO, Vector2(0.33, 0.33), 4, Palette.WOOD, 33),
+				B.part(Vector2.ZERO, Vector2(0.28, 0.28), 7, Palette.BUTTER, 37),
 			]},
 		"pond": {"name": "Pond", "role": "attraction", "appeal": 5, "capacity": 6, "footprint": Vector2i(2, 2), "cost": 80,
 			"specialty": "water", "mode": "faster",

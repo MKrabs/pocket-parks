@@ -15,8 +15,13 @@ and the game shows the latest entry in its "What's new" card.
 - **Charm view:** press **C** to tint every path from grey (dull) through green to a soft yellow glow (charming), with
   the other buildings faded. Guests show a little ♥ after a lovely stroll and a ~ after a dull one, and building cards
   say how charming the paths next to them are, with a tip when they're dull.
+- **Bigger shops:** every food shop comes in three sizes. Zoo: Snack Cart, Hot-dog Stand, Burger Diner. Festival: Food
+  Truck, Taco Truck, Food Hall. Cinema: Popcorn Stand, Candy Bar, Lobby Café. Bigger shops serve more guests at once and
+  charge more. Switch sizes with the small ‹ › arrows on the shop's button, or press **1**/**2**/**3** while placing.
+  A row of different sizes from the same family still counts as "the same stand" for park charm.
 
 ### Changed
+- The zoo's Snack Stand is now called the Snack Cart.
 - What guests spend depends on their mood. Happy guests pay in full, and unhappy ones often skip buying.
 - **The build bar tucks itself away** to a small tab when you're not using it, and slides back up when the mouse nears
   the bottom edge or you press **B**. Use the pin on the bar to keep it open. It never hides while you're placing

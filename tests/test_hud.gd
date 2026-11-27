@@ -30,7 +30,8 @@ func _initialize() -> void:
 	for t: String in BuildBar.TABS:
 		bar.show_tab(t)
 		all += bar.visible_ids().filter(func(i: String) -> bool: return i != "")
-	ok(all.size() == Buildings.ids().size(), "every catalog item sits in some tab")
+	var families := Buildings.ids().filter(func(i: String) -> bool: return Buildings.family(i)[0] == i)
+	ok(all.size() == families.size() and families.all(func(i: String) -> bool: return i in all),"every catalog family sits in some tab, once")
 	bar.pick("snack_stand")
 	ok(bar.tab == "Shops" and main.zoo.selected == "snack_stand", "pick opens the item's tab")
 	bar.show_tab("Decor")

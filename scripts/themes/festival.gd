@@ -28,11 +28,32 @@ static func catalog() -> Dictionary:
 				Buildings.part(Vector2(0.75, -0.55), Vector2(0.14, 0.3), 6, Palette.WOOD, 3),
 				Buildings.part(Vector2(-0.55, 0.75), Vector2(0.3, 0.14), 6, Palette.WOOD, 3),
 			]},
-		"fest_truck": {"name": "Food Truck", "role": "shop", "price": 6, "footprint": Vector2i(1, 1), "cost": 70,
+		"fest_truck": {"name": "Food Truck", "role": "shop", "price": 6, "capacity": 2, "footprint": Vector2i(1, 1), "cost": 70,
+			"variants": ["fest_truck", "fest_taco", "fest_hall"],
 			"parts": [
 				Buildings.part(Vector2.ZERO, Vector2(0.34, 0.42), 18, Palette.SKY, 3),
 				Buildings.part(Vector2.ZERO, Vector2(0.38, 0.46), 3, Palette.CLAY, 21),
 				Buildings.part(Vector2(0.36, 0), Vector2(0.06, 0.3), 3, Palette.BUTTER, 12),
+			]},
+		"fest_taco": {"name": "Taco Truck", "role": "shop", "price": 9, "capacity": 4, "footprint": Vector2i(2, 1), "cost": 120,
+			"parts": [
+				Buildings.part(Vector2.ZERO, Vector2(0.82, 0.36), 18, Palette.BUTTER, 3),
+				Buildings.part(Vector2(0, 0.37), Vector2(0.4, 0.04), 7, Palette.STONE, 10),  # hatch
+				Buildings.part(Vector2(0, 0.46), Vector2(0.46, 0.1), 2, Palette.CORAL, 18),  # flap
+				Buildings.part(Vector2.ZERO, Vector2(0.86, 0.4), 3, Palette.CORAL, 21),
+				Buildings.part(Vector2(-0.4, 0), Vector2(0.2, 0.14), 6, Palette.MOSS, 24),  # sign
+			]},
+		"fest_hall": {"name": "Food Hall", "role": "shop", "price": 13, "capacity": 7, "footprint": Vector2i(2, 2), "cost": 200,
+			"parts": [
+				Buildings.part(Vector2.ZERO, Vector2(0.92, 0.92), 3, Palette.WOOD),
+				Buildings.part(Vector2.ZERO, Vector2(0.78, 0.78), 18, Palette.CLOUD, 3),
+				Buildings.part(Vector2(0.8, 0), Vector2(0.03, 0.4), 9, Palette.CLAY, 3),  # doors
+				Buildings.part(Vector2(0, 0.8), Vector2(0.4, 0.03), 9, Palette.CLAY, 3),
+				Buildings.part(Vector2.ZERO, Vector2(0.9, 0.9), 4, Palette.CORAL, 21),  # stepped tent roof
+				Buildings.part(Vector2.ZERO, Vector2(0.6, 0.6), 4, Palette.CORAL, 25),
+				Buildings.part(Vector2.ZERO, Vector2(0.3, 0.3), 4, Palette.BUTTER, 29),
+				Buildings.part(Vector2.ZERO, Vector2(0.04, 0.04), 12, Palette.WOOD, 33),
+				Buildings.part(Vector2(0.1, 0), Vector2(0.1, 0.03), 6, Palette.BUTTER, 39),  # flag
 			]},
 		"fest_lantern": {"name": "Lantern Tree", "role": "decor", "appeal": 3, "footprint": Vector2i(1, 1), "cost": 30,
 			"parts": Buildings.tree(Vector2.ZERO) + [

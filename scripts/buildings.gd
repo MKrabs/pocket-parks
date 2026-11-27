@@ -1,6 +1,6 @@
 class_name Buildings
 # Building lookup over the theme packs (scripts/themes/*.gd). Each entry: name, role, footprint (tiles),
-# cost, parts, plus appeal (attraction, decor), capacity (attraction), price (shop).
+# cost, parts, plus appeal (attraction, decor), capacity (attraction, shop), price (shop), variants (see family()).
 # A part is one extruded squircle block: at/half in tiles (relative to the footprint centre),
 # h = height px, z = lift px, color. Parts are drawn in list order (back to front).
 # A part with a "kind" is a shaped silhouette (dome, wall, glass...), see shaped().
@@ -33,6 +33,14 @@ static func ids() -> Array:
 
 static func ids_with_role(role: String) -> Array:
 	return ids().filter(func(id: String) -> bool: return themes()[active][id]["role"] == role)
+
+## Size variants of `id`, smallest first (the first one names them in "variants"); [id] if it has none.
+static func family(id: String) -> Array:
+	for t: Dictionary in themes().values():
+		for d: Dictionary in t.values():
+			if id in d.get("variants", []):
+				return d["variants"]
+	return [id]
 
 const MAX_LEVEL := 3
 

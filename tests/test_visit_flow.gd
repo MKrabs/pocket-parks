@@ -28,7 +28,7 @@ func _init() -> void:
 	home.guests.clear()
 	var m0: int = home.money
 
-	main.visit({"name": "Test Park", "theme": "zoo", "seed": 11, "size": "small", "guards": 0})
+	main.visit({"name": "Test Park", "theme": "zoo", "seed": 12, "size": "small", "guards": 0})
 	ok(main.visiting and not main.hud.visible, "visiting swaps the view")
 	ok(main.send("guest") and main.send("thief"), "sends accepted")
 	ok(home.money == m0 - Visit.PRICES["guest"] - Visit.PRICES["thief"], "paid now: %d" % (m0 - home.money))
