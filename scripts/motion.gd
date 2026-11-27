@@ -11,6 +11,7 @@ const SHAKE_TIME := 0.3
 const SHAKE_STEPS := 6
 const FLY_TIME := 0.5
 const SLIDE_TIME := 0.3  # info card slides in from the right
+const BAR_TIME := 0.25  # build bar slides down to its handle / back up
 const PUFF_TIME := 0.6  # puff_at: pop, then grow and fade
 const PUFF_GROW := 1.25
 const BOUNCE := 1.08  # bounce: grow by this, then settle back
@@ -89,6 +90,12 @@ static func shake(node: CanvasItem, strength: float) -> Tween:
 static func slide(node: CanvasItem, to_x: float) -> Tween:
 	var t := node.create_tween()
 	t.tween_property(node, "position:x", to_x, SLIDE_TIME).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	return t
+
+## Ease `prop` of any node (e.g. a CanvasLayer's offset:y) to `to`, no overshoot: the build bar hiding and showing.
+static func glide(node: Node, prop: String, to: Variant) -> Tween:
+	var t := node.create_tween()
+	t.tween_property(node, prop, to, BAR_TIME).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	return t
 
 static func fly_to(node: CanvasItem, to_pos: Vector2, then := Callable()) -> Tween:

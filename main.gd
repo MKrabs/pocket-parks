@@ -71,6 +71,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		escape()
 	elif k.physical_keycode == KEY_F:
 		follow = not follow
+	elif k.physical_keycode == KEY_B:
+		bar.toggle()
 	elif k.physical_keycode == KEY_F9:
 		hud.confirm_new_park()
 
@@ -113,6 +115,7 @@ func _ready() -> void:
 		hud.day = saved["day"]
 		bar.stolen.assign(saved["stolen"].filter(func(id: Variant) -> bool: return id is String and not Buildings.get_def(id).is_empty()))
 		net.load_state(saved.get("net", {}))
+		bar.pinned = saved.get("bar_pinned", false) == true
 	zoo.sim = sim
 	_rng.seed = 1
 	zoo.money_changed.connect(_on_map_changed)
@@ -226,7 +229,9 @@ func _seed() -> void:
 ## Your park to disk (no-op in tests and shots).
 func save() -> void:
 	if save_path != "":
-		SaveGame.write(save_path, SaveGame.pack(zoo.map, sim, hud.day, bar.stolen, net.state()))
+		var d := SaveGame.pack(zoo.map, sim, hud.day, bar.stolen, net.state())
+		d["bar_pinned"] = bar.pinned  # ponytail: a UI pref riding in the park save; own settings file if more prefs come
+		SaveGame.write(save_path, d)
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:

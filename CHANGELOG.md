@@ -6,6 +6,11 @@ and the game shows the latest entry in its "What's new" card.
 
 ## [Unreleased]
 
+### Changed
+- **The build bar tucks itself away** to a small tab when you're not using it, and slides back up when the mouse nears
+  the bottom edge or you press **B**. Use the pin on the bar to keep it open. It never hides while you're placing
+  something.
+
 ## [0.2.0] - 2026-11-27: Visit in person
 
 ### Added

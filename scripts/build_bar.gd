@@ -7,19 +7,70 @@ signal hire(kind: String)
 
 const RADIUS := 14
 const TABS := {"Paths": ["entrance", "path"], "Attractions": ["attraction"], "Shops": ["shop"], "Decor": ["decor"], "Staff": ["staff"]}
+# Auto-hide (docs/design/game.md → Bottom bar), tuned by feel:
+const HIDE_AFTER := 1.0  # s the mouse is away before the bar slides down
+const NEAR := 70.0  # px from the bottom edge that bring it back up
+const MARGIN := 16  # px between the bar and the bottom edge
+const HANDLE := Vector2(60, 18)  # the tab left showing when hidden
 
 var row := HBoxContainer.new()  # every item; only the current tab's are visible
 var tabs := HBoxContainer.new()
 var tab := "Paths"
 var stolen: Array[String] = []  # blueprints spies brought home, offered in every theme
 var map: ParkMap  # your park: shed items show when the park level caps them
+var panel := PanelContainer.new()
+var handle := Control.new()
+var pin: Button
+var shown := true
+var pinned := false  # saved with the park (main.gd)
+var placing := false  # an item is picked: a placement ghost is out
+var _away := 0.0
+var _visited := true  # the mouse came to the bar since it opened (one opened with B waits for it)
+var _was_near := false
+var _tween: Tween
 
 ## "More sheds at park level N" for ParkMap.shed_needs, "" when not blocked.
 static func shed_text(needs: int) -> String:
 	return "" if needs == 0 else "No more sheds" if needs < 0 else "More sheds at park level %d" % needs
 
-## Shed items wait for the park level: disabled, with the level that unlocks the next one.
-func _process(_delta: float) -> void:
+## Placing or typing: the bar must stay up.
+func busy() -> bool:
+	return placing or get_viewport().gui_get_focus_owner() is LineEdit
+
+## One frame of auto-hide: up when the mouse arrives near the bottom (or busy), down after HIDE_AFTER away.
+func step(delta: float, mouse: Vector2, screen_h: float) -> void:
+	var near := mouse.y >= screen_h - NEAR or (shown and (panel.get_global_rect().grow(8).has_point(mouse)
+		or handle.get_global_rect().has_point(mouse)))
+	if (near and not _was_near) or (busy() and not shown):
+		set_shown(true)
+	_was_near = near
+	_visited = _visited or near or busy()
+	_away = 0.0 if near or busy() or pinned or not _visited else _away + delta
+	if shown and _away >= HIDE_AFTER:
+		set_shown(false)
+
+## B or a click on the handle. A pinned or busy bar stays up.
+func toggle() -> void:
+	if not shown:
+		set_shown(true)
+		_visited = false
+	elif not pinned and not busy():
+		set_shown(false)
+
+func set_shown(on: bool) -> void:
+	if on == shown:
+		return
+	shown = on
+	_away = 0.0
+	if _tween:
+		_tween.kill()
+	_tween = Motion.glide(self, "offset:y", 0.0 if on else panel.size.y + MARGIN)
+	handle.queue_redraw()
+
+func _process(delta: float) -> void:
+	step(delta, get_viewport().get_mouse_position(), get_viewport().get_visible_rect().size.y)
+	handle.position = panel.position + Vector2((panel.size.x - HANDLE.x) / 2, 2 - HANDLE.y)
+	# Shed items wait for the park level: disabled, with the level that unlocks the next one.
 	if not map:
 		return
 	for b: Button in row.get_children():
@@ -40,6 +91,16 @@ static func box(c: Color, radius: int = RADIUS) -> StyleBoxFlat:
 	s.set_border_width_all(2)
 	return s
 
+## The handle: a small rounded tab on the bar's top edge with a chevron (up = open the bar, down = hide it).
+func _draw_handle() -> void:
+	var s := box(Palette.STONE, 9)
+	s.corner_radius_bottom_left = 0
+	s.corner_radius_bottom_right = 0
+	handle.draw_style_box(s, Rect2(Vector2.ZERO, HANDLE + Vector2(0, 4)))
+	var c := HANDLE / 2 + Vector2(0, -1)
+	var d := 3.0 if shown else -3.0
+	handle.draw_polyline([c + Vector2(-7, -d), c + Vector2(0, d), c + Vector2(7, -d)], Color(Palette.INK, 0.5), 2.5, true)
+
 ## Tab a building id belongs to ("" if none).
 static func tab_of(id: String) -> String:
 	for t: String in TABS:
@@ -48,7 +109,14 @@ static func tab_of(id: String) -> String:
 	return ""
 
 func _ready() -> void:
-	var bar := PanelContainer.new()
+	picked.connect(func(id: String) -> void: placing = id != "")
+	handle.size = HANDLE
+	handle.draw.connect(_draw_handle)
+	handle.gui_input.connect(func(e: InputEvent) -> void:
+		if e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT:
+			toggle())
+	add_child(handle)  # before the panel, so the panel covers its foot
+	var bar := panel
 	bar.add_theme_stylebox_override("panel", box(Palette.STONE, 20))
 	var col := VBoxContainer.new()
 	col.add_theme_constant_override("separation", 8)
@@ -69,6 +137,23 @@ func _ready() -> void:
 			(b.get_theme_stylebox(k) as StyleBoxFlat).content_margin_right = 12
 		b.set_meta("tab", t)
 		tabs.add_child(b)
+	pin = Hud._button("", func() -> void: pass)
+	pin.toggle_mode = true
+	pin.button_pressed = pinned
+	pin.tooltip_text = "Keep the bar open"
+	pin.custom_minimum_size = Vector2(30, 0)
+	pin.add_theme_stylebox_override("pressed", box(Palette.BUTTER, 10))
+	pin.add_theme_stylebox_override("hover_pressed", box(Palette.BUTTER, 10))
+	for k in ["normal", "hover", "pressed", "hover_pressed"]:
+		(pin.get_theme_stylebox(k) as StyleBoxFlat).set_content_margin_all(5)
+	pin.toggled.connect(func(on: bool) -> void: pinned = on)
+	pin.draw.connect(func() -> void:  # a push pin: round head, short needle
+		var c := pin.size / 2
+		var ink := Color(Palette.INK, 0.7)
+		pin.draw_line(c + Vector2(-1, 1), c + Vector2(-6, 6), ink, 2.0, true)
+		pin.draw_circle(c + Vector2(2, -2), 5.0, Palette.CORAL)
+		pin.draw_circle(c + Vector2(2, -2), 5.0, Palette.shade(Palette.CORAL, 0.22), false, 1.5, true))
+	tabs.add_child(pin)
 	col.add_child(tabs)
 	row.add_theme_constant_override("separation", 8)
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -102,7 +187,8 @@ func fill() -> void:
 func show_tab(t: String) -> void:
 	tab = t
 	for b: Button in tabs.get_children():
-		b.set_pressed_no_signal(b.get_meta("tab") == t)
+		if b != pin:
+			b.set_pressed_no_signal(b.get_meta("tab") == t)
 	for b: Button in row.get_children():
 		b.visible = b.get_meta("tab") == t
 		if not b.visible and b.button_pressed:
