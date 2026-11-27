@@ -16,6 +16,10 @@ and the game shows the latest entry in its "What's new" card.
 - **The build bar tucks itself away** to a small tab when you're not using it, and slides back up when the mouse nears
   the bottom edge or you press **B**. Use the pin on the bar to keep it open. It never hides while you're placing
   something.
+### Changed
+- **Clearer enclosures:** the aviary is now a see-through dome with a few net arcs, the reinforced enclosure has one
+  solid stone wall with buttresses, the water tank has glass sides with the water inside, and fences are a continuous
+  rail with posts. When wrecked, the dome's net tears open and walls, fences and glass get a breach.
 
 ## [0.2.0] - 2026-11-27: Visit in person
 

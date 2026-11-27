@@ -3,6 +3,7 @@ class_name Buildings
 # cost, parts, plus appeal (attraction, decor), capacity (attraction), price (shop).
 # A part is one extruded squircle block: at/half in tiles (relative to the footprint centre),
 # h = height px, z = lift px, color. Parts are drawn in list order (back to front).
+# A part with a "kind" is a shaped silhouette (dome, wall, glass...), see shaped().
 # Ids are unique across themes, so get_def finds a building from any theme.
 
 const ROLES := ["entrance", "path", "attraction", "shop", "decor", "staff"]
@@ -50,6 +51,22 @@ static func leveled(id: String, level: int) -> Dictionary:
 
 static func part(at: Vector2, half: Vector2, h: float, color: Color, z := 0.0) -> Dictionary:
 	return {"at": at, "half": half, "h": h, "z": z, "color": color}
+
+## A part BuildingView draws as one silhouette instead of a block: kind "dome", "water", or a ring
+## ("wall", "fence", "glass") following the squircle outline of `half`.
+static func shaped(kind: String, half: Vector2, h: float, color: Color, z := 0.0) -> Dictionary:
+	var p := part(Vector2.ZERO, half, h, color, z)
+	p["kind"] = kind
+	return p
+
+## A ring as [far half, near half]: list what stands inside between the two.
+static func ring(kind: String, h: float, color: Color, z := 0.0) -> Array:
+	var out: Array = []
+	for side in [-1, 1]:
+		var p := shaped(kind, Vector2(1.32, 1.32), h, color, z)
+		p["side"] = side
+		out.append(p)
+	return out
 
 ## Entrance arch on a 1x1 tile: two posts along y and a top beam, so a path along x runs through it.
 static func arch(post: Color, top: Color) -> Array:
