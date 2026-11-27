@@ -89,6 +89,20 @@ func _init() -> void:
 	ok(early, "no loot in the ledger while the thief is inside")
 	ok(find(sim, "thief").is_empty() and sim.ledger["a"] == loot, "loot delivered on leaving (%d)" % loot)
 
+	# Still inside when the day ends: settled as if they had left.
+	sim = quiet(2)
+	sim.send("thief", "a")
+	sim.send("guest", "g")
+	until(sim, func(s: ParkSim) -> bool: return not s.events.is_empty())
+	var thief := find(sim, "thief")
+	var g := find(sim, "guest")
+	ok(not thief.is_empty() and thief["loot"] > 0 and not g.is_empty(), "thief and guest still inside at closing")
+	g["spent"] = 50
+	var host := sim.money
+	sim.new_day()
+	ok(sim.ledger.get("a", 0) == thief["loot"], "loot delivered at day end (%d)" % sim.ledger.get("a", 0))
+	ok(sim.ledger.get("g", 0) == 10 and sim.money == host - 10, "guest share paid at day end")
+
 	# Litterbug drops litter next to the building.
 	sim = quiet(3)
 	sim.send("litterbug", "a")

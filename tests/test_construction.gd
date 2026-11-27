@@ -65,7 +65,7 @@ func _init() -> void:
 	ok(worked == 200, "worked the table time (%d)" % worked)
 	ok(walked > 0, "walked to the site first")
 	ok(targeted(sim, Vector2i(5, 8)) and Vector2i(5, 8) in sim.finished, "open when done")
-	for i in 3 * ParkSim.TPS:
+	for i in 6 * ParkSim.TPS:  # home by the path, not across the grass
 		sim.step()
 	ok(sim.builders[0]["state"] == "home", "walks home after")
 
@@ -80,6 +80,20 @@ func _init() -> void:
 	var t1 := run(one)
 	var t2 := run(two)
 	ok(t1 > 400 and t2 < 300, "two sheds run two jobs in parallel (%d vs %d ticks)" % [t1, t2])
+
+	# builders walk along the paths to a far site, straight across open ground to a near one
+	sim = sim_with(1)
+	var far := sim._builder_route(Vector2(1.55, 8.1), Vector2(13.6, 5.6))
+	ok(far[0] == Vector2(2, 7) and far[-2] == Vector2(13, 7) and far.size() == 13, "far site: along the path (%s)" % [far])
+	ok(sim._builder_route(Vector2(1.55, 8.1), Vector2(3.6, 9.6)) == [Vector2(3.6, 9.6)], "near site: straight line")
+	sim.build("pond", Vector2i(12, 4))
+	var off := 0.0
+	while sim.builders[0]["state"] != "work" and sim.tick < 2000:
+		sim.step()
+		var p: Vector2 = sim.builders[0]["pos"]
+		if p.x > 2.0 and p.x < 12.0:
+			off = maxf(off, absf(p.y - 7.0))
+	ok(sim.builders[0]["state"] == "work" and off < 0.01, "walked the path to the site (off by %.2f)" % off)
 
 	# a new shed under construction has no builder yet
 	sim = sim_with(1)

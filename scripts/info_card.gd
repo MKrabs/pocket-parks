@@ -27,7 +27,7 @@ var accuse := _action("accuse")
 var buy := _action("buy")
 var specs := HFlowContainer.new()  # a builder's specialty toggles; only the choosable or chosen ones show
 var warning := Hud._label(13)
-# Habitat: animal picker (portraits, the fence's category only), needs checklist, comfort bar, buy.
+# Habitat: animal picker (portraits, the fence's category only; a plain fence: Animals.STARTER), needs checklist, comfort bar, buy.
 var hab := VBoxContainer.new()
 var picks := HBoxContainer.new()
 var pick := ""  # the animal the checklist is for

@@ -14,7 +14,8 @@ func _init() -> void:
 	ok(Animals.picker("glass") == ["otter", "capybara", "platypus"], "glass: water animals")
 	ok(Animals.picker("net") == ["shoebill", "puffin", "hornbill"], "net: birds")
 	ok(Animals.picker("wall") == ["red_panda", "takin", "klipspringer"], "wall: highlands")
-	for f: String in ["glass", "net", "wall", "fence"]:
+	ok(Animals.picker("fence") == ["capybara", "red_panda", "klipspringer"], "fence: the starter set, one per open-ground category")
+	for f: String in ["glass", "net", "wall"]:
 		for a: String in Animals.picker(f):
 			ok(Animals.ALL[a]["category"] == Animals.FENCE_CATEGORY[f], "%s offers only its category (%s)" % [f, a])
 

@@ -6,7 +6,8 @@ class_name Animals
 
 const MAX := 4  # animals per habitat
 const HAPPY := 50  # comfort at or above: out and active
-const FENCE_CATEGORY := {"glass": "water", "wall": "highlands", "net": "birds", "fence": "highlands"}
+const FENCE_CATEGORY := {"glass": "water", "wall": "highlands", "net": "birds"}
+const STARTER := ["capybara", "red_panda", "klipspringer"]  # a plain wood fence: one open-ground animal per category
 const ITEM_TERRAIN := {"pool": ["water"], "pool_big": ["water"], "rocks": ["rocks"], "rocks_long": ["rocks"],
 	"tree": ["trees"], "shelter": ["shelter"], "waterfall": ["water", "rocks"]}
 
@@ -66,6 +67,8 @@ const ALL := {
 
 ## Animals a habitat with fence style `fence` can hold.
 static func picker(fence: String) -> Array:
+	if fence == "fence":
+		return STARTER.duplicate()
 	return ALL.keys().filter(func(a: String) -> bool: return ALL[a]["category"] == FENCE_CATEGORY.get(fence, ""))
 
 ## What habitat `h` offers: {cells, water, rocks, trees (shares 0–1), shelter (bool)}.

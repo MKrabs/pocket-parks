@@ -72,6 +72,19 @@ func _init() -> void:
 	ok(r["wages"] == 45, "wages taken at day end")
 	ok(clean.closed.is_empty(), "nothing closed yet")
 
+	# The janitor picks the nearest litter by walk: (3,4) is 3 tiles away as the crow flies but 13 along the loop.
+	var loop := park(false)
+	for c: Vector2i in [Vector2i(8, 6), Vector2i(8, 5), Vector2i(8, 4), Vector2i(7, 4), Vector2i(6, 4), Vector2i(5, 4),
+			Vector2i(4, 4), Vector2i(3, 4)]:
+		loop.place("path", c)
+	var jan := ParkSim.new(loop, 1)
+	jan.hire("janitor")
+	var s: Dictionary = jan.staff[0]
+	s.merge({"cell": Vector2i(3, 7), "pos": Vector2(3, 7), "path": []}, true)
+	jan.litter = {Vector2i(3, 4): true, Vector2i(7, 7): true}
+	jan._step_staff(s)
+	ok(not s["path"].is_empty() and s["path"][-1] == Vector2i(7, 7), "janitor heads for the litter nearest by walk")
+
 	# Building mid-day: the sim picks up the new map.
 	var m := park(false)
 	var live := ParkSim.new(m, 5)

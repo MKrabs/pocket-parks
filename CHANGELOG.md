@@ -14,6 +14,14 @@ and the game shows the latest entry in its "What's new" card.
   puffin). Glass opens at park level 2, Wall at 3, Net at 4; the other animals arrive between levels 2 and 8; the 2×1
   buildings open at level 2 and the 2×2 at level 4. Locked items stay in the bar and the animal picker, greyed, with
   "Unlocks at park level N", and the "Level up!" card lists what each level brings.
+- **Plain Fence animals:** a wood Fence now holds a starter set (capybara, red panda, klipspringer); Glass, Wall
+  and Net each hold their full category.
+- **Builders use the paths:** they walk along your paths to a far site instead of cutting across grass and buildings.
+- **Janitors** head for the litter that's nearest to walk to, not the one that only looks nearest.
+
+### Fixed
+- People still inside when the day ends now settle up: sent guests pay their sender's share, and thieves and spies
+  deliver what they carried, as if they had left through the gate.
 
 ## [0.4.0] - 2026-11-27: Habitats, animals and three new themes
 
