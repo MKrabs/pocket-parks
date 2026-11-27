@@ -53,7 +53,7 @@ var _walking_out := false
 var _present: Array = []  # names of the characters in our park but ours, last frame (arrive / leave toasts)
 
 ## T cycles the active theme (zoo → festival → cinema); the build bar follows, placed buildings stay.
-## Esc leaves place mode, or closes the card in Select mode.
+## Esc leaves place mode, or closes the card in Select mode. 1/2/3 while placing pick a size variant.
 func _unhandled_key_input(event: InputEvent) -> void:
 	var k := event as InputEventKey
 	if not k.pressed or k.echo:
@@ -65,6 +65,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		Buildings.use(ts[(ts.find(Buildings.active) + 1) % ts.size()])
 		net.theme = Buildings.active
 		bar.fill()
+	elif k.physical_keycode in [KEY_1, KEY_2, KEY_3] and bar.placing:
+		bar.variant(k.physical_keycode - KEY_1)
 	elif k.physical_keycode == KEY_R:
 		zoo.rotate_ghost(-1 if k.shift_pressed else 1)
 	elif k.physical_keycode == KEY_ESCAPE:

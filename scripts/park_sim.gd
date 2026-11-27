@@ -220,7 +220,7 @@ func _load(map: ParkMap) -> void:
 				continue
 			var shop: bool = d["role"] == "shop"
 			_targets.append({"id": id, "origin": origin, "cells": cells, "role": d["role"], "door": door, "inside": 0,
-				"appeal": SHOP_APPEAL if shop else d["appeal"], "capacity": SHOP_CAPACITY if shop else d["capacity"],
+				"appeal": SHOP_APPEAL if shop else d["appeal"], "capacity": d.get("capacity", SHOP_CAPACITY),
 				"price": d.get("price", 0)})
 			_appeal += _targets[-1]["appeal"]
 	if not _targets.is_empty():
@@ -268,8 +268,8 @@ func _charm_of(cell: Vector2i) -> float:
 	var water := false
 	var ids := {}  # building id -> copies in view
 	for o: Vector2i in seen:
-		var id: String = _map.buildings[o]
-		var d := Buildings.leveled(id, _map.level(o))
+		var d := Buildings.leveled(_map.buildings[o], _map.level(o))
+		var id: String = Buildings.family(_map.buildings[o])[0]  # size variants count as the same building
 		if d["role"] == "path" or d["role"] == "entrance":
 			continue
 		if closed.has(o):

@@ -24,7 +24,7 @@ func _init() -> void:
 	var d := Squircle.points(Vector2.ZERO, Vector2.ONE, 4.0, 8)[1]
 	ok(d.x > cos(PI / 4) + 0.05, "n=4 is squarer than a circle")
 	ok(Squircle.iso_points(Vector2.ZERO, Vector2.ONE, 4.0, 4)[0].is_equal_approx(Vector2(32, 16)), "iso 2:1 projection")
-	ok(Buildings.ids().size() == 11, "11 zoo buildings")
+	ok(Buildings.ids().size() == 13, "13 zoo buildings")
 	for id in Buildings.ids():
 		var b: Dictionary = Buildings.get_def(id)
 		ok(b["cost"] > 0 and b["footprint"].x > 0 and b["footprint"].y > 0, "cost/footprint: " + id)

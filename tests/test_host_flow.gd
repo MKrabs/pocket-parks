@@ -27,7 +27,7 @@ func _initialize() -> void:
 	var o: Vector2i = rob[0]["origin"]
 	ok(main.toasts.items.size() >= 1, "a toast for the crime")
 	var texts: Array = main.toasts.items.map(func(t: Dictionary) -> String: return t["panel"].get_child(0).get_child(1).get_child(0).text)
-	ok(texts.any(func(s: String) -> bool: return s.begins_with("Snack Stand was robbed: −$")), "robbed toast text %s" % [texts])
+	ok(texts.any(func(s: String) -> bool: return s.begins_with("Snack Cart was robbed: −$")), "robbed toast text %s" % [texts])
 	main.pins._process(0.0)
 	ok(main.pins.pins.any(func(p: Dictionary) -> bool: return p["origin"] == o and p["kind"] == "robbed"), "robbed pin")
 

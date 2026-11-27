@@ -171,9 +171,11 @@ func fill() -> void:
 		c.queue_free()
 	var group := ButtonGroup.new()
 	group.allow_unpress = true
-	for id: String in Buildings.ids() + stolen.filter(func(s: String) -> bool: return not s in Buildings.ids()):
-		var b: Dictionary = Buildings.get_def(id)
-		row.add_child(button("%s\n$%d" % [b["name"], b["cost"]], id, group))
+	var ids: Array = Buildings.ids() + stolen.filter(func(s: String) -> bool: return not s in Buildings.ids())
+	for id: String in ids:
+		if Buildings.family(id)[0] != id and Buildings.family(id)[0] in ids:
+			continue  # one button per family: the smallest variant's
+		row.add_child(button(label(id), id, group))
 	for kind: String in ParkSim.STAFF:
 		var h := Hud._button("Hire %s\n$%d" % [kind, ParkSim.STAFF[kind]["hire"]], hire.emit.bind(kind))
 		h.custom_minimum_size = Vector2(96, 0)
@@ -208,17 +210,70 @@ func clear() -> void:
 		b.button_pressed = false
 
 ## Press the item for `id` (emits picked(id)), as a click on it would; its tab opens first.
+## A size variant switches its family's item to it.
 func pick(id: String) -> void:
 	show_tab(tab_of(id))
 	for b: Button in row.get_children():
-		if b.get_meta("id") == id:
+		if b.get_meta("id") in Buildings.family(id):
+			set_variant(b, id)
 			b.button_pressed = true
+
+static func label(id: String) -> String:
+	return "%s\n$%d" % [Buildings.get_def(id)["name"], Buildings.get_def(id)["cost"]]
+
+## Show variant `id` on item `b`; a pressed item swaps the placement ghost (picked(id)).
+func set_variant(b: Button, id: String) -> void:
+	if b.get_meta("id") == id:
+		return
+	b.set_meta("id", id)
+	b.set_meta("text", label(id))
+	b.text = label(id)
+	if b.button_pressed:
+		picked.emit(id)
+
+## The pressed item's variant number `i` (1/2/3 while placing). False if nothing is pressed or no such variant.
+func variant(i: int) -> bool:
+	for b: Button in row.get_children():
+		var fam := Buildings.family(b.get_meta("id"))
+		if b.button_pressed and i < fam.size():
+			set_variant(b, fam[i])
+			return true
+	return false
+
+## ‹ (dir -1) or › (dir 1) on item `b`: the next smaller or bigger variant, wrapping.
+func step_variant(b: Button, dir: int) -> void:
+	var fam := Buildings.family(b.get_meta("id"))
+	set_variant(b, fam[posmod(fam.find(b.get_meta("id")) + dir, fam.size())])
+
+## A small chevron on the item's left (dir -1) or right edge (dir 1) that steps the variant.
+func arrow(b: Button, dir: int) -> Control:
+	var a := Control.new()
+	a.size = Vector2(18, 28)
+	a.set_anchors_preset(Control.PRESET_CENTER_LEFT if dir < 0 else Control.PRESET_CENTER_RIGHT)
+	a.position = Vector2(3 if dir < 0 else -21, -14)
+	a.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	a.tooltip_text = "Smaller" if dir < 0 else "Bigger"
+	a.draw.connect(func() -> void:
+		var c := a.size / 2
+		var ink := Color(Palette.INK, 0.6)
+		a.draw_polyline([c + Vector2(3 * -dir, -5), c + Vector2(3 * dir, 0), c + Vector2(3 * -dir, 5)], ink, 2.5, true))
+	a.gui_input.connect(func(e: InputEvent) -> void:
+		if e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT:
+			a.accept_event()
+			step_variant(b, dir))
+	return a
 
 func button(text: String, id: String, group: ButtonGroup) -> Button:
 	var b := Hud._button(text, func() -> void: pass)
 	b.toggle_mode = true
 	b.button_group = group
 	b.custom_minimum_size = Vector2(96, 0)
+	if Buildings.family(id).size() > 1:
+		for k in ["normal", "hover", "pressed", "hover_pressed"]:
+			(b.get_theme_stylebox(k) as StyleBoxFlat).content_margin_left = 22
+			(b.get_theme_stylebox(k) as StyleBoxFlat).content_margin_right = 22
+		b.add_child(arrow(b, -1))
+		b.add_child(arrow(b, 1))
 	b.set_meta("id", id)
 	b.set_meta("text", text)
 	b.add_theme_stylebox_override("disabled", box(Palette.STONE))
@@ -234,7 +289,7 @@ func button(text: String, id: String, group: ButtonGroup) -> Button:
 		b.tooltip_text = "Needs a %s builder" % Specialties.ALL[need]["name"]
 	b.toggled.connect(func(on: bool) -> void:
 		if on:
-			picked.emit(id)
+			picked.emit(b.get_meta("id"))
 		elif group.get_pressed_button() == null:
 			picked.emit(""))
 	return b

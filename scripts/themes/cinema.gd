@@ -17,14 +17,36 @@ static func catalog() -> Dictionary:
 			"specialty": "projection", "mode": "faster", "parts": screen_room()},
 		"cin_big": {"name": "Big Screen", "role": "attraction", "appeal": 14, "capacity": 14, "footprint": Vector2i(3, 3), "cost": 250,
 			"specialty": "projection", "mode": "only", "parts": big_screen()},
-		"cin_popcorn": {"name": "Popcorn Stand", "role": "shop", "price": 5, "footprint": Vector2i(1, 1), "cost": 60,
-			"specialty": "carpenter", "mode": "faster",
+		"cin_popcorn": {"name": "Popcorn Stand", "role": "shop", "price": 5, "capacity": 2, "footprint": Vector2i(1, 1), "cost": 60,
+			"specialty": "carpenter", "mode": "faster", "variants": ["cin_popcorn", "cin_candy", "cin_cafe"],
 			"parts": [
 				P.call(Vector2.ZERO, Vector2(0.32, 0.32), 16, Palette.CORAL),
 				P.call(Vector2.ZERO, Vector2(0.36, 0.36), 3, Palette.CLOUD, 16),
 				P.call(Vector2.ZERO, Vector2(0.14, 0.14), 10, Palette.CLOUD, 19),  # cup
 				P.call(Vector2.ZERO, Vector2(0.17, 0.17), 4, Palette.BUTTER, 29),  # popcorn
 				P.call(Vector2.ZERO, Vector2(0.11, 0.11), 3, Palette.BUTTER, 33),
+			]},
+		"cin_candy": {"name": "Candy Bar", "role": "shop", "price": 8, "capacity": 4, "footprint": Vector2i(2, 1), "cost": 110,
+			"specialty": "carpenter", "mode": "faster",
+			"parts": [
+				P.call(Vector2.ZERO, Vector2(0.82, 0.34), 14, Palette.CORAL),
+				P.call(Vector2.ZERO, Vector2(0.86, 0.38), 3, Palette.CLOUD, 14),
+				P.call(Vector2(-0.48, 0), Vector2(0.14, 0.14), 9, Palette.BUTTER, 17),  # candy jars
+				P.call(Vector2(0, 0), Vector2(0.14, 0.14), 9, Palette.SKY, 17),
+				P.call(Vector2(0.48, 0), Vector2(0.14, 0.14), 9, Palette.MOSS, 17),
+				P.call(Vector2(-0.48, 0), Vector2(0.09, 0.09), 3, Palette.CLOUD, 26),
+				P.call(Vector2(0, 0), Vector2(0.09, 0.09), 3, Palette.CLOUD, 26),
+				P.call(Vector2(0.48, 0), Vector2(0.09, 0.09), 3, Palette.CLOUD, 26),
+			]},
+		"cin_cafe": {"name": "Lobby Café", "role": "shop", "price": 12, "capacity": 7, "footprint": Vector2i(2, 2), "cost": 180,
+			"specialty": "carpenter", "mode": "faster",
+			"parts": [
+				P.call(Vector2.ZERO, Vector2(0.82, 0.82), 22, Palette.CLAY),
+				P.call(Vector2(0.84, 0), Vector2(0.03, 0.56), 5, Palette.BUTTER, 13),  # marquee lights
+				P.call(Vector2(0, 0.84), Vector2(0.56, 0.03), 5, Palette.BUTTER, 13),
+				P.call(Vector2.ZERO, Vector2(0.9, 0.9), 4, Palette.CLOUD, 22),
+				P.call(Vector2.ZERO, Vector2(0.2, 0.2), 12, Palette.CLOUD, 26),  # the cup sign
+				P.call(Vector2.ZERO, Vector2(0.16, 0.16), 1, Palette.WOOD, 38),
 			]},
 		"cin_poster": {"name": "Poster Wall", "role": "decor", "appeal": 3, "footprint": Vector2i(1, 1), "cost": 30,
 			"parts": [
