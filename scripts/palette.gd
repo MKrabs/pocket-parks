@@ -18,6 +18,16 @@ const CORAL := Color("#E9A99C")     # warnings, invalid placement
 const SKY := Color("#B9CFE6")       # selection, hover
 const CLOUD := Color("#FBF7EF")     # cloud puffs (warm off-white)
 const CLOUD_SHADOW := Color("#E7DFD3")  # underside of a puff
+# Animals (Animals.ALL): one body colour each, soft enough to sit with the rest.
+const OTTER := Color("#A88A70")
+const CAPYBARA := Color("#C9A27A")
+const PLATYPUS := Color("#8F7F70")
+const RED_PANDA := Color("#D9926A")
+const TAKIN := Color("#E0C487")
+const KLIPSPRINGER := Color("#BCA586")
+const SHOEBILL := Color("#A9B5BF")
+const PUFFIN := Color("#6F6B73")
+const HORNBILL := Color("#6A635F")
 
 ## Faces of an extruded iso shape: top is the base colour, sides get darker.
 static func shade(c: Color, amount: float) -> Color:

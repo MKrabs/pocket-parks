@@ -25,7 +25,7 @@ func _ready() -> void:
 func _process(_delta: float) -> void:
 	if not sim:
 		return
-	for v: BuildingView in get_children():
+	for v: BuildingView in views():
 		if v == ghost:
 			continue
 		var path: bool = Buildings.get_def(v.id)["role"] == "path"
@@ -68,6 +68,9 @@ func rebuild() -> void:
 			var dome := HabitatView.of(map.buildings[o], cs, o, "dome")
 			dome.z_index = 2 * front
 			add_child(dome)
+			var h: Dictionary = map.habitats[o]
+			for i in h.get("count", 0):
+				add_child(AnimalView.of(h["animal"], h, i))
 			continue
 		var v := BuildingView.new(map.buildings[o])
 		v.origin = o
@@ -81,9 +84,13 @@ func rebuild() -> void:
 	update_ghost()
 	money_changed.emit(map.money)
 
+## Building views (habitat animals are children too).
+func views() -> Array:
+	return get_children().filter(func(c: Node) -> bool: return c is BuildingView)
+
 ## Show the buildings the sim has closed (wrecked by a hooligan) as their damaged variant.
 func show_wrecked(closed: Dictionary) -> void:
-	for v: BuildingView in get_children():
+	for v: BuildingView in views():
 		if v != ghost and v.wrecked != closed.has(v.origin):
 			v.wrecked = not v.wrecked
 
@@ -174,7 +181,7 @@ func on_hover(cell: Vector2i) -> void:
 ## Lift the building at `origin` a little (Select-mode hover); NONE drops it back.
 func highlight(origin: Vector2i) -> void:
 	lifted = origin
-	for v: BuildingView in get_children():
+	for v: BuildingView in views():
 		if v != ghost:
 			v.position = IsoGrid.to_screen(v.origin) - Vector2(0, LIFT if v.origin == origin else 0.0)
 
@@ -222,7 +229,7 @@ func demolish(origin: Vector2i) -> bool:
 
 ## The building view at a building origin, or null.
 func view_at(origin: Vector2i) -> BuildingView:
-	for v: BuildingView in get_children():
+	for v: BuildingView in views():
 		if v != ghost and v.origin == origin and not v.is_queued_for_deletion():
 			return v
 	return null

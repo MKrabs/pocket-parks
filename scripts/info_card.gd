@@ -27,6 +27,14 @@ var accuse := _action("accuse")
 var buy := _action("buy")
 var specs := HFlowContainer.new()  # a builder's specialty toggles; only the choosable or chosen ones show
 var warning := Hud._label(13)
+# Habitat: animal picker (portraits, the fence's category only), needs checklist, comfort bar, buy.
+var hab := VBoxContainer.new()
+var picks := HBoxContainer.new()
+var pick := ""  # the animal the checklist is for
+var needs_text := Hud._label(14)
+var comfort_text := Hud._label(14)
+var comfort_bar := Control.new()
+var buy_animal := _action("buy_animal")
 var tip := Hud._label(14)
 var _panel := PanelContainer.new()
 var _tip := PanelContainer.new()
@@ -72,7 +80,25 @@ func _ready() -> void:
 	_days.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	ban_row.add_child(_days)
 	ban_row.add_child(Hud._button("+", func() -> void: days = mini(days + 1, ParkSim.BAN_MAX)))
-	for c in [title, body, specs, upgrade, repair, demolish, ban_row, accuse, buy, warning]:
+	picks.add_theme_constant_override("separation", 6)
+	for a: String in Animals.ALL:
+		var b := Hud._button(Animals.ALL[a]["name"], func() -> void: pick = a)
+		b.set_meta("animal", a)
+		b.custom_minimum_size = Vector2(76, 72)
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		b.add_theme_font_size_override("font_size", 12)
+		for k in ["normal", "hover", "pressed", "hover_pressed"]:
+			(b.get_theme_stylebox(k) as StyleBoxFlat).set_content_margin_all(4)
+			(b.get_theme_stylebox(k) as StyleBoxFlat).content_margin_top = 50  # the portrait sits above the name
+		b.draw.connect(func() -> void: Animals.draw(b, a, Vector2(b.size.x * 0.5, 46), 1.0, "walk", 0.0, 1.6))
+		picks.add_child(b)
+	comfort_bar.custom_minimum_size = Vector2(0, 12)
+	comfort_bar.draw.connect(_draw_comfort)
+	needs_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hab.add_theme_constant_override("separation", 6)
+	for c in [picks, needs_text, comfort_text, comfort_bar, buy_animal]:
+		hab.add_child(c)
+	for c in [title, body, hab, specs, upgrade, repair, demolish, ban_row, accuse, buy, warning]:
 		col.add_child(c)
 	_panel.add_child(col)
 	_panel.visible = false
@@ -174,6 +200,7 @@ static func guest_title(g: Dictionary) -> String:
 	return "Wanted guest" if g["wanted"] else "Guest"  # hidden actors look like everyone else
 
 func _process(_delta: float) -> void:
+	hab.visible = origin != GridView.NONE and map.habitats.has(origin)
 	if origin != GridView.NONE:
 		if not map.buildings.has(origin):
 			close()
@@ -252,6 +279,7 @@ func _building() -> void:
 	var lines: Array[String] = []
 	match d["role"]:
 		"shop": lines.append("Shop · sells at $%d" % d["price"])
+		"attraction" when hab.visible: lines.append(_habitat())
 		"attraction": lines.append("Attraction · appeal %d, holds %d" % [d["appeal"], d["capacity"]])
 		"decor": lines.append("Decor · cheers up guests nearby")
 		"entrance": lines.append("Entrance · $%d a guest" % ParkSim.ENTRY_FEE)
@@ -299,6 +327,52 @@ func _building() -> void:
 	accuse.visible = false
 	buy.visible = false
 	warning.visible = false
+
+## Fill the habitat section for the habitat on the card; returns its body line.
+func _habitat() -> String:
+	var h: Dictionary = map.habitats[origin]
+	var offer := Animals.picker(h["fence"])
+	var has: String = h["animal"] if h.get("count", 0) > 0 else ""
+	if not pick in offer:
+		pick = has if has != "" else (offer[0] if not offer.is_empty() else "")
+	for b: Button in picks.get_children():
+		b.visible = b.get_meta("animal") in offer
+		b.set_pressed_no_signal(b.get_meta("animal") == pick)
+	var n: int = h["cells"].size()
+	var appeal := roundi(n * Animals.appeal_factor(h))
+	var line := "%d cells · appeal %d" % [n, appeal]
+	if has == "":
+		line += "\nNo animals yet: pick one below"
+	else:
+		var c := Animals.comfort(has, h)
+		line += "\n%d %s%s · %s" % [h["count"], Animals.ALL[has]["name"], "" if h["count"] == 1 else "s",
+			"happy and out" if c >= Animals.HAPPY else "unhappy, hiding and pacing"]
+	needs_text.visible = pick != ""
+	comfort_text.visible = pick != ""
+	comfort_bar.visible = pick != ""
+	buy_animal.visible = pick != ""
+	if pick == "":
+		return line
+	needs_text.text = "\n".join(Animals.needs(pick, h).map(func(e: Dictionary) -> String:
+		return ("✓  " if e["ok"] else "✗  ") + e["text"]))
+	comfort_text.text = "Comfort %d / 100%s" % [Animals.comfort(pick, h), "" if pick == has else " (if it lived here)"]
+	comfort_bar.queue_redraw()
+	var why := map.animal_block(origin, pick)
+	buy_animal.disabled = why != ""
+	buy_animal.text = "Buy a %s · $%d" % [Animals.ALL[pick]["name"], Animals.ALL[pick]["price"]] if why == "" else why
+	return line
+
+func _draw_comfort() -> void:
+	if pick == "" or not map.habitats.has(origin):
+		return
+	var c := Animals.comfort(pick, map.habitats[origin])
+	var s := comfort_bar.size
+	var r := s.y * 0.5
+	comfort_bar.draw_colored_polygon(Squircle.points(s * 0.5, s * 0.5, 4.0, 48), Palette.STONE)
+	if c > 0:
+		var w := maxf(s.x * c / 100.0, 2.0 * r)
+		comfort_bar.draw_colored_polygon(Squircle.points(Vector2(w * 0.5, r), Vector2(w * 0.5, r), 4.0, 48),
+			Palette.MOSS if c >= Animals.HAPPY else Palette.CORAL)
 
 func _plot() -> void:
 	var price := map.plot_price()

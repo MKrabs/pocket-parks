@@ -209,8 +209,8 @@ func _load(map: ParkMap) -> void:
 		if not job_at(origin).is_empty():
 			continue  # a site: closed until the builder is done
 		var d: Dictionary = Buildings.leveled(id, map.level(origin))
-		if map.habitats.has(origin):  # per cell: a bigger habitat draws more guests (animals add to it in HAB2)
-			d["appeal"] *= map.cells(origin).size()
+		if map.habitats.has(origin):  # per cell: a bigger habitat draws more guests, comfortable animals more still
+			d["appeal"] = roundi(d["appeal"] * map.cells(origin).size() * Animals.appeal_factor(map.habitats[origin]))
 			d["capacity"] *= map.cells(origin).size()
 		if d["role"] == "decor":
 			decor_appeal += d["appeal"]

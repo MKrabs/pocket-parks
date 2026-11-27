@@ -6,6 +6,13 @@ and the game shows the latest entry in its "What's new" card.
 
 ## [Unreleased]
 
+### Added
+- **Animals:** 9 of them, three per fence. Glass holds otters, capybaras and platypuses, Net holds shoebills,
+  puffins and hornbills, and Wall (or a plain Fence) holds red pandas, takins and klipspringers. Click a habitat to open
+  its card: pick an animal from the portraits, see what it needs (room, water, rocks, trees, a shelter, e.g. "needs
+  20% more water"), check the comfort bar, and buy up to 4. Happy animals wander, rest and swim, and draw more guests.
+  Unhappy ones hide or pace, and the habitat draws fewer. The starting habitat comes with two red pandas.
+
 ### Changed
 - **Habitats instead of enclosures:** Attractions → Habitat, pick a fence (wood Fence, or Glass, Net and Wall for
   Water, Aviary and Heavy builders) and drag a rectangle on your land. A preview shows the outline, the cell count and

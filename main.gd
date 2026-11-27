@@ -235,7 +235,9 @@ func _seed() -> void:
 	zoo.map.money = 1 << 30  # seed without running out
 	for s in SEED:
 		zoo.map.place(s[0], s[1])
-	zoo.map.paint("habitat", SEED_HABITAT)
+	var hab := zoo.map.paint("habitat", SEED_HABITAT)
+	for i in 2:
+		zoo.map.buy_animal(hab, "red_panda")
 	for x in range(5, 16):
 		zoo.map.place("path", Vector2i(x, 11))
 	zoo.map.money = ParkMap.START_MONEY  # the seeded zoo is free
@@ -673,6 +675,10 @@ func _on_card_action(what: String) -> void:
 				sim.money = zoo.map.money
 				grid.queue_redraw()
 				card.close()
+		"buy_animal":
+			zoo.map.money = sim.money
+			if zoo.map.buy_animal(o, card.pick):
+				zoo.rebuild()  # hands money and layout (comfort → appeal) back to the sim
 		"upgrade":
 			if card.staff >= 0:
 				sim.upgrade_staff(card.staff)  # map money follows in _process
