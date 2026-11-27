@@ -223,7 +223,7 @@ func unpaint(rect: Rect2i) -> Dictionary:
 
 ## (Re)write habitat `old` ((-1,-1) = new) as `cs`; the origin moves to the smallest cell. Returns it, or (-1,-1) if empty.
 func _set_habitat(old: Vector2i, id: String, cs: Array) -> Vector2i:
-	var h: Dictionary = habitats.get(old, {"fence": Buildings.get_def(id)["habitat"], "animal": "", "items": []})
+	var h: Dictionary = habitats.get(old, {"fence": Buildings.get_def(id)["habitat"], "animal": "", "count": 0, "items": []})
 	if habitats.has(old):
 		for c: Vector2i in habitats[old]["cells"]:
 			occupied.erase(c)
@@ -290,6 +290,28 @@ func level(origin: Vector2i) -> int:
 	return levels.get(origin, 1)
 
 ## Price of the next level (level 2 = 1× cost, level 3 = 2×), or -1 if this can't be upgraded.
+## Why animal `a` can't be bought for habitat `o` ("" = it can): one species per habitat, up to Animals.MAX.
+func animal_block(o: Vector2i, a: String) -> String:
+	var h: Dictionary = habitats.get(o, {})
+	if h.is_empty() or not a in Animals.picker(h["fence"]):
+		return "Not for this fence"
+	if h["animal"] != "" and h["animal"] != a and h.get("count", 0) > 0:
+		return "This habitat has %ss" % Animals.ALL[h["animal"]]["name"]
+	if h.get("count", 0) >= Animals.MAX:
+		return "Full: %d is plenty" % Animals.MAX
+	if money < Animals.ALL[a]["price"]:
+		return "Need $%d more" % (Animals.ALL[a]["price"] - money)
+	return ""
+
+## Buy one animal `a` into habitat `o`. False if animal_block says no.
+func buy_animal(o: Vector2i, a: String) -> bool:
+	if animal_block(o, a) != "":
+		return false
+	money -= Animals.ALL[a]["price"]
+	habitats[o]["animal"] = a
+	habitats[o]["count"] = habitats[o].get("count", 0) + 1
+	return true
+
 func upgrade_cost(origin: Vector2i) -> int:
 	if not buildings.has(origin) or not Buildings.upgradable(buildings[origin]) or level(origin) >= Buildings.MAX_LEVEL:
 		return -1

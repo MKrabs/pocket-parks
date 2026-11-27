@@ -92,7 +92,7 @@ func _init() -> void:
 	var pm := park([])
 	pm.paint("habitat", Rect2i(4, 4, 3, 3))
 	var sim := ParkSim.new(pm, 9)
-	ok(sim._targets.size() == 1 and sim._targets[0]["appeal"] == 9 and sim._targets[0]["door"].y == 7, "an attraction, appeal by size, door on the path")
+	ok(sim._targets.size() == 1 and sim._targets[0]["appeal"] == 5 and sim._targets[0]["door"].y == 7, "an attraction, appeal by size, door on the path")
 	for i in ParkSim.DAY_TICKS / 2:
 		sim.step()
 	ok(sim.today.get(Vector2i(4, 4), {"guests": 0})["guests"] > 0, "guests visit it")

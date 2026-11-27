@@ -45,7 +45,11 @@ static func generate(theme_id: String, seed: int, size := "small") -> ParkMap:
 		for c: Vector2i in _shuffled(rng, cells):
 			r.position = c
 			if map.paint_target(id, r).x == -1 and map.can_paint(id, r) and touches_path(map, ParkMap.rect_cells(r)):
-				map.paint(id, r)
+				var o := map.paint(id, r)
+				var offer := Animals.picker(map.habitats[o]["fence"])
+				var k := absi(hash(o))  # not from rng: the rest of the layout stays as it was
+				map.habitats[o]["animal"] = offer[k % offer.size()]
+				map.habitats[o]["count"] = 2 + k % (Animals.MAX - 1)
 				break
 	var placed := 0
 	for c: Vector2i in _shuffled(rng, cells):

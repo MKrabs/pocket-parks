@@ -28,7 +28,9 @@ func quiet(seed_value: int) -> Array:
 		m.place("path", Vector2i(x, 7))
 	m.place("pond", Vector2i(9, 5))
 	m.place("snack_stand", Vector2i(6, 8))
-	m.paint("habitat", Rect2i(2, 4, 3, 3))
+	var h := m.paint("habitat", Rect2i(2, 4, 3, 3))
+	m.buy_animal(h, "red_panda")  # with one tree: comfort 32, appeal 9 as before animals (the scenario is seed-tuned)
+	m.habitats[h]["items"] = [{"id": "tree", "cells": [Vector2i(2, 4)]}]
 	m.money = 500
 	var sim := ParkSim.new(m, seed_value)
 	sim._appeal = 0.0
