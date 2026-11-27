@@ -32,9 +32,11 @@ var hab := VBoxContainer.new()
 var picks := HBoxContainer.new()
 var pick := ""  # the animal the checklist is for
 var needs_text := Hud._label(14)
-var comfort_text := Hud._label(14)
 var comfort_bar := Control.new()
 var buy_animal := _action("buy_animal")
+var decor := HBoxContainer.new()  # decor item buttons ("item_<id>"): click one, then click inside the habitat
+var item := -1  # the habitat's decor item that was clicked (index into its items), or -1
+var remove_item := _action("remove_item")
 var tip := Hud._label(14)
 var _panel := PanelContainer.new()
 var _tip := PanelContainer.new()
@@ -84,19 +86,37 @@ func _ready() -> void:
 	for a: String in Animals.ALL:
 		var b := Hud._button(Animals.ALL[a]["name"], func() -> void: pick = a)
 		b.set_meta("animal", a)
-		b.custom_minimum_size = Vector2(76, 72)
+		b.custom_minimum_size = Vector2(76, 62)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		b.add_theme_font_size_override("font_size", 12)
 		for k in ["normal", "hover", "pressed", "hover_pressed"]:
 			(b.get_theme_stylebox(k) as StyleBoxFlat).set_content_margin_all(4)
-			(b.get_theme_stylebox(k) as StyleBoxFlat).content_margin_top = 50  # the portrait sits above the name
-		b.draw.connect(func() -> void: Animals.draw(b, a, Vector2(b.size.x * 0.5, 46), 1.0, "walk", 0.0, 1.6))
+			(b.get_theme_stylebox(k) as StyleBoxFlat).content_margin_top = 42  # the portrait sits above the name
+		b.draw.connect(func() -> void: Animals.draw(b, a, Vector2(b.size.x * 0.5, 39), 1.0, "walk", 0.0, 1.4))
 		picks.add_child(b)
 	comfort_bar.custom_minimum_size = Vector2(0, 12)
 	comfort_bar.draw.connect(_draw_comfort)
 	needs_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	hab.add_theme_constant_override("separation", 6)
-	for c in [picks, needs_text, comfort_text, comfort_bar, buy_animal]:
+	decor.add_theme_constant_override("separation", 3)
+	for id: String in Animals.ITEMS:  # a small drawing of the item over its price; the name in the tooltip
+		var b := _action("item_" + id)
+		b.set_meta("item", id)
+		b.tooltip_text = Animals.ITEMS[id]["name"]
+		b.custom_minimum_size = Vector2(0, 42)
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		b.add_theme_font_size_override("font_size", 11)
+		for k in ["normal", "hover", "pressed", "hover_pressed", "disabled"]:
+			(b.get_theme_stylebox(k) as StyleBoxFlat).set_content_margin_all(1)
+			(b.get_theme_stylebox(k) as StyleBoxFlat).content_margin_top = 25
+		var v := BuildingView.new(id)
+		var fp: Vector2i = Animals.ITEMS[id]["footprint"]
+		v.scale = Vector2.ONE * 0.45 / maxi(fp.x, fp.y)
+		b.add_child(v)
+		b.resized.connect(func() -> void:
+			v.position = Vector2(b.size.x * 0.5, 22) -IsoGrid.project(Vector2(fp - Vector2i.ONE) * 0.5) * v.scale)
+		decor.add_child(b)
+	for c in [picks, needs_text, comfort_bar, buy_animal, decor, remove_item]:
 		hab.add_child(c)
 	for c in [title, body, hab, specs, upgrade, repair, demolish, ban_row, accuse, buy, warning]:
 		col.add_child(c)
@@ -125,6 +145,7 @@ func top() -> float:
 
 func show_building(o: Vector2i) -> void:
 	origin = o
+	item = -1
 	person = -1
 	staff = -1
 	plot = GridView.NONE
@@ -338,6 +359,16 @@ func _habitat() -> String:
 	for b: Button in picks.get_children():
 		b.visible = b.get_meta("animal") in offer
 		b.set_pressed_no_signal(b.get_meta("animal") == pick)
+	for b: Button in decor.get_children():
+		var d: Dictionary = Animals.ITEMS[b.get_meta("item")]
+		b.text = "$%d" % d["cost"]
+		b.disabled = map.money < d["cost"]
+	var its: Array = h.get("items", [])
+	remove_item.visible = item >= 0 and item < its.size()
+	decor.visible = not remove_item.visible  # a clicked item: its Remove button takes the row's place
+	if remove_item.visible:
+		var d: Dictionary = Animals.ITEMS[its[item]["id"]]
+		remove_item.text = "Remove %s · +$%d back" % [d["name"], d["cost"] / 2]
 	var n: int = h["cells"].size()
 	var appeal := roundi(n * Animals.appeal_factor(h))
 	var line := "%d cells · appeal %d" % [n, appeal]
@@ -348,14 +379,13 @@ func _habitat() -> String:
 		line += "\n%d %s%s · %s" % [h["count"], Animals.ALL[has]["name"], "" if h["count"] == 1 else "s",
 			"happy and out" if c >= Animals.HAPPY else "unhappy, hiding and pacing"]
 	needs_text.visible = pick != ""
-	comfort_text.visible = pick != ""
 	comfort_bar.visible = pick != ""
 	buy_animal.visible = pick != ""
 	if pick == "":
 		return line
 	needs_text.text = "\n".join(Animals.needs(pick, h).map(func(e: Dictionary) -> String:
-		return ("✓  " if e["ok"] else "✗  ") + e["text"]))
-	comfort_text.text = "Comfort %d / 100%s" % [Animals.comfort(pick, h), "" if pick == has else " (if it lived here)"]
+		return ("✓  " if e["ok"] else "✗  ") + e["text"])) + "\nComfort %d / 100%s" % [Animals.comfort(pick, h),
+		"" if pick == has else " (if it lived here)"]
 	comfort_bar.queue_redraw()
 	var why := map.animal_block(origin, pick)
 	buy_animal.disabled = why != ""

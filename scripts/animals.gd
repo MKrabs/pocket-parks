@@ -7,8 +7,39 @@ class_name Animals
 const MAX := 4  # animals per habitat
 const HAPPY := 50  # comfort at or above: out and active
 const FENCE_CATEGORY := {"glass": "water", "wall": "highlands", "net": "birds", "fence": "highlands"}
-const ITEM_TERRAIN := {"pool": ["water"], "rocks": ["rocks"], "tree": ["trees"], "shelter": ["shelter"],
-	"waterfall": ["water", "rocks"]}
+const ITEM_TERRAIN := {"pool": ["water"], "pool_big": ["water"], "rocks": ["rocks"], "rocks_long": ["rocks"],
+	"tree": ["trees"], "shelter": ["shelter"], "waterfall": ["water", "rocks"]}
+
+# Decor items (HAB3), placed inside a habitat from its card. Drawn by BuildingView like a building (Buildings.get_def
+# finds them here); role "item" keeps them off the build bar. appeal = decor points for nearby paths' charm.
+# "flat" ones lie on the floor: drawn under the animals on their cells.
+static var ITEMS := {
+	"pool": {"name": "Pool", "role": "item", "footprint": Vector2i(1, 1), "cost": 30, "appeal": 2, "flat": true,
+		"parts": [Buildings.part(Vector2.ZERO, Vector2(0.44, 0.44), 2, Palette.STONE),
+			Buildings.shaped("water", Vector2(0.36, 0.36), 1, Palette.WATER, 1)]},
+	"pool_big": {"name": "Big Pool", "role": "item", "footprint": Vector2i(2, 2), "cost": 100, "appeal": 4, "flat": true,
+		"parts": [Buildings.part(Vector2.ZERO, Vector2(0.92, 0.92), 2, Palette.STONE),
+			Buildings.shaped("water", Vector2(0.8, 0.8), 1, Palette.WATER, 1)]},
+	"rocks": {"name": "Rocks", "role": "item", "footprint": Vector2i(1, 1), "cost": 20, "appeal": 1,
+		"parts": [Buildings.part(Vector2(-0.05, -0.05), Vector2(0.3, 0.26), 9, Palette.STONE),
+			Buildings.part(Vector2(0.2, 0.18), Vector2(0.15, 0.13), 5, Palette.STONE)]},
+	"rocks_long": {"name": "Rock Ridge", "role": "item", "footprint": Vector2i(2, 1), "cost": 35, "appeal": 2,
+		"parts": [Buildings.part(Vector2.ZERO, Vector2(0.8, 0.3), 8, Palette.STONE),
+			Buildings.part(Vector2(-0.25, 0), Vector2(0.4, 0.2), 6, Palette.STONE, 8)]},
+	"tree": {"name": "Tree", "role": "item", "footprint": Vector2i(1, 1), "cost": 20, "appeal": 2,
+		"parts": Buildings.tree(Vector2.ZERO)},
+	"shelter": {"name": "Shelter", "role": "item", "footprint": Vector2i(1, 1), "cost": 40, "appeal": 1,
+		"parts": [Buildings.part(Vector2.ZERO, Vector2(0.32, 0.32), 11, Palette.WOOD),
+			Buildings.part(Vector2(0.31, 0), Vector2(0.03, 0.13), 8, Palette.shade(Palette.WOOD, 0.4)),  # the doorway
+			Buildings.part(Vector2.ZERO, Vector2(0.42, 0.42), 5, Palette.MOSS, 11)]},  # a turf roof
+	"waterfall": {"name": "Waterfall", "role": "item", "footprint": Vector2i(2, 1), "cost": 90, "appeal": 6,
+		"parts": [Buildings.part(Vector2(0.3, 0), Vector2(0.6, 0.42), 2, Palette.STONE),
+			Buildings.part(Vector2(0.3, 0), Vector2(0.5, 0.34), 1, Palette.WATER, 1),
+			Buildings.part(Vector2(-0.55, 0), Vector2(0.4, 0.44), 14, Palette.STONE),  # the cliff: a broad base...
+			Buildings.part(Vector2(-0.62, -0.04), Vector2(0.3, 0.34), 10, Palette.STONE, 14),  # ...and a smaller top
+			Buildings.part(Vector2(-0.2, 0), Vector2(0.06, 0.16), 22, Palette.WATER),  # the stream down its face
+			Buildings.part(Vector2(-0.15, 0.03), Vector2(0.02, 0.06), 21, Palette.CLOUD)]},
+}
 const SHARES := ["water", "rocks", "trees"]
 
 # cells = minimum habitat size; water / rocks / trees = share of its cells; shelter = needs one.

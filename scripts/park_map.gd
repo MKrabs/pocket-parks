@@ -233,6 +233,8 @@ func _set_habitat(old: Vector2i, id: String, cs: Array) -> Vector2i:
 		return Vector2i(-1, -1)
 	cs.sort()
 	h["cells"] = cs
+	# ponytail: items on removed cells just go (no refund); the cells' refund is already half
+	h["items"] = h.get("items", []).filter(func(it: Dictionary) -> bool: return it["cells"].all(func(c: Vector2i) -> bool: return c in cs))
 	var o: Vector2i = cs[0]
 	habitats[o] = h
 	buildings[o] = id
@@ -284,6 +286,8 @@ func remove_at(cell: Vector2i, back := -1) -> bool:
 ## What removing the building at `origin` gives back: half of all it cost (1×, +1×, +2× per level).
 func refund(origin: Vector2i) -> int:
 	var cost: int = Buildings.get_def(buildings[origin])["cost"] * (habitats[origin]["cells"].size() if habitats.has(origin) else 1)
+	for it: Dictionary in habitats.get(origin, {}).get("items", []):  # a habitat's decor goes with it
+		cost += Animals.ITEMS[it["id"]]["cost"]
 	return cost * (1 + (level(origin) - 1) * level(origin) / 2) / 2
 
 func level(origin: Vector2i) -> int:
@@ -310,6 +314,43 @@ func buy_animal(o: Vector2i, a: String) -> bool:
 	money -= Animals.ALL[a]["price"]
 	habitats[o]["animal"] = a
 	habitats[o]["count"] = habitats[o].get("count", 0) + 1
+	return true
+
+## Why decor item `id` can't go at `cell` turned `rot` in habitat `o` ("" = it can): inside it, on free cells, paid.
+func item_block(o: Vector2i, id: String, cell: Vector2i, rot := 0) -> String:
+	if not habitats.has(o):
+		return "Not a habitat"
+	for c in footprint(id, cell, rot):
+		if not c in habitats[o]["cells"]:
+			return "Inside the habitat only"
+		if item_at(o, c) >= 0:
+			return "Something's already there"
+	var cost: int = Animals.ITEMS[id]["cost"]
+	return "Need $%d more" % (cost - money) if money < cost else ""
+
+## Place decor item `id` in habitat `o`. False if item_block says no.
+func place_item(o: Vector2i, id: String, cell: Vector2i, rot := 0) -> bool:
+	if item_block(o, id, cell, rot) != "":
+		return false
+	money -= Animals.ITEMS[id]["cost"]
+	habitats[o]["items"].append({"id": id, "cells": footprint(id, cell, rot), "turn": rot % 4})
+	return true
+
+## Index of habitat `o`'s item covering `cell`, or -1.
+func item_at(o: Vector2i, cell: Vector2i) -> int:
+	var its: Array = habitats.get(o, {}).get("items", [])
+	for i in its.size():
+		if cell in its[i]["cells"]:
+			return i
+	return -1
+
+## Remove habitat `o`'s item `i`, refunding half its cost. False if there's no such item.
+func remove_item(o: Vector2i, i: int) -> bool:
+	var its: Array = habitats.get(o, {}).get("items", [])
+	if i < 0 or i >= its.size():
+		return false
+	money += Animals.ITEMS[its[i]["id"]]["cost"] / 2
+	its.remove_at(i)
 	return true
 
 func upgrade_cost(origin: Vector2i) -> int:
