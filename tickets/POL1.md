@@ -24,3 +24,4 @@ Fix the rough edges collected during reviews (each was seen in a screenshot):
 8. **The plot card doesn't show which plot it means.** Highlight the plot on the map while its card is open.
 ## Acceptance
 A before/after shot per item where visual. `./gd check` ok. Add a Fixed/Changed line to CHANGELOG.md.
+9. **Show scripts that render the build bar** (e.g. `tests/show_unlocks.gd`) now show only the tucked handle, because the bar auto-hides with no mouse nearby. Pin or open the bar in show scripts.
