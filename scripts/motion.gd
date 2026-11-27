@@ -46,6 +46,8 @@ const LAYER_TRAVEL := [1.6, 1.9, 2.2]  # screen widths each layer travels on the
 const LAYER_DARK := 0.05  # each layer further back is shaded this much more
 const TITLE_SIZE := 72
 const TITLE_FADE := 0.1
+const STROLL_TIME := 2.0  # ♥ / ~ over a guest after a lovely / dull stroll: pops, drifts up this long, vanishes
+const STROLL_RISE := 10.0
 
 static func pop(node: CanvasItem) -> Tween:
 	node.scale = Vector2.ZERO

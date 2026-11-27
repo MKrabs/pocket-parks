@@ -97,6 +97,7 @@ var fined: Dictionary = {}          # sender -> fines it paid so far (already in
 var charged: Dictionary = {}        # sender -> send prices it paid through send_paid (already inside ledger)
 var sender_levels: Dictionary = {}  # sender -> its park level, as told in hello and each send
 var cash_events: Array = []         # guest payments: {tick, origin (gate or shop), amount}; for the money floats
+var strolls: Array = []             # stroll verdicts on arrival: {tick, pos, stroll}; for the ♥ / ~ marks
 var arrests: Array = []             # {tick, pos (cell), guard (staff index, -1 = accused), amount, wrongful}
 var _gate: Array = []               # [kind, sender] waiting to enter
 var jobs: Array[Dictionary] = []     # sites: {origin, id, level (being built), left, total (work ticks), paid, builder ("" = waiting)}
@@ -249,6 +250,23 @@ func charm(cell: Vector2i) -> float:
 			_charm[p] = _charm_of(p)
 	return _charm.get(cell, 0.0)
 
+## Average charm of the path tiles touching the building at `origin` (NAN if none touch it).
+func path_charm(origin: Vector2i) -> float:
+	var sum := 0.0
+	var n := 0
+	for cell: Vector2i in _map.occupied:
+		if _map.occupied[cell] != origin:
+			continue
+		for d: Vector2i in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
+			if _map.occupied.get(cell + d, origin) != origin and cell + d in _paths:  # ponytail: linear scans, fine per card frame
+				sum += charm(cell + d)
+				n += 1
+	return sum / n if n > 0 else NAN
+
+## "lovely" / "pleasant" / "dull" for a charm value, on the same lines as a stroll's verdict.
+static func charm_word(c: float) -> String:
+	return "lovely" if c >= LOVELY else "dull" if c <= DULL else "pleasant"
+
 func _charm_of(cell: Vector2i) -> float:
 	var free := 0
 	var seen := {}  # origin -> true, each building in view once
@@ -300,6 +318,8 @@ func _judge_stroll(g: Dictionary) -> void:
 	var avg: float = g["walk_charm"] / g["walk_tiles"] if g["walk_tiles"] > 0 else 0.0
 	g["stroll"] = "" if g["walk_tiles"] < STROLL_MIN else "lovely" if avg >= LOVELY else "dull" if avg <= DULL else ""
 	g["mood"] += STROLL_MOOD if g["stroll"] == "lovely" else -STROLL_MOOD if g["stroll"] == "dull" else 0.0
+	if g["stroll"] != "":
+		strolls.append({"tick": tick, "pos": g["pos"], "stroll": g["stroll"]})
 	g["walk_tiles"] = 0
 	g["walk_charm"] = 0.0
 

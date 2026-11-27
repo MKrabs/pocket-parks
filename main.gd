@@ -29,6 +29,7 @@ var _visit_walkers: WalkerView
 var debug_visit := false  # tests/show_visit.gd: start inside a visit with a few people sent
 var pins := PinView.new()
 var fx := Feedback.new()
+var charm := CharmView.new()
 var toasts := CrimeToasts.new()
 var cam := IsoCamera.new()
 var transition := CloudTransition.new()
@@ -73,6 +74,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		follow = not follow
 	elif k.physical_keycode == KEY_B:
 		bar.toggle()
+	elif k.physical_keycode == KEY_C and not visiting:
+		charm.toggle()
 	elif k.physical_keycode == KEY_F9:
 		hud.confirm_new_park()
 
@@ -136,6 +139,8 @@ func _ready() -> void:
 	fx.hud = hud
 	zoo.fx = fx
 	add_child(fx)
+	charm.zoo = zoo
+	add_child(charm)
 
 	bar.picked.connect(func(id: String) -> void:
 		zoo.select(id)
@@ -435,6 +440,8 @@ func _enter_visit(title: String) -> void:
 	card.hover("", Vector2.ZERO)
 	bar.clear()
 	grid.map = null  # bot parks own all their land
+	if charm.visible:
+		charm.toggle()  # charm view is for your own park
 	for n in [zoo, walkers, pins, fx, bar, hud]:
 		n.hide()
 	sim.leave_avatar(net.player)  # we're away: our character is in the other park

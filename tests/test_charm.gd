@@ -37,7 +37,7 @@ func day(m: ParkMap, stand: Vector2i) -> Dictionary:
 			if g["state"] != "walk":
 				strolls[g["stroll"]] = true
 	var d: Dictionary = sim.today.get(stand, {"guests": 0, "income": 0})
-	return {"strolls": strolls, "visits": d["guests"], "per_visit": float(d["income"]) / maxi(d["guests"], 1)}
+	return {"sim": sim, "strolls": strolls, "visits": d["guests"], "per_visit": float(d["income"]) / maxi(d["guests"], 1)}
 
 func _init() -> void:
 	var cell := Vector2i(5, 7)
@@ -83,6 +83,17 @@ func _init() -> void:
 	ok(lovely["strolls"].has("lovely") and not lovely["strolls"].has("dull"), "a long charming route is a lovely stroll")
 	ok(dull["strolls"].has("dull") and not dull["strolls"].has("lovely"), "a long paved route is a dull walk")
 	ok(lovely["per_visit"] > dull["per_visit"], "a lovely stroll earns more per visit than a dull one")
+	var ls: ParkSim = lovely["sim"]
+	var ds: ParkSim = dull["sim"]
+	ok(ls.strolls.any(func(s: Dictionary) -> bool: return s["stroll"] == "lovely"), "lovely strolls are logged for the ♥ marks")
+	ok(ds.strolls.all(func(s: Dictionary) -> bool: return s["stroll"] == "dull") and not ds.strolls.is_empty(), "dull ones for the ~")
+	print("paths at the stand: %.2f vs %.2f" % [ls.path_charm(stand), ds.path_charm(stand)])
+	ok(ls.path_charm(stand) > ds.path_charm(stand), "the card's path charm follows the route")
+	ok(ParkSim.charm_word(ds.path_charm(stand)) != "lovely", "paved stand doesn't read lovely")
+	ok(is_nan(ls.path_charm(Vector2i(1, 5))), "no touching path (a tree off the path): no charm line")
+	ok(ParkSim.charm_word(ParkSim.LOVELY) == "lovely" and ParkSim.charm_word(0.1) == "pleasant" and ParkSim.charm_word(ParkSim.DULL) == "dull", "charm words")
+	ok(CharmView.tint(-1.0) == Palette.STONE and CharmView.tint(1.0) == Palette.BUTTER, "charm view tint runs STONE to BUTTER")
+	ok(CharmView.tint((ParkSim.DULL + ParkSim.LOVELY) * 0.5).is_equal_approx(Palette.GRASS), "with GRASS in the middle")
 
 	var short := day(park(3, {Vector2i(4, 7): "snack_stand", Vector2i(2, 6): "tree", Vector2i(2, 8): "fountain"}), Vector2i(4, 7))
 	ok(short["visits"] > 0 and short["strolls"].keys() == [""], "short walks are neutral")

@@ -10,6 +10,9 @@ and the game shows the latest entry in its "What's new" card.
 - **Park charm:** guests now rate the walk between stops. A long walk past decor, water, open grass and a mix of
   buildings is a lovely stroll: they cheer up and spend more at the next stop. A long walk past rows of the same stand,
   packed paving, litter or wrecks is a dull walk: they grumble and spend less.
+- **Charm view:** press **C** to tint every path from grey (dull) through green to a soft yellow glow (charming), with
+  the other buildings faded. Guests show a little ♥ after a lovely stroll and a ~ after a dull one, and building cards
+  say how charming the paths next to them are, with a tip when they're dull.
 
 ### Changed
 - What guests spend depends on their mood. Happy guests pay in full, and unhappy ones often skip buying.
