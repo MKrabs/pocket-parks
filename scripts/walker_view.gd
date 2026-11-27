@@ -18,6 +18,26 @@ var _layers: Array[Node2D] = []
 var _rows: Array = []  # per depth: [[kind, item], ...]
 var _time := 0.0
 var _hops: Dictionary = {}  # staff index -> time its hop started
+var _bubbles: Dictionary = {}  # avatar name -> its speech Bubble (one each, the newest line)
+const BUBBLE_TIME := 5.0
+const BUBBLE_WIDTH := 130.0  # world px before the line wraps
+
+## A speech bubble over `name`'s character for BUBBLE_TIME s (pops in, vanishes). A newer line replaces it.
+func say(name: String, text: String) -> void:
+	if _bubbles.has(name) and is_instance_valid(_bubbles[name]):
+		_bubbles[name].queue_free()
+	var b := Bubble.new()
+	b.text = text
+	b.z_index = 2 * (IsoGrid.SIZE.x + IsoGrid.SIZE.y) + 2  # above every row
+	b.hide()  # until _process puts it over its character
+	add_child(b)
+	_bubbles[name] = b
+	var t := Motion.pop(b)
+	t.tween_interval(BUBBLE_TIME)
+	t.tween_callback(func() -> void:
+		if _bubbles.get(name) == b:
+			_bubbles.erase(name)
+		Motion.vanish(b))
 
 ## A little hop for staff member i (a guard who just caught someone).
 func hop(i: int) -> void:
@@ -50,6 +70,13 @@ func _process(delta: float) -> void:
 			_row(g["pos"]).append(["guest", g])
 	for a in sim.avatars:
 		_row(a["pos"]).append(["avatar", a])
+	for n: String in _bubbles:
+		var b: Node2D = _bubbles[n]
+		b.hide()
+		for a in sim.avatars:
+			if a["name"] == n:
+				b.position = IsoGrid.project(a["pos"]) - Vector2(0, LIFT + 35.0)
+				b.show()
 	for l in _layers:
 		l.queue_redraw()
 
@@ -128,3 +155,19 @@ func _bean(ci: Node2D, p: Vector2, phase: int, half: Vector2, col: Color, cap: C
 		ci.draw_colored_polygon(top, cap)
 	if mark.a > 0.0:
 		ci.draw_colored_polygon(Squircle.points(foot - Vector2(0, half.y + bob), Vector2(3.0, 3.0), 4.0, 12), mark)
+
+## A rounded speech bubble; its origin is the tip of the little tail (it grows from there when it pops).
+class Bubble extends Node2D:
+	var text := ""
+	func _draw() -> void:
+		var f := Palette.FONT
+		var size := f.get_multiline_string_size(text, HORIZONTAL_ALIGNMENT_CENTER, BUBBLE_WIDTH, TAG_FONT)
+		var half := size * 0.5 + Vector2(7, 5)
+		var centre := Vector2(0, -half.y - 4.0)
+		draw_colored_polygon(Squircle.points(Vector2(0, -2.5), Vector2(2.6, 2.6), 4.0, 12), Palette.CLOUD)
+		var body := Squircle.points(centre, half, 4.0, 32)
+		draw_colored_polygon(body, Palette.CLOUD)
+		body.append(body[0])
+		draw_polyline(body, Color(Palette.INK, 0.15), 1.0, true)
+		draw_multiline_string(f, centre - Vector2(size.x * 0.5, size.y * 0.5 - f.get_ascent(TAG_FONT)), text,
+			HORIZONTAL_ALIGNMENT_CENTER, size.x, TAG_FONT, -1, Palette.INK)

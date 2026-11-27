@@ -34,6 +34,7 @@ var cam := IsoCamera.new()
 var transition := CloudTransition.new()
 var card := InfoCard.new()
 var net := Net.new()
+var chat := ChatLog.new()
 var live := false  # the park on screen is a real one over the network (net.visit_sim), not a bot park
 var _joining := {}  # a typed-address offer waiting for its park to answer (we stay home meanwhile)
 var bots := true  # bot friends send groups into your park (tests switch them off)
@@ -52,7 +53,9 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	var k := event as InputEventKey
 	if not k.pressed or k.echo:
 		return
-	if k.physical_keycode == KEY_T:
+	if k.physical_keycode in [KEY_ENTER, KEY_KP_ENTER]:
+		chat.open()
+	elif k.physical_keycode == KEY_T:
 		var ts: Array = Buildings.themes().keys()
 		Buildings.use(ts[(ts.find(Buildings.active) + 1) % ts.size()])
 		net.theme = Buildings.active
@@ -65,6 +68,18 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		follow = not follow
 	elif k.physical_keycode == KEY_F9:
 		hud.confirm_new_park()
+
+## Say a line through our character: a real park's host relays it, a bot park just shows it, at home our net does both.
+func say(text: String) -> bool:
+	if visiting and not live:
+		_hear(net.player, net.color, text.strip_edges().left(Net.SAY_MAX))
+		return true
+	return net.say(text)
+
+## A line said in the park on screen: a bubble over the speaker and a row in the log.
+func _hear(name: String, color: Color, text: String) -> void:
+	chat.add(name, color, text)
+	(_visit_walkers if visiting else walkers).say(name, text)
 
 func escape() -> void:
 	if zoo.selected != "":
@@ -153,6 +168,10 @@ func _ready() -> void:
 			_joining = {})
 	visit_panel.join_address.connect(join_address)
 	net.stolen.connect(_learn)
+	net.said.connect(func(name: String, color: Color, text: String, home: bool) -> void:
+		if home != visiting:  # lines from our own park while we're away elsewhere aren't for this screen
+			_hear(name, color, text))
+	chat.typed.connect(say)
 	add_child(net)  # net.player is set from here on
 	sim.join_avatar(net.player, net.color)
 	visit_panel.picked.connect(travel_to)
@@ -162,6 +181,7 @@ func _ready() -> void:
 	add_child(transition)
 	toasts.clicked.connect(func(o: Vector2i) -> void: cam.position = IsoGrid.to_screen(o))
 	add_child(toasts)
+	add_child(chat)
 
 	# centre of the board top, nudged down by half the slab depth, sized to sit between the two bars
 	cam.position = IsoGrid.project(Vector2(IsoGrid.SIZE) / 2.0 - Vector2(0.5, 0.5)) + Vector2(0, GridView.SLAB / 2)

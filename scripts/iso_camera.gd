@@ -15,6 +15,8 @@ const TRACKPAD_FACTOR_MAX := 0.9  # wheel factors below this are a trackpad swip
 var dragging := false
 
 func _process(delta: float) -> void:
+	if get_viewport().gui_get_focus_owner() is LineEdit:
+		return  # typing a chat line or an address, not panning
 	var dir := Vector2(
 		float(Input.is_physical_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT)) - float(Input.is_physical_key_pressed(KEY_A) or Input.is_key_pressed(KEY_LEFT)),
 		float(Input.is_physical_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN)) - float(Input.is_physical_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP)))

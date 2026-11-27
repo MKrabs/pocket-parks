@@ -11,12 +11,14 @@ extends Node
 #        live also carries avatars [name, color, pos, walking]: every character in the host's park, its own included.
 # Visitor → host: hello {t, player, color, level} once connected (the host adds its avatar), send {t, kind, level} per
 # person (the host runs sim.send_paid: refused at the send limit, otherwise the price comes off the ledger; `inside`
-# carries the limit), move {t, cell} to walk its avatar there. A visitor's avatar leaves when it disconnects.
+# carries the limit), move {t, cell} to walk its avatar there, say {t, text} to talk. A visitor's avatar leaves when it
+# disconnects. Host → every visitor: say {t, name, color, text}, any line said in its park (the sender's own too).
 
 signal map_changed  # the visited park's layout arrived or changed: rebuild its ZooView
 signal lost         # the visited park went away (host closed, or never answered)
 signal joined       # the park we join() answered (we sent our hello)
 signal stolen(ids: Array)  # blueprints our spies brought home from the visited park (running list, may repeat)
+signal said(name: String, color: Color, text: String, home: bool)  # a chat line; home = said in our own park
 
 const GAME_PORT := 24610   # ENet: first free of GAME_PORT .. +19
 const DISCO_PORT := 24600  # UDP: listen on the first free of DISCO_PORT .. +9, announce to all ten
@@ -24,6 +26,7 @@ const DISCO_PORTS := 10
 const ANNOUNCE_EVERY := 2.0
 const FORGET_AFTER := 6.0
 const LIVE_EVERY := 0.1
+const SAY_MAX := 80  # chat line length
 const CONNECT_TIMEOUT_MS := 4000  # join(): an address that never answers is dropped (lost) after about this long
 
 var park_name := "Pocket Zoo"
@@ -213,6 +216,24 @@ func move_avatar(cell: Vector2i) -> bool:
 	_send(_client, 1, {"t": "move", "cell": cell})
 	return true
 
+## Say a line in the park we're in: the visited host relays it to everyone there (us included), at home it shows in
+## our park and goes to our visitors. False for an empty line, or a visited park that hasn't heard our hello yet.
+func say(text: String) -> bool:
+	text = text.strip_edges().left(SAY_MAX)
+	if text == "" or _client and not _hello:
+		return false
+	if _client:
+		_send(_client, 1, {"t": "say", "text": text})
+	else:
+		_say(player, color, text)
+	return true
+
+## Host: a line said in our park, shown here and sent to every visitor.
+func _say(name: String, c: Color, text: String) -> void:
+	said.emit(name, c, text, true)
+	if _visitors > 0:
+		_send(_host, 0, {"t": "say", "name": name, "color": c, "text": text})
+
 ## What the save keeps of us: our name (the sender id in other parks), the host seq and what we were paid.
 func state() -> Dictionary:
 	return {"player": player, "seq": seq, "got": got}
@@ -283,6 +304,14 @@ func _hear(peer: int, m: Dictionary) -> void:
 		sim.send_paid(m["kind"], _names[peer], clampi(int(m.get("level", 1)), 1, ParkLevel.MAX))
 	elif m.get("t") == "move" and _names.has(peer) and sim and m.get("cell") is Vector2i:
 		sim.move_avatar(_names[peer], m["cell"])
+	elif m.get("t") == "say" and _names.has(peer) and m.get("text") is String:
+		var c := Palette.SKY
+		for a in sim.avatars if sim else []:
+			if a["name"] == _names[peer]:
+				c = a["color"]
+		var text: String = m["text"].strip_edges().left(SAY_MAX)
+		if text != "":
+			_say(_names[peer], c, text)
 
 ## Host: each visitor whose ledger entry (or people inside) changed gets its new totals.
 func _tell() -> void:
@@ -322,6 +351,8 @@ func _apply(m: Dictionary) -> void:
 		visit_sim.staff.clear()
 		visit_sim.load_map(visit_map)
 		map_changed.emit()
+	elif m.get("t") == "say":
+		said.emit(str(m["name"]), m["color"] if m.get("color") is Color else Palette.SKY, str(m["text"]), false)
 	elif m.get("t") == "live":
 		var s := visit_sim
 		s.tick = m["tick"]
