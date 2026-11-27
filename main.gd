@@ -42,6 +42,9 @@ var _reported := 0  # sim.events already toasted
 var _rng := RandomNumberGenerator.new()
 var save_path := ""  # set in _ready when this is the real game (not a test, not a ./gd shot)
 var _unsaved := 0  # sim ticks since the last save
+var follow := true  # F: the camera follows your character while it walks
+const FOLLOW_RATE := 3.0  # camera catch-up per second
+var _chasing := false
 
 ## T cycles the active theme (zoo → festival → cinema); the build bar follows, placed buildings stay.
 ## Esc leaves place mode, or closes the card in Select mode.
@@ -58,6 +61,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		zoo.rotate_ghost(-1 if k.shift_pressed else 1)
 	elif k.physical_keycode == KEY_ESCAPE:
 		escape()
+	elif k.physical_keycode == KEY_F:
+		follow = not follow
 	elif k.physical_keycode == KEY_F9:
 		hud.confirm_new_park()
 
@@ -148,7 +153,8 @@ func _ready() -> void:
 			_joining = {})
 	visit_panel.join_address.connect(join_address)
 	net.stolen.connect(_learn)
-	add_child(net)
+	add_child(net)  # net.player is set from here on
+	sim.join_avatar(net.player, net.color)
 	visit_panel.picked.connect(travel_to)
 	visit_panel.sent.connect(send)
 	visit_panel.home.connect(travel_home)
@@ -211,6 +217,29 @@ func _process(delta: float) -> void:
 		visit_panel.show_ledger(visits[0]["sim"].sent_by(Visit.ME), sim.money)
 	else:
 		_hover(get_global_mouse_position(), get_viewport().get_mouse_position())
+	var me := my_avatar()
+	if me.is_empty() or not follow or transition.visible:
+		_chasing = false
+	elif not me["path"].is_empty() or _chasing:  # keeps easing in after the walk ends
+		var at := IsoGrid.project(me["pos"])
+		cam.position = cam.position.lerp(at, 1.0 - exp(-FOLLOW_RATE * delta))
+		_chasing = not me["path"].is_empty() or cam.position.distance_to(at) > 2.0
+
+## The park on screen: ours, the bot park we visit, or the live mirror (null while it connects).
+func here() -> ParkSim:
+	return net.visit_sim if live else visits[0]["sim"] if visiting else sim
+
+## Our character in the park on screen, {} if it isn't there (yet).
+func my_avatar() -> Dictionary:
+	var s := here()
+	for a in s.avatars if s else []:
+		if a["name"] == net.player:
+			return a
+	return {}
+
+## Walk our character to `cell` along paths. A real park's host does the walking.
+func walk_to(cell: Vector2i) -> bool:
+	return net.move_avatar(cell) if live else here().move_avatar(net.player, cell)
 
 ## Select mode: lift the person or building under the mouse and name it in the tooltip.
 func _hover(world: Vector2, screen: Vector2) -> void:
@@ -241,9 +270,11 @@ func _guest(id: int) -> Dictionary:
 ## Money the visited parks owe us (or we owe them) moves into our sim; stolen blueprints join the build bar.
 func step_world() -> void:
 	advance(1 if visiting else hud.speed)  # your park: bot senders + crime toasts
+	sim.step_avatars()  # characters walk at 1×, paused or not
 	for v in visits.duplicate():
 		var vs: ParkSim = v["sim"]
 		vs.step()
+		vs.step_avatars()
 		if vs.tick >= ParkSim.DAY_TICKS:
 			vs.new_day()  # ponytail: bot parks loop their day; our people still inside are dropped
 		var owed: int = vs.ledger.get(Visit.ME, 0)
@@ -289,6 +320,7 @@ func visit(offer: Dictionary) -> void:
 	_visit_walkers = WalkerView.new()
 	_visit_walkers.sim = v["sim"]
 	_visit_walkers.me = Visit.ME
+	(v["sim"] as ParkSim).join_avatar(net.player, net.color)
 	_enter_visit(offer["name"])
 
 ## The Visit picker, with our own address for a friend to type.
@@ -332,6 +364,7 @@ func _enter_visit(title: String) -> void:
 	grid.map = null  # bot parks own all their land
 	for n in [zoo, walkers, pins, fx, bar, hud]:
 		n.hide()
+	sim.leave_avatar(net.player)  # we're away: our character is in the other park
 	add_child(_visit_zoo)
 	add_child(_visit_walkers)
 	visiting = true
@@ -355,6 +388,9 @@ func go_home() -> void:
 	if not visiting:
 		return
 	visiting = false
+	if not live:
+		(visits[0]["sim"] as ParkSim).leave_avatar(net.player)
+	sim.join_avatar(net.player, net.color)  # back at our gate
 	grid.map = zoo.map
 	live = false
 	net.leave()
@@ -441,10 +477,15 @@ func _nearest(world: Vector2, cells: Array) -> int:
 
 ## Left-click on the ground: place in place mode (back to Select unless painting or Shift), else select.
 func _on_cell_clicked(cell: Vector2i, button: MouseButton, shift := false) -> void:
-	if visiting or button != MOUSE_BUTTON_LEFT:
-		return  # someone else's park: you send people, you don't build or accuse
+	if button != MOUSE_BUTTON_LEFT:
+		return
+	if visiting:
+		walk_to(cell)  # someone else's park: you walk and send people, you don't build or accuse
+		return
 	var id := zoo.selected
-	if id == "":
+	if id == "" and (shift or Input.is_key_pressed(KEY_SHIFT)):
+		walk_to(cell)  # Shift+click: plain clicks stay for selecting
+	elif id == "":
 		select_at(cell, get_global_mouse_position())
 	elif zoo.on_click(cell) and not Buildings.get_def(id)["role"] in PAINT_ROLES and not (shift or Input.is_key_pressed(KEY_SHIFT)):
 		bar.clear()

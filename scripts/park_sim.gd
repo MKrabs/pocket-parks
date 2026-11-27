@@ -47,6 +47,7 @@ const KINDS := ["guest", "hooligan", "litterbug", "thief", "spy"]
 const BUILD_SECONDS := {"path": 0.0, "entrance": 0.0, "decor": 5.0, "shop": 20.0, "pond": 40.0, "enclosure": 60.0}
 const LEVEL_TIME := [1.0, 1.5, 2.5]  # × build time for building level 1 / upgrading to 2 / to 3
 const BUILDER_SPEED := 0.15
+const AVATAR_SPEED := 0.25  # tiles per tick
 const BUILDER_NAMES := ["Bo", "Ada", "Kit", "Nell", "Rio", "Pip", "Sol", "June"]
 
 var money: int
@@ -70,6 +71,7 @@ var _gate: Array = []               # [kind, sender] waiting to enter
 var jobs: Array[Dictionary] = []     # sites: {origin, id, level (being built), left, total (work ticks), paid, builder ("" = waiting)}
 var builders: Array[Dictionary] = [] # one per finished shed: {name, shed (origin), pos (fractional cell), state: home|walk|work}
 var finished: Array[Vector2i] = []   # sites done; the view pops them and clears this
+var avatars: Array[Dictionary] = []  # player characters, not guests (no spending, mood, accusing): {name, color, cell, pos, path}
 var _map: ParkMap
 
 var _rng := RandomNumberGenerator.new()
@@ -102,7 +104,7 @@ func load_map(map: ParkMap) -> void:
 	var index := {}
 	for i in _targets.size():
 		index[_targets[i]["origin"]] = i
-	for w in guests + staff:
+	for w in guests + staff + avatars:
 		w["path"] = []
 		if _astar.is_point_solid(w["cell"]):  # path under them was erased
 			w["cell"] = _entrance
@@ -309,6 +311,29 @@ func _settle(g: Dictionary) -> void:
 	ledger[sender] = ledger.get(sender, 0) + owed
 	if not g["spied"].is_empty():
 		blueprints[sender] = blueprints.get(sender, []) + g["spied"]
+
+## A player's character enters at the gate (back to the gate if already here).
+func join_avatar(name: String, color: Color) -> void:
+	leave_avatar(name)
+	avatars.append({"name": name, "color": color, "cell": _entrance, "pos": Vector2(_entrance), "path": []})
+
+func leave_avatar(name: String) -> void:
+	avatars.assign(avatars.filter(func(a: Dictionary) -> bool: return a["name"] != name))
+
+## Walk `name`'s character along the paths to `cell`. False if it isn't here or the cell isn't walkable.
+func move_avatar(name: String, cell: Vector2i) -> bool:
+	if not _astar.is_in_boundsv(cell) or _astar.is_point_solid(cell):
+		return false
+	for a in avatars:
+		if a["name"] == name:
+			_go(a, cell)
+			return true
+	return false
+
+## One tick of every character's walk. Separate from step() so they walk while the day is paused or over.
+func step_avatars() -> void:
+	for a in avatars:
+		_walk(a, AVATAR_SPEED)
 
 func _go(w: Dictionary, to: Vector2i) -> void:
 	var p := _astar.get_id_path(w["cell"], to)
