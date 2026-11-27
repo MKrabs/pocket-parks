@@ -6,6 +6,7 @@ signal picked(offer: Dictionary)
 signal sent(kind: String)
 signal home
 signal join_address(text: String)
+signal crime(kind: String)  # our character strikes in person (ParkSim.CRIMES key)
 
 var last_address := ""  # the last address typed into Join, for this session
 var _picker := PanelContainer.new()
@@ -15,6 +16,8 @@ var _title := Hud._label(18)
 var _ledger := Hud._label(15)
 var _reason := Hud._label(13)
 var _sends: Array[Button] = []
+var _crimes := HBoxContainer.new()  # Wreck / Litter / Steal / Spy beside a building; hidden elsewhere
+var _offered: Array = []
 
 func _ready() -> void:
 	var pbox := BuildBar.box(Palette.CREAM, 20)
@@ -37,6 +40,20 @@ func _ready() -> void:
 	chip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top.add_child(chip)
 	col.add_child(top)
+	_crimes.add_theme_constant_override("separation", 8)
+	var you := Hud._label(14)
+	you.text = "You, in person:"
+	you.modulate.a = 0.75
+	_crimes.add_child(you)
+	for kind: String in ParkSim.CRIMES:
+		var c := Hud._button(ParkSim.CRIMES[kind], crime.emit.bind(kind))
+		c.set_meta("kind", kind)
+		for k in ["normal", "hover", "pressed"]:
+			c.add_theme_stylebox_override(k, BuildBar.box(Palette.shade(Palette.CORAL, 0.04) if k == "hover" else Palette.CORAL))
+		c.custom_minimum_size = Vector2(72, 0)
+		_crimes.add_child(c)
+	_crimes.hide()
+	col.add_child(_crimes)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)
 	for kind: String in Visit.PRICES:
@@ -194,6 +211,20 @@ func show_ledger(t: Dictionary, money: int) -> void:
 		b.disabled = full
 	_reason.text = ("Full: at most %d of yours inside at once (3 + your park level). Send more when some leave." if full
 		else "Up to %d of yours inside at once (3 + your park level).") % t["limit"]
+	if t.get("banned", 0) > 0:
+		_reason.text = "Blacklisted here for %d more day%s: no visits in person, half the limit (%d), double prices." % [
+			t["banned"], "" if t["banned"] == 1 else "s", t["limit"]]
+
+## The crimes our character can do where it stands (ParkSim.crimes_for); none hides the row.
+func show_crimes(kinds: Array) -> void:
+	if kinds == _offered:
+		return
+	_offered = kinds
+	for c in _crimes.get_children():
+		c.visible = not c.has_meta("kind") or c.get_meta("kind") in kinds
+	_crimes.visible = not kinds.is_empty()
+	_send.reset_size()
+	_send.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM, Control.PRESET_MODE_MINSIZE, 16)
 
 ## Our people in the park (the gate queue included).
 static func inside(t: Dictionary) -> int:

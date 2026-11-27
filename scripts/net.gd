@@ -11,7 +11,8 @@ extends Node
 #        live also carries avatars [name, color, pos, walking]: every character in the host's park, its own included.
 # Visitor → host: hello {t, player, color, level} once connected (the host adds its avatar), send {t, kind, level} per
 # person (the host runs sim.send_paid: refused at the send limit, otherwise the price comes off the ledger; `inside`
-# carries the limit), move {t, cell} to walk its avatar there. A visitor's avatar leaves when it disconnects.
+# carries the limit), move {t, cell} to walk its avatar there, crime {t, kind} to strike in person (SOC5). A visitor's
+# avatar leaves when it disconnects. A blacklisted visitor gets no avatar; `inside` carries banned (days left, 0 = not).
 
 signal map_changed  # the visited park's layout arrived or changed: rebuild its ZooView
 signal lost         # the visited park went away (host closed, or never answered)
@@ -195,7 +196,7 @@ func join(ip: String, game_port: int) -> bool:
 	_client.host.get_peers()[0].set_timeout(0, CONNECT_TIMEOUT_MS, CONNECT_TIMEOUT_MS)  # give up on a dead address fast
 	visit_map = ParkMap.new()
 	visit_sim = ParkSim.new(visit_map, 0)
-	visit_ledger = {"guests": 0, "hidden": 0, "wanted": 0, "earned": 0, "fines": 0, "limit": ParkSim.SEND_BASE + level}
+	visit_ledger = {"guests": 0, "hidden": 0, "wanted": 0, "earned": 0, "fines": 0, "limit": ParkSim.SEND_BASE + level, "banned": 0}
 	return true
 
 ## Send one person of `kind` into the park we visit; the host charges it through our ledger, or refuses it at our
@@ -211,6 +212,13 @@ func move_avatar(cell: Vector2i) -> bool:
 	if not _hello:
 		return false
 	_send(_client, 1, {"t": "move", "cell": cell})
+	return true
+
+## Our character does `kind` (ParkSim.CRIMES) at the building beside it; the host checks it can. False until hello.
+func strike(kind: String) -> bool:
+	if not _hello:
+		return false
+	_send(_client, 1, {"t": "crime", "kind": kind})
 	return true
 
 ## What the save keeps of us: our name (the sender id in other parks), the host seq and what we were paid.
@@ -270,7 +278,8 @@ func _live_msg() -> Dictionary:
 			return [g["id"], g["kind"], g["pos"], g["state"], snappedf(g["mood"], 1.0), g["wanted"]]),
 		"staff": sim.staff.map(func(s: Dictionary) -> Array: return [s["kind"], s["pos"], not s["path"].is_empty(), s["level"]]),
 		"builders": sim.builders, "jobs": sim.jobs, "litter": sim.litter, "closed": sim.closed, "events": robbed,
-		"avatars": sim.avatars.map(func(a: Dictionary) -> Array: return [a["name"], a["color"], a["pos"], not a["path"].is_empty()])}
+		"avatars": sim.avatars.map(func(a: Dictionary) -> Array:
+			return [a["name"], a["color"], a["pos"], not a["path"].is_empty(), a.get("strike", 0) > 0])}
 
 ## Host: a message from visitor `peer`.
 func _hear(peer: int, m: Dictionary) -> void:
@@ -283,6 +292,8 @@ func _hear(peer: int, m: Dictionary) -> void:
 		sim.send_paid(m["kind"], _names[peer], clampi(int(m.get("level", 1)), 1, ParkLevel.MAX))
 	elif m.get("t") == "move" and _names.has(peer) and sim and m.get("cell") is Vector2i:
 		sim.move_avatar(_names[peer], m["cell"])
+	elif m.get("t") == "crime" and _names.has(peer) and sim:
+		sim.avatar_strike(_names[peer], str(m.get("kind", "")))
 
 ## Host: each visitor whose ledger entry (or people inside) changed gets its new totals.
 func _tell() -> void:
@@ -336,4 +347,5 @@ func _apply(m: Dictionary) -> void:
 		s.closed = m["closed"]
 		s.events = m["events"]
 		s.avatars.assign(m.get("avatars", []).map(func(a: Array) -> Dictionary:
-			return {"name": a[0], "color": a[1], "pos": a[2], "cell": Vector2i(a[2].round()), "path": [0] if a[3] else []}))
+			return {"name": a[0], "color": a[1], "pos": a[2], "cell": Vector2i(a[2].round()), "path": [0] if a[3] else [],
+				"strike": 1 if a.size() > 4 and a[4] else 0}))

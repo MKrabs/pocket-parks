@@ -89,7 +89,9 @@ func _draw_row(ci: Node2D, d: int) -> void:
 				var name: String = a["name"]
 				var w := Palette.FONT_BOLD.get_string_size(name, HORIZONTAL_ALIGNMENT_LEFT, -1, TAG_FONT).x
 				var tag := IsoGrid.project(a["pos"]) - Vector2(0, LIFT + 27.0)
-				ci.draw_colored_polygon(Squircle.points(tag, Vector2(w * 0.5 + 4.0, TAG_FONT * 0.6), 4.0, 24), Color(Palette.CLOUD, 0.92))
+				var striking: bool = a.get("strike", 0) > 0  # exposed: the tag turns CORAL while it does its crime
+				ci.draw_colored_polygon(Squircle.points(tag, Vector2(w * 0.5 + 4.0, TAG_FONT * 0.6), 4.0, 24),
+					Palette.CORAL if striking else Color(Palette.CLOUD, 0.92))
 				ci.draw_string(Palette.FONT_BOLD, tag + Vector2(-w * 0.5, TAG_FONT * 0.35), name, HORIZONTAL_ALIGNMENT_LEFT, -1, TAG_FONT, Palette.INK)
 			"guest":
 				var g: Dictionary = e[1]
