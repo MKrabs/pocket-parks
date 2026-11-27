@@ -26,6 +26,20 @@ func _init() -> void:
 				ok(b.get("capacity", 0) > 0, "capacity: " + id)
 			if b["role"] == "shop":
 				ok(b.get("price", 0) > 0, "price: " + id)
+	# the festival in full: every role, the new buildings, two more stall families, the Grill specialty
+	Buildings.use("festival")
+	for id: String in ["fest_band", "fest_lights", "fest_lawn", "fest_grill"]:
+		ok(Buildings.ids().has(id), "festival has " + id)
+	ok(Buildings.get_def("fest_lawn").get("habitat", "") == "hedge", "picnic lawn is painted, with a hedge")
+	var fams := {}
+	for id: String in Buildings.ids_with_role("shop"):
+		fams[Buildings.family(id)[0]] = Buildings.family(id)
+	ok(fams.size() == 3, "festival: three stall families")
+	for f: Array in fams.values():
+		ok(f.size() == 3 and Buildings.get_def(f[0])["price"] < Buildings.get_def(f[2])["price"], "three sizes, dearer when bigger: " + f[0])
+	ok("grill" in Specialties.for_theme("festival") and not "grill" in Specialties.for_theme("zoo"), "Grill is the festival's own")
+	ok(Specialties.required("fest_grill") == "grill", "only Grill specialists build the Big Grill")
+	ok(Specialties.speed(["grill"], "fest_grill") == 1.5 and Specialties.speed([], "fest_grill") == 0.0, "grill speed")
 	Buildings.use("zoo")
 	ok(Buildings.get_def("fest_stage")["name"] == "Stage", "get_def finds other theme's id")
 	ok(not Buildings.ids().has("fest_stage"), "ids() is the active theme only")

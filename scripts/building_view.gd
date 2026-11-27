@@ -291,10 +291,29 @@ func _shaped(p: Dictionary, mid: Vector2, k: float, gap: float) -> void:
 			block(self, Squircle.iso_points(at, p["half"], 4.0, 48), h, p["z"], c)
 			var shine := Squircle.iso_points(at + Vector2(-5, -p["z"] - h), p["half"] * 0.6, 4.0, 48)
 			draw_colored_polygon(shine, c.lerp(Palette.CLOUD, 0.35))
+		"lights":
+			_lights(at, p["half"], p["h"], c, k)
 		_:
 			_ring_shape(at - Vector2(0, p["z"]), p, c, k, gap)
 
+## String lights: two thin WOOD poles at ±half (left and right on screen), one sagging wire `h` up between them, and
+## small bulbs along it in `c`, CORAL and SKY. Wrecked: the wire sags lower.
+func _lights(at: Vector2, half: Vector2, h: float, c: Color, k: float) -> void:
+	var a := at + IsoGrid.project(Vector2(-half.x, half.y))
+	var b := at + IsoGrid.project(Vector2(half.x, -half.y))
+	for q in [a, b]:
+		block(self, Squircle.iso_points(q, Vector2(0.04, 0.04), 4.0, 16), h + 3.0, 0.0, _tint(Palette.WOOD))
+	var wire := PackedVector2Array()
+	for i in 17:
+		var t := i / 16.0
+		wire.append(a.lerp(b, t) + Vector2(0, -h + LIGHTS_SAG * (1.0 + k) * 4.0 * t * (1.0 - t)))
+	draw_polyline(wire, _tint(Palette.shade(Palette.WOOD, 0.22)), 1.5, true)
+	var cols := [c, _tint(Palette.CORAL), _tint(Palette.SKY)]
+	for i in range(2, 15, 2):
+		draw_colored_polygon(Squircle.points(wire[i] + Vector2(0, 2.5), Vector2(2.4, 2.8), 4.0, 12), cols[(i / 2) % 3])
+
 # Shaped parts (tuning):
+const LIGHTS_SAG := 9.0  # px the string lights' wire hangs down at its middle
 const RING_STEPS := 96  # outline samples of a ring
 const THICK := {"wall": 0.16, "glass": 0.05, "fence": 0.0}  # ring thickness, tiles
 const BREACH := 0.6  # wrecked ring: half width of the breach, radians of outline

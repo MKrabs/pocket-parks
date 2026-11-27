@@ -1,7 +1,7 @@
 class_name HabitatView
 extends BuildingView
 # Draws a painted habitat (ParkMap.habitats): a ground-coloured floor and its fence along the outline, in the fence's
-# style: wood rails, glass panels, a stone wall, or a low net footing under one dome over the bounding area.
+# style: wood rails, glass panels, a stone wall, a low hedge round a picnic lawn (festival), or a low net footing under one dome over the bounding area.
 # ZooView splits a habitat into layers so walkers and buildings sort right: one "floor" under everything, one
 # "fence" per cell (its outline sides, depth-sorted like a 1×1 building), one "dome". The preview draws "all".
 
@@ -16,6 +16,8 @@ const GLASS_H := 22.0
 const WALL_H := 16.0
 const WALL_THICK := 0.09
 const NET_FOOT := 4.0
+const HEDGE_H := 7.0
+const HEDGE_THICK := 0.08
 const GLASS_ALPHA_ := 0.35
 
 static func of(id: String, cs: Array, origin_: Vector2i, layer_: String) -> HabitatView:
@@ -35,7 +37,13 @@ func _draw() -> void:
 		for c: Vector2i in cells:
 			var k := 0.51  # a hair over half a tile, so neighbouring cells leave no seam
 			draw_colored_polygon(PackedVector2Array([_at(Vector2(c) + Vector2(-k, -k)), _at(Vector2(c) + Vector2(k, -k)),
-				_at(Vector2(c) + Vector2(k, k)), _at(Vector2(c) + Vector2(-k, k))]), Palette.HABITAT)
+				_at(Vector2(c) + Vector2(k, k)), _at(Vector2(c) + Vector2(-k, k))]), Palette.LAWN if fence == "hedge" else Palette.HABITAT)
+		if fence == "hedge":  # picnic blankets on some cells, the same ones every time
+			for c: Vector2i in cells:
+				if posmod(c.x * 7 + c.y * 13 + 3, 6) == 0:
+					var col: Color = [Palette.CORAL, Palette.BUTTER, Palette.SKY][posmod(c.x + c.y, 3)]
+					draw_colored_polygon(Squircle.iso_points(_at(Vector2(c)), Vector2(0.26, 0.2), 4.0, 24), col)
+					draw_colored_polygon(Squircle.iso_points(_at(Vector2(c)), Vector2(0.06, 0.2), 4.0, 16), Palette.CLOUD)
 	if layer in ["fence", "all"]:
 		var sides := ParkMap.outline(cells if cell == GridView.NONE else [cell]).filter(
 			func(s: Array) -> bool: return not s[0] + s[1] in cells)
@@ -80,6 +88,8 @@ func _side(c: Vector2i, d: Vector2i, grow: float) -> void:
 			_band(a, b, h, h, h - 3.0, h, Palette.shade(Palette.STONE, amt))
 		"wall":
 			block(self, _strip(mid - Vector2(d) * WALL_THICK, along, WALL_THICK), WALL_H * grow, 0.0, Palette.STONE)
+		"hedge":
+			block(self, _strip(mid - Vector2(d) * HEDGE_THICK, along, HEDGE_THICK), HEDGE_H * grow, 0.0, Palette.MOSS)
 		"net":
 			_band(a, b, NET_FOOT, NET_FOOT, 0.0, NET_FOOT, Palette.shade(Palette.WOOD, amt))
 
