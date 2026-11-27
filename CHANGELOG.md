@@ -6,8 +6,7 @@ and the game shows the latest entry in its "What's new" card.
 
 ## [Unreleased]
 
-### Fixed
-- Two copies of the game started under the same computer login could get the same player id and mix up their characters. Ids are now much longer and stay unique.
+## [0.5.0] - 2026-11-27: Progression and polish
 
 ### Changed
 - **Unlocks by park level:** new parks start with the plain Fence and one animal per fence type (otter, red panda,
@@ -20,6 +19,7 @@ and the game shows the latest entry in its "What's new" card.
 - **Janitors** head for the litter that's nearest to walk to, not the one that only looks nearest.
 
 ### Fixed
+- Two copies of the game started under the same computer login could get the same player id and mix up their characters. Ids are now much longer and stay unique.
 - People still inside when the day ends now settle up: sent guests pay their sender's share, and thieves and spies
   deliver what they carried, as if they had left through the gate.
 - **Big shops look their part:** the Burger Diner is a long diner with a giant burger and a terrace table, the Lobby
@@ -27,8 +27,6 @@ and the game shows the latest entry in its "What's new" card.
   two peaked tents, and the Cake Pavilion a three-tier cake.
 - **Player characters stand out:** they are clearly bigger than guests, with a soft outline in their colour.
 - **Land you can buy** is paler, so it's easy to tell from your own. The plot on an open "Land for sale" card glows.
-
-### Fixed
 - A long habitat card no longer slides under the money chip: it stops below it and its contents scroll.
 - The bar's pin button looks like a push pin, not a magnifying glass.
 - An L-shaped net habitat gets joined domes over its cells instead of one dome over the empty corner.
