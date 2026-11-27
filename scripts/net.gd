@@ -8,7 +8,8 @@ extends Node
 #   ledger {t, from, seq, owed, blueprints, inside}   host → one visitor, whenever its entry in sim.ledger changes.
 #        owed and blueprints are running totals; the visitor applies owed minus what it already got from `from`, and
 #        only for a seq newer than the last one it applied, so a replay or a reconnect never pays twice.
-# Visitor → host: hello {t, player} once connected, then send {t, kind} per person (the host runs sim.send).
+# Announce: {id, name (park), player, nick, colour, port, theme}; nick and colour are optional (older copies).
+# Visitor → host: hello {t, player, nick, colour} once connected, then send {t, kind} per person (the host runs sim.send).
 
 signal map_changed  # the visited park's layout arrived or changed: rebuild its ZooView
 signal lost         # the visited park went away (host closed, or never answered)
@@ -24,13 +25,15 @@ const LIVE_EVERY := 0.1
 const CONNECT_TIMEOUT_MS := 4000  # join(): an address that never answers is dropped (lost) after about this long
 
 var park_name := "Pocket Zoo"
-var player := ""
+var player := ""   # stable id: the key other parks' ledgers use; never shown once a nick is chosen
+var nick := ""     # the name you chose (IdentityCard); "" until then
+var colour := "SKY"  # an IdentityCard.COLOURS key
 var theme := "zoo"
 var sim: ParkSim  # our park, as visitors see it
 var map: ParkMap
 var port := 0       # our ENet server port (0 = not hosting)
 var udp_port := 0   # our discovery port (0 = not listening)
-var nearby: Dictionary = {}  # announcer id -> {name, player, port, theme, ip, seen (s)}
+var nearby: Dictionary = {}  # announcer id -> {name, player, colour, port, theme, ip, seen (s)}; player = their nick
 var visit_map: ParkMap  # mirror of the park we are visiting (null when home)
 var visit_sim: ParkSim  # only ever written from the wire, never stepped
 var visit_ledger := {}  # sim.sent_by(us) in the park we visit, for the Send panel
@@ -119,7 +122,8 @@ func poll(delta: float) -> void:
 func announce() -> void:
 	if port == 0:
 		return
-	var msg := var_to_bytes({"id": _id, "name": park_name, "player": player, "port": port, "theme": theme})
+	var msg := var_to_bytes({"id": _id, "name": park_name, "player": player, "nick": nick, "colour": colour, "port": port,
+		"theme": theme})
 	for ip in ["255.255.255.255", "127.0.0.1"] + Net.broadcasts(IP.get_local_addresses()):
 		for p in range(DISCO_PORT, DISCO_PORT + DISCO_PORTS):
 			_udp.set_dest_address(ip, p)
@@ -131,15 +135,16 @@ func _listen() -> void:
 		var ip := _udp.get_packet_ip()
 		if not d is Dictionary or not d.has_all(["id", "name", "player", "port", "theme"]) or d["id"] == _id:
 			continue
-		nearby[d["id"]] = {"name": str(d["name"]), "player": str(d["player"]), "port": int(d["port"]),
-			"theme": str(d["theme"]), "ip": ip, "seen": _time}
+		var who := str(d.get("nick", ""))
+		nearby[d["id"]] = {"name": str(d["name"]), "player": who if who != "" else str(d["player"]),
+			"colour": str(d.get("colour", "SKY")), "port": int(d["port"]), "theme": str(d["theme"]), "ip": ip, "seen": _time}
 
 ## Nearby parks as picker offers (by player name), each with live = true.
 func offers() -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	for k: String in nearby:
 		var n: Dictionary = nearby[k]
-		out.append({"name": n["name"], "player": n["player"], "theme": n["theme"], "ip": n["ip"], "port": n["port"], "live": true})
+		out.append({"name": n["name"], "player": n["player"], "colour": n["colour"], "theme": n["theme"], "ip": n["ip"], "port": n["port"], "live": true})
 	out.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a["player"] < b["player"])
 	return out
 
@@ -198,13 +203,21 @@ func send_person(kind: String) -> bool:
 	_send(_client, 1, {"t": "send", "kind": kind})
 	return true
 
-## What the save keeps of us: our name (the sender id in other parks), the host seq and what we were paid.
+## What the save keeps of us: our id (the sender id in other parks), who we chose to be, the host seq and what we
+## were paid.
 func state() -> Dictionary:
-	return {"player": player, "seq": seq, "got": got}
+	return {"player": player, "nick": nick, "park": park_name, "colour": colour, "seq": seq, "got": got}
+
+## The name others see: the chosen nick, else the id.
+func shown() -> String:
+	return nick if nick != "" else player
 
 ## Before start(): pick up a saved state().
 func load_state(d: Dictionary) -> void:
 	player = str(d.get("player", ""))
+	nick = str(d.get("nick", ""))  # optional keys: saves from before SOC1 load without them
+	park_name = str(d.get("park", park_name))
+	colour = str(d.get("colour", colour))
 	seq = int(d.get("seq", 0))
 	got = d.get("got", {})
 
@@ -227,7 +240,7 @@ func _poll_client() -> void:
 		return
 	if status == MultiplayerPeer.CONNECTION_CONNECTED and not _hello:
 		_hello = true
-		_send(_client, 1, {"t": "hello", "player": player})
+		_send(_client, 1, {"t": "hello", "player": player, "nick": nick, "colour": colour})
 		_client.get_peer(1).set_timeout(0, 5000, 30000)  # ENet's defaults again, once connected
 		joined.emit()
 	while _client and _client.get_available_packet_count() > 0:
