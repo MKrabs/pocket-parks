@@ -110,14 +110,15 @@ round Visit button. Bottom-left: pause / play / fast. Right side: the info card 
 - A wrongful accusation never blacklists anyone. It still pays the sender, as today.
 - **Send limit:** how many of your people can be inside one park at once. Default: 3 + your park level, halved while
   you're blacklisted there. Other conditions can be added later.
-- Open: does a blacklist last forever, until the host lifts it, or for a number of days?
+- **Duration:** the host chooses **1–7 in-game days** when the catch happens (Decided 2026-11-27). Arrests by guards
+  while the host isn't deciding use the host's default (a setting, starting at 3 days).
 
 ## Roadmap (updated 2026-11-27)
 **Done:** M3 depth (building levels, staff levels, plots, cinema theme, damaged models, builders and specialties,
 park level), M4 local network (discovery, live visits, join by address, saving), M6 sending over the network.
 
 **Next, in order**
-1. **Owner's two-machine test** (GATE4).
+1. ~~Owner's two-machine test (GATE4)~~: passed 2026-11-27.
 2. **M5 Live social:** your character in the park you visit (walk, interact, mischief in person), presence (who is
    in your park, who else is where you are), chat (speech bubbles plus a log), identity (choose a name and colour),
    send limits and the blacklist (above).
