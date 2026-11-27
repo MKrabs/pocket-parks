@@ -119,6 +119,7 @@ var _targets: Array[Dictionary] = []  # reachable attractions/shops: origin, rol
 var _decor: Dictionary = {}           # cell -> mood per tick from nearby decor
 var _charm: Dictionary = {}           # path cell -> charm; cleared on map change, rebuilt when litter/wrecks change
 var _charm_key := 0
+var _routes: Dictionary = {}          # builder name -> {to, path (waypoints), pos}; cleared on map change
 var _appeal := 0.0
 var _gone_mood := 0.0
 var _gone := 0
@@ -170,6 +171,8 @@ func new_day() -> void:
 	_gone = 0
 	_gone_mood = 0.0
 	_wages = 0
+	for g in guests:  # still inside at closing: they go home as if through the gate
+		_settle(g)
 	guests.clear()
 	litter.clear()
 	closed.clear()  # reopen ticks count from the old day's clock
@@ -189,6 +192,7 @@ func _load(map: ParkMap) -> void:
 	_targets.clear()
 	_decor.clear()
 	_charm.clear()
+	_routes.clear()
 	_appeal = 0.0
 	_map = map
 	_sync_builders()
@@ -457,8 +461,7 @@ func _spawn(kind := "guest", sender := "") -> void:
 	cash_events.append({"tick": tick, "origin": _entrance, "amount": ENTRY_FEE})
 	_pick(g)
 
-## Left through the gate: the sender gets its guest share, or the actor's loot and blueprints.
-## ponytail: people still inside at new_day() are dropped without settling.
+## Left through the gate (or still inside at new_day): the sender gets its guest share, or the actor's loot and blueprints.
 func _settle(g: Dictionary) -> void:
 	var sender: String = g["sender"]
 	if sender == "":
@@ -865,12 +868,13 @@ func _step_staff(s: Dictionary) -> void:
 	if litter.has(s["cell"]):
 		s["work"] = stat(s, "clean")
 		return
-	# ponytail: nearest by grid distance, not walk distance; fine on a 16x16 park
 	var best := Vector2i(-1, -1)
 	var best_d: int = stat(s, "reach") + 1
-	for c: Vector2i in litter:
-		var d := absi(c.x - s["cell"].x) + absi(c.y - s["cell"].y)
-		if d < best_d:
+	for c: Vector2i in litter:  # nearest by walk; grid distance is a lower bound, so it skips the far ones cheaply
+		if absi(c.x - s["cell"].x) + absi(c.y - s["cell"].y) >= best_d:
+			continue
+		var d := _astar.get_id_path(s["cell"], c).size() - 1
+		if d >= 0 and d < best_d:
 			best = c
 			best_d = d
 	if best.x >= 0:
@@ -1017,9 +1021,29 @@ func _site(j: Dictionary) -> Vector2:
 func speed_on(b: Dictionary, j: Dictionary) -> float:
 	return Specialties.speed(_map.specs(b["shed"]), j["id"], _map.spec_xp.get(b["shed"], {}))
 
-## Waiting sites (oldest first) get the fastest free builder that can build them; builders walk there in a
-## straight line, work, then walk home. Specialist-only sites wait for a matching builder.
-## ponytail: straight line across grass and buildings; path-finding if builders should look like they use paths.
+## Waypoints from `from` to `to`: onto the nearest path, along the paths, off at the path nearest `to`; a straight
+## line when that's no shorter than cutting across (open ground, no paths, or no route).
+func _builder_route(from: Vector2, to: Vector2) -> Array:
+	var a := _nearest_walkable(from)
+	var b := _nearest_walkable(to)
+	if a.x < 0 or from.distance_to(Vector2(a)) + to.distance_to(Vector2(b)) >= from.distance_to(to):
+		return [to]
+	var p := _astar.get_id_path(a, b)
+	if p.is_empty():
+		return [to]
+	var out: Array = Array(p).map(func(c: Vector2i) -> Vector2: return Vector2(c))
+	out.append(to)
+	return out
+
+func _nearest_walkable(p: Vector2) -> Vector2i:
+	var best := _entrance
+	for c in _paths:
+		if p.distance_squared_to(Vector2(c)) < p.distance_squared_to(Vector2(best)):
+			best = c
+	return best
+
+## Waiting sites (oldest first) get the fastest free builder that can build them; builders walk there along the
+## paths (_builder_route), work, then walk home. Specialist-only sites wait for a matching builder.
 func _step_builders() -> void:
 	for j in jobs:
 		if j["builder"] != "" and builders.any(func(b: Dictionary) -> bool: return b["name"] == j["builder"] and speed_on(b, j) == 0):
@@ -1034,9 +1058,13 @@ func _step_builders() -> void:
 	for b in builders:
 		var j := job_of(b)
 		var to: Vector2 = _home(b["shed"]) if j.is_empty() else _site(j)
-		var d: float = b["pos"].distance_to(to)
-		if d > BUILDER_SPEED:
-			b["pos"] += (to - b["pos"]) / d * BUILDER_SPEED
+		var r: Dictionary = _routes.get(b["name"], {})
+		if r.get("to") != to:
+			r = {"to": to, "path": _builder_route(b["pos"], to), "pos": b["pos"]}
+			_routes[b["name"]] = r
+		r["pos"] = b["pos"]
+		if not _walk(r, BUILDER_SPEED):
+			b["pos"] = r["pos"]
 			b["state"] = "walk"
 			continue
 		b["pos"] = to
