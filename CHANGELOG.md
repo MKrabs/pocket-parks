@@ -6,6 +6,8 @@ and the game shows the latest entry in its "What's new" card.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-27: Habitats, animals and three new themes
+
 ### Added
 - **Animals:** 9 of them, three per fence. Glass holds otters, capybaras and platypuses, Net holds shoebills,
   puffins and hornbills, and Wall (or a plain Fence) holds red pandas, takins and klipspringers. Click a habitat to open
@@ -16,14 +18,6 @@ and the game shows the latest entry in its "What's new" card.
   Waterfall. Click one, then click inside the habitat to place it (R turns it, right-click or Esc cancels, Shift keeps
   placing). Each one adds water, rocks, trees or a shelter toward your animals' needs, and charms the paths nearby.
   Click a placed item to remove it for half its price back.
-
-### Changed
-- **Habitats instead of enclosures:** Attractions → Habitat, pick a fence (wood Fence, or Glass, Net and Wall for
-  Water, Aviary and Heavy builders) and drag a rectangle on your land. A preview shows the outline, the cell count and
-  the cost. Drag again from inside or along the edge to grow it into L shapes and more; right-drag removes cells.
-  A builder puts up the fence, and bigger habitats draw more guests. The old Enclosure, Water Tank, Aviary and
-  Reinforced Enclosure are gone; new parks start with a small fenced habitat.
-### Added
 - **Amusement park theme:** press **T** once more after cinema. A Ticket Arch, Midway paths, a Coaster (only builders
   with the new **Rides** specialty can build it), Teacups, a Ferris Wheel, a Churro Cart that grows into a Sweet Stall
   and a Churro Parlour, plus balloons and bunting. Amusement parks also turn up in the Visit picker.
@@ -39,6 +33,11 @@ and the game shows the latest entry in its "What's new" card.
   toast says when someone levels up, and the shed card shows each specialty's level, speed and XP bar.
 
 ### Changed
+- **Habitats instead of enclosures:** Attractions → Habitat, pick a fence (wood Fence, or Glass, Net and Wall for
+  Water, Aviary and Heavy builders) and drag a rectangle on your land. A preview shows the outline, the cell count and
+  the cost. Drag again from inside or along the edge to grow it into L shapes and more; right-drag removes cells.
+  A builder puts up the fence, and bigger habitats draw more guests. The old Enclosure, Water Tank, Aviary and
+  Reinforced Enclosure are gone; new parks start with a small fenced habitat.
 - A new specialist now starts at ×1.5 on their specialty's buildings (it was ×2), and specialist-only buildings get the
   speed bonus too.
 

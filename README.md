@@ -24,7 +24,9 @@ strike, hide again, and press their luck.
 |---|---|
 | 🏗 **Build** | Paths, attractions, shops and decor on an isometric grid. Rotate with <kbd>R</kbd>, upgrade buildings to level 3, buy more land as your park grows. |
 | 👷 **Builders** | Every job needs a builder from a builder shed. Give each one a specialty (Water, Aviary, Landscaper, Heavy, Carpenter, Projection) to build faster, or to unlock specialist-only buildings like the water tank or the aviary. |
-| 🎭 **Themes** | Zoo, food festival and cinema. Each one is just a data pack, so more can follow. |
+| 🎭 **Themes** | Zoo, food festival, cinema, amusement park and conference. Each one is a data pack, so more can follow. |
+| 🦦 **Habitats and animals** | Paint habitats in any shape with a wood fence, glass, a net dome or a stone wall, then pick from 9 animals (otters, red pandas, shoebills…). Each animal has needs, and you decorate with pools, rocks, trees, shelters and waterfalls until it's happy. |
+| 🌸 **Park charm** | Guests rate the *walk* between stops. Lovely strolls make them happier and spend more, rows of the same stand make paths dull. Press <kbd>C</kbd> to see it. |
 | 🕵️ **Sending people** | Visit a park and send in guests (you earn a share of what they spend) or hooligans, litterbugs, thieves and spies. They stay hidden until they strike. |
 | 🛡 **Defending** | Crime reports tell you *what* and *where*, never *who*. Guards catch what they witness; you can accuse anyone, but a wrongful arrest costs *you*. |
 | 🌐 **Play with friends** | Parks on the same network find each other. Visit a friend's park live, no server or account needed. |
@@ -74,6 +76,9 @@ Click **Visit**, and your friend's park shows up under *Nearby*. You both need t
 | Pan | Middle-drag, <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>, or a two-finger swipe |
 | Zoom | Mouse wheel, <kbd>Ctrl</kbd>+wheel, or pinch |
 | Switch theme | <kbd>T</kbd> |
+| Charm view | <kbd>C</kbd> |
+| Show or hide the build bar | <kbd>B</kbd> |
+| Talk | <kbd>Enter</kbd> |
 | New park | <kbd>F9</kbd> |
 
 Your park saves itself every 30 seconds and when you quit.
