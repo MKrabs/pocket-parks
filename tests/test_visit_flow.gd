@@ -14,12 +14,13 @@ func _init() -> void:
 	ok(offers.size() == 3, "three parks on offer")
 	ok(offers[0]["theme"] != offers[1]["theme"] and offers[0]["name"] != offers[1]["name"], "themes mix, names differ")
 	var themes := offers.map(func(o: Dictionary) -> String: return o["theme"])
-	ok(themes.all(func(t: String) -> bool: return Buildings.themes().has(t) and themes.count(t) == 1), "three different themes")
-	var any_amusement := false
-	for s in 10:
+	ok(themes[0] != themes[2] and themes[1] != themes[2], "three different themes")
+	var seen := {}
+	for s in 8:
 		rng.seed = s
-		any_amusement = any_amusement or Visit.offers(rng).any(func(o: Dictionary) -> bool: return o["theme"] == "amusement")
-	ok(any_amusement, "the picker offers amusement parks too")
+		for o in Visit.offers(rng):
+			seen[o["theme"]] = true
+	ok(seen.size() == Buildings.themes().size(), "every theme comes up on offer: %s" % [seen.keys()])
 	for o in offers:
 		ok(o["guards"] >= 0 and o["guards"] <= 3, "0-3 guards")
 	ok(Visit.open(offers[0])[1].staff.size() == offers[0]["guards"], "guards hired in the visited park")

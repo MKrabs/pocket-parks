@@ -9,7 +9,11 @@ func done() -> void:
 
 func _init() -> void:
 	var seen := {}
-	ok(Buildings.themes().keys() == ["zoo", "festival", "cinema", "amusement"], "four themes, in T order")
+	ok(Buildings.themes().keys() == ["zoo", "festival", "cinema", "amusement", "conference"], "five themes, in T order")
+	ok(Buildings.get_def("conf_stage")["footprint"] == Vector2i(3, 2), "Main Stage is 3x2")
+	ok(Specialties.required("conf_stage") == "tech" and Specialties.for_theme("conference").has("tech")
+		and not Specialties.for_theme("zoo").has("tech"), "Tech: conference only, needed for the Main Stage")
+	ok(Buildings.family("conf_pavilion") == ["conf_booth", "conf_expo", "conf_pavilion"], "booth sizes are one family")
 	for theme: String in Buildings.themes():
 		Buildings.use(theme)
 		ok(Buildings.ids_with_role("entrance").size() == 1, theme + ": exactly one entrance")
