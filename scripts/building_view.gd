@@ -291,12 +291,16 @@ func _shaped(p: Dictionary, mid: Vector2, k: float, gap: float) -> void:
 			block(self, Squircle.iso_points(at, p["half"], 4.0, 48), h, p["z"], c)
 			var shine := Squircle.iso_points(at + Vector2(-5, -p["z"] - h), p["half"] * 0.6, 4.0, 48)
 			draw_colored_polygon(shine, c.lerp(Palette.CLOUD, 0.35))
+		"wheel":
+			_wheel(at - Vector2(0, p["z"]), p["half"], p["h"], c)
+		"balloons":
+			_balloons(at - Vector2(0, p["z"]), p["h"])
 		_:
 			_ring_shape(at - Vector2(0, p["z"]), p, c, k, gap)
 
 # Shaped parts (tuning):
 const RING_STEPS := 96  # outline samples of a ring
-const THICK := {"wall": 0.16, "glass": 0.05, "fence": 0.0}  # ring thickness, tiles
+const THICK := {"wall": 0.16, "glass": 0.05, "fence": 0.0, "rails": 0.0}  # ring thickness, tiles
 const BREACH := 0.6  # wrecked ring: half width of the breach, radians of outline
 const BREACH_DEPTH := 0.85  # share of the height knocked out at its middle
 const GLASS_ALPHA := 0.3
@@ -304,6 +308,48 @@ const DOME_ALPHA := 0.32
 const DOME_N := 2.5  # dome profile superellipse exponent (2 = round, 4 = boxy)
 const DOME_SAG := 0.2  # wrecked dome: share of its height lost
 const WATER_DRAIN := 0.45  # wrecked tank: share of the water lost
+
+const GONDOLAS := 8
+
+## An upright wheel of diameter h px standing on `base`, in the plane of half's long axis: an A-frame of legs,
+## spokes, a thin rim and gondolas hanging off it. One silhouette, so it turns with the building.
+func _wheel(base: Vector2, half: Vector2, h: float, c: Color) -> void:
+	var along := IsoGrid.project(Vector2(0, 1) if half.y > half.x else Vector2(1, 0))
+	var across := IsoGrid.project(Vector2(1, 0) if half.y > half.x else Vector2(0, 1)) * minf(half.x, half.y)
+	var r := h * 0.5
+	var hub := base - Vector2(0, r)
+	var dir := along.normalized()
+	var leg := Palette.shade(_tint(Palette.STONE), 0.12)
+	for s in [-1.0, 1.0]:
+		for t in [-1.0, 1.0]:
+			draw_line(hub, base + dir * r * 0.55 * s + across * t, leg, 2.5, true)
+	var spoke := Palette.shade(c, 0.12)
+	var rim := PackedVector2Array()
+	for i in 49:
+		var a := TAU * i / 48
+		rim.append(hub + dir * cos(a) * r + Vector2(0, sin(a) * r))
+	for i in GONDOLAS:
+		draw_line(hub, rim[i * 48 / GONDOLAS], spoke, 1.5, true)
+	draw_polyline(rim, c, 3.0, true)
+	draw_colored_polygon(Squircle.points(hub, Vector2(3.5, 3.5), 4.0, 16), spoke)
+	var cols := [Palette.CORAL, Palette.BUTTER, Palette.MOSS, Palette.CLOUD]
+	for i in GONDOLAS:
+		var g := rim[i * 48 / GONDOLAS] + Vector2(0, 5)
+		var col := _tint(cols[i % cols.size()])
+		draw_colored_polygon(Squircle.points(g, Vector2(5, 4.5), 4.0, 16), Palette.shade(col, 0.12))
+		draw_colored_polygon(Squircle.points(g - Vector2(0, 1), Vector2(4, 3.5), 4.0, 16), col)
+
+## Three round balloons on strings, tied at `base`, floating up to h px.
+func _balloons(base: Vector2, h: float) -> void:
+	var tops := [Vector2(-9, -h + 8), Vector2(1, -h), Vector2(9, -h + 11)]
+	var cols := [Palette.CORAL, Palette.SKY, Palette.BUTTER]
+	for i in tops.size():
+		draw_line(base, base + tops[i] + Vector2(0, 7), _tint(Palette.STONE), 1.0, true)
+	for i in tops.size():
+		var col := _tint(cols[i])
+		draw_colored_polygon(Squircle.points(base + tops[i], Vector2(6.5, 7.5), 2.2, 24), Palette.shade(col, 0.12))
+		draw_colored_polygon(Squircle.points(base + tops[i] - Vector2(1, 1), Vector2(5.5, 6.5), 2.2, 24), col)
+		draw_colored_polygon(Squircle.points(base + tops[i] - Vector2(3, 3.5), Vector2(1.5, 2), 2.0, 12), col.lerp(Palette.CLOUD, 0.5))
 
 ## A ring along the squircle outline, only its far (side -1) or near (side 1) half, segments back to front.
 ## Wall: STONE faces with a darker base and a lighter cap band. Glass: translucent panels with a highlight stripe
@@ -333,12 +379,15 @@ func _ring_shape(base: Vector2, p: Dictionary, c: Color, k: float, gap: float) -
 		var ha := hs[i]
 		var hb := hs[j]
 		var nrm := (ob - oa).orthogonal()
-		if kind == "fence":
+		if kind in ["fence", "rails"]:  # rails: a coaster track, two close rails on posts that stop under them
 			var col := Palette.shade(c, _side_shade(nrm if nrm.y > 0.0 else -nrm))
-			for y in [p["h"] * 0.45, p["h"] - 2.5]:
+			for y in ([p["h"] - 7.0, p["h"] - 2.5] if kind == "rails" else [p["h"] * 0.45, p["h"] - 2.5]):
 				_band(oa, ob, ha, hb, y, y + 2.5, col)
-			if i % (RING_STEPS / 4) == RING_STEPS / 8:  # a post every quarter of the outline (~2.5 tiles)
-				block(self, Squircle.iso_points(oa, Vector2(0.07, 0.07), 4.0, 16), ha + 2.0, 0.0, c)
+			var every := RING_STEPS / (8 if kind == "rails" else 4)
+			if i % every == every / 2:  # fence: a post every quarter of the outline (~2.5 tiles); rails: every eighth
+				var post := Vector2(0.04, 0.04) if kind == "rails" else Vector2(0.07, 0.07)
+				block(self, Squircle.iso_points(oa, post, 4.0, 16), ha - 7.0 if kind == "rails" else ha + 2.0, 0.0,
+					_tint(Palette.STONE) if kind == "rails" else c)
 			continue
 		var ia := base + IsoGrid.project(inn[i])
 		var ib := base + IsoGrid.project(inn[j])

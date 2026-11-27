@@ -9,7 +9,7 @@ func done() -> void:
 
 func _init() -> void:
 	var seen := {}
-	ok(Buildings.themes().keys() == ["zoo", "festival", "cinema"], "three themes, in T order")
+	ok(Buildings.themes().keys() == ["zoo", "festival", "cinema", "amusement"], "four themes, in T order")
 	for theme: String in Buildings.themes():
 		Buildings.use(theme)
 		ok(Buildings.ids_with_role("entrance").size() == 1, theme + ": exactly one entrance")
@@ -36,5 +36,11 @@ func _init() -> void:
 	Buildings.use("festival")
 	ok(map.place("fest_stage", Vector2i(4, 4)), "place stage after swap")
 	ok(map.remove_at(Vector2i(0, 0)), "remove zoo gate while festival active")
+	# amusement: the coaster needs a Rides specialist, churros come in sizes, Rides is its own specialty
+	ok(Specialties.required("amu_coaster") == "rides", "coaster is Rides-only")
+	ok(Specialties.speed(["carpenter"], "amu_coaster") == 0.0 and Specialties.speed(["rides"], "amu_coaster") > 1.0, "only a Rides builder builds it")
+	ok(Buildings.get_def("amu_coaster")["footprint"] == Vector2i(3, 3), "coaster is 3x3")
+	ok(Buildings.family("amu_sweets") == ["amu_churro", "amu_sweets", "amu_parlour"], "churro variants")
+	ok(Specialties.for_theme("amusement").has("rides") and not Specialties.for_theme("zoo").has("rides"), "Rides only in amusement")
 	Buildings.use("zoo")
 	done()

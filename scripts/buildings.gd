@@ -13,7 +13,8 @@ static var _themes: Dictionary = {}  # theme id -> {building id -> def}, filled 
 
 static func themes() -> Dictionary:
 	if _themes.is_empty():
-		_themes = {"zoo": ZooTheme.catalog(), "festival": FestivalTheme.catalog(), "cinema": CinemaTheme.catalog()}
+		_themes = {"zoo": ZooTheme.catalog(), "festival": FestivalTheme.catalog(), "cinema": CinemaTheme.catalog(),
+			"amusement": AmusementTheme.catalog()}
 	return _themes
 
 static func use(theme_id: String) -> void:
@@ -60,7 +61,7 @@ static func leveled(id: String, level: int) -> Dictionary:
 static func part(at: Vector2, half: Vector2, h: float, color: Color, z := 0.0) -> Dictionary:
 	return {"at": at, "half": half, "h": h, "z": z, "color": color}
 
-## A part BuildingView draws as one silhouette instead of a block: kind "dome", "water", or a ring
+## A part BuildingView draws as one silhouette instead of a block: kind "dome", "water", "wheel" (upright, in the plane of half's long axis), "balloons", or a ring
 ## ("wall", "fence", "glass") following the squircle outline of `half`.
 static func shaped(kind: String, half: Vector2, h: float, color: Color, z := 0.0) -> Dictionary:
 	var p := part(Vector2.ZERO, half, h, color, z)

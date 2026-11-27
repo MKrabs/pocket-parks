@@ -35,6 +35,7 @@ const ALL := {
 	"heavy": {"name": "Heavy", "glyph": "H", "color": Palette.STONE, "theme": "zoo"},
 	"carpenter": {"name": "Carpenter", "glyph": "C", "color": Palette.WOOD},
 	"projection": {"name": "Projection", "glyph": "P", "color": Palette.BUTTER, "theme": "cinema"},
+	"rides": {"name": "Rides", "glyph": "R", "color": Palette.CORAL, "theme": "amusement"},
 }
 
 ## Specialties offered in theme `t`: its own plus the shared ones (no "theme" key).

@@ -7,7 +7,7 @@ const KEEP := 3  # visited parks still simulated after you leave
 const NAMES := ["Maple Hollow", "Sunny Burrow", "Pebble Bay", "Clover Fields", "Otter Lane", "Juniper Park",
 	"Bramble Nook", "Honey Meadow", "Fern Gully", "Willow Cove"]
 
-## Three nearby parks: distinct names, one of each theme in shuffled order, 0-3 guards.
+## Three nearby parks: distinct names, three different themes in shuffled order, 0-3 guards.
 static func offers(rng: RandomNumberGenerator) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	var names: Array = BotPark._shuffled(rng, NAMES)
