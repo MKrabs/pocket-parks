@@ -35,7 +35,7 @@ func _init() -> void:
 	ok(ParkSim.build_ticks("path") == 0, "paths are instant")
 	ok(ParkSim.build_ticks("tree") == 50, "tree 5 s")
 	ok(ParkSim.build_ticks("snack_stand") == 200, "shop 20 s")
-	ok(ParkSim.build_ticks("pond") == 400 and ParkSim.build_ticks("enclosure") == 600, "pond 40 s, enclosure 60 s")
+	ok(ParkSim.build_ticks("pond") == 400, "pond 40 s")
 	ok(ParkSim.build_ticks("fest_stage") > ParkSim.build_ticks("fest_grill"), "others by size")
 	ok(ParkSim.build_ticks("pond", 2) == 600 and ParkSim.build_ticks("pond", 3) == 1000, "upgrades x1.5 / x2.5")
 

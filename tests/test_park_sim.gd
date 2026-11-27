@@ -18,7 +18,7 @@ func park(enclosure: bool, with_path := true) -> ParkMap:
 	m.place("snack_stand", Vector2i(6, 8))
 	m.place("tree", Vector2i(12, 8))
 	if enclosure:
-		m.place("enclosure", Vector2i(2, 4))
+		m.paint("habitat", Rect2i(2, 4, 3, 3))
 	m.money = 500
 	return m
 
@@ -79,7 +79,7 @@ func _init() -> void:
 		live.step()
 	var before := live.guests.size()
 	m.money = 1 << 30
-	m.place("enclosure", Vector2i(2, 4))
+	m.paint("habitat", Rect2i(2, 4, 3, 3))
 	m.remove_at(Vector2i(9, 5))  # the pond goes
 	m.remove_at(Vector2i(12, 7))  # path under someone's feet maybe
 	live.load_map(m)

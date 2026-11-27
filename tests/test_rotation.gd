@@ -40,7 +40,7 @@ func _init() -> void:
 		ok((got > 0) == (turn % 2 == 1), "turn %d stage guests %d" % [turn, got])
 
 	# Turned parts: every rotation keeps every part, and turn 4 is turn 0.
-	for id in ["zoo_gate", "fest_stage", "fest_truck", "enclosure"]:
+	for id in ["zoo_gate", "fest_stage", "fest_truck"]:
 		var n: int = Buildings.get_def(id)["parts"].size()
 		for t in 4:
 			ok(BuildingView.turned(id, t).size() == n, "%s turn %d keeps parts" % [id, t])

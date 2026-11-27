@@ -33,11 +33,13 @@ func check(theme: String, s: int, size: String) -> void:
 		if r == "entrance":
 			entrance = o
 		if r == "attraction" or r == "shop":
-			ok(BotPark.touches_path(map, map.buildings[o], o), tag + " %s touches a path" % map.buildings[o])
+			ok(BotPark.touches_path(map, map.cells(o)), tag + " %s touches a path" % map.buildings[o])
 	ok(count.get("entrance", 0) == 1, tag + " exactly one entrance")
 	ok(entrance.x == 0 or entrance.y == 0 or entrance.x == IsoGrid.SIZE.x - 1 or entrance.y == IsoGrid.SIZE.y - 1, tag + " entrance on edge")
 	var cfg: Dictionary = BotPark.SIZES[size]
-	ok(count.get("attraction", 0) == cfg["attractions"], tag + " attraction count %d" % count.get("attraction", 0))
+	var painted := map.habitats.size()
+	ok(count.get("attraction", 0) - painted == cfg["attractions"], tag + " attraction count %d" % count.get("attraction", 0))
+	ok((painted >= 1 and painted <= 2) == (theme == "zoo"), tag + " zoo parks paint a habitat or two (%d)" % painted)
 	ok(count.get("shop", 0) == cfg["shops"], tag + " shop count")
 	ok(count.get("decor", 0) > 0, tag + " has decor")
 	# Flood from the entrance over path tiles; every path tile must be reached.

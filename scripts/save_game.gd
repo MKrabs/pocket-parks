@@ -16,7 +16,7 @@ static func pack(map: ParkMap, sim: ParkSim, day: int, stolen: Array, net := {})
 		"ledger": sim.ledger.duplicate(true), "blueprints": sim.blueprints.duplicate(true), "fined": sim.fined.duplicate(true),
 		"charged": sim.charged.duplicate(true), "blacklist": sim.blacklist.duplicate(), "ban_days": sim.ban_days,
 		"map": {"buildings": map.buildings, "levels": map.levels, "rotations": map.rotations, "owned": map.owned,
-			"bought": map.bought, "specialties": map.specialties}.duplicate(true),
+			"bought": map.bought, "specialties": map.specialties, "habitats": map.habitats}.duplicate(true),
 		"money": sim.money, "xp": sim.xp, "tick": sim.tick,
 		"staff": sim.staff.map(func(s: Dictionary) -> Dictionary: return {"kind": s["kind"], "level": s["level"]}),
 		"jobs": sim.jobs.duplicate(true), "builders": sim.builders.duplicate(true)}
@@ -31,6 +31,7 @@ static func restore(d: Dictionary, map: ParkMap) -> ParkSim:
 	map.owned = m["owned"]
 	map.bought = m["bought"]
 	map.specialties = m["specialties"]
+	map.habitats = m.get("habitats", {})  # optional: saves from before HAB1 have none
 	for o: Vector2i in m["buildings"]:
 		if not Buildings.get_def(m["buildings"][o]).is_empty():  # a building this copy doesn't know is dropped
 			map.buildings[o] = m["buildings"][o]

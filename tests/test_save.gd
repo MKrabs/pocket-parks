@@ -23,14 +23,14 @@ func _init() -> void:
 	m.money = 2000
 	m.xp = 340
 	var sim := ParkSim.new(m, 3)
-	ok(sim.build("enclosure", Vector2i(6, 8)) and sim.build("snack_stand", Vector2i(9, 12), 1), "build a site and a turned shop")
+	ok(sim.paint("habitat", Rect2i(6, 8, 3, 3)) and sim.build("snack_stand", Vector2i(9, 12), 1), "build a site and a turned shop")
 	sim.hire("guard")
 	sim.hire("janitor")
 	sim.upgrade_staff(0)
 	for i in 30:
 		sim.step()
 	ok(not sim.jobs.is_empty() and sim.builders[0]["state"] != "home", "a builder on its way to a site")
-	var saved := SaveGame.pack(m, sim, 4, ["aviary"])
+	var saved := SaveGame.pack(m, sim, 4, ["pond"])
 
 	var path := "user://test_save_%d.json" % OS.get_process_id()
 	SaveGame.write(path, saved)

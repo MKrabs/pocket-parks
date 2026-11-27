@@ -4,6 +4,7 @@ extends Node2D
 
 signal cell_hovered(cell: Vector2i)
 signal cell_clicked(cell: Vector2i, button: MouseButton)
+signal released  # a left or right mouse button went up (ends a habitat drag)
 
 const SLAB := 18.0  # depth of the ground slab in px
 const NONE := Vector2i(-1, -1)
@@ -31,6 +32,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	var mb := event as InputEventMouseButton
 	if mb and mb.pressed and hovered != NONE:
 		cell_clicked.emit(hovered, mb.button_index)
+	elif mb and not mb.pressed and mb.button_index in [MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT]:
+		released.emit()
 
 func _draw() -> void:
 	var half := Vector2(IsoGrid.SIZE) / 2.0

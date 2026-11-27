@@ -45,7 +45,7 @@ static func family(id: String) -> Array:
 const MAX_LEVEL := 3
 
 static func upgradable(id: String) -> bool:
-	return get_def(id)["role"] in ["attraction", "shop", "decor"]
+	return get_def(id)["role"] in ["attraction", "shop", "decor"] and not get_def(id).has("habitat")
 
 ## Def with the level effect applied: +50% appeal, capacity and price per level above 1.
 ## The sim and the UI both read this, so they agree.
@@ -66,15 +66,6 @@ static func shaped(kind: String, half: Vector2, h: float, color: Color, z := 0.0
 	var p := part(Vector2.ZERO, half, h, color, z)
 	p["kind"] = kind
 	return p
-
-## A ring as [far half, near half]: list what stands inside between the two.
-static func ring(kind: String, h: float, color: Color, z := 0.0) -> Array:
-	var out: Array = []
-	for side in [-1, 1]:
-		var p := shaped(kind, Vector2(1.32, 1.32), h, color, z)
-		p["side"] = side
-		out.append(p)
-	return out
 
 ## Entrance arch on a 1x1 tile: two posts along y and a top beam, so a path along x runs through it.
 static func arch(post: Color, top: Color) -> Array:

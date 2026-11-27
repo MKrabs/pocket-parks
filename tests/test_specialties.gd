@@ -44,7 +44,7 @@ func _init() -> void:
 
 	# specialist-only: waits for the specialist, and says so
 	var sim := sim_with([[], ["heavy"]])
-	sim.build("water_tank", Vector2i(5, 3))
+	sim.paint("habitat_glass", Rect2i(5, 3, 3, 3))
 	for i in 200:  # the day ends at DAY_TICKS, and with it the work
 		sim.step()
 	var j := sim.job_at(Vector2i(5, 3))
@@ -58,7 +58,7 @@ func _init() -> void:
 		sim.step()
 		t += 1
 	ok(sim.jobs.is_empty(), "water tank gets built")
-	for id: String in ["water_tank", "aviary", "fountain", "reinforced"]:
+	for id: String in ["habitat_glass", "habitat_net", "fountain", "habitat_wall"]:
 		ok(Specialties.required(id) != "", id + " is specialist-only")
 
 	# the assigner picks the fastest free builder

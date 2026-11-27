@@ -185,11 +185,14 @@ func _draw() -> void:
 	if site >= 0.0:
 		_ring(IsoGrid.project(mid) + Vector2(0, -_scaffold_h(top) - 20))
 	if label != "":
-		var f := Palette.FONT
-		var at := IsoGrid.project(mid) + Vector2(0, -maxf(top, 10.0) * grow - 38)  # clear of the flags
-		var w := f.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x
-		draw_colored_polygon(Squircle.points(at, Vector2(w * 0.5 + 9, 11), 4.0, 32), Palette.BUTTER)
-		draw_string(f, at + Vector2(-w * 0.5, 5), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Palette.INK)
+		_pill(IsoGrid.project(mid) + Vector2(0, -maxf(top, 10.0) * grow - 38))  # clear of the flags
+
+## `label` in a BUTTER pill centred on `at`.
+func _pill(at: Vector2) -> void:
+	var f := Palette.FONT
+	var w := f.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x
+	draw_colored_polygon(Squircle.points(at, Vector2(w * 0.5 + 9, 11), 4.0, 32), Palette.BUTTER)
+	draw_string(f, at + Vector2(-w * 0.5, 5), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Palette.INK)
 
 func _scaffold_h(top: float) -> float:
 	return (top if site_upgrade else 14.0) + 8.0

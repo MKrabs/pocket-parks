@@ -34,9 +34,19 @@ static func generate(theme_id: String, seed: int, size := "small") -> ParkMap:
 		for n in cfg[role + "s"]:
 			var id := _pick(rng, theme_id, role)
 			for c: Vector2i in _shuffled(rng, cells):
-				if map.can_place(id, c) and touches_path(map, id, c):
+				if map.can_place(id, c) and touches_path(map, ParkMap.footprint(id, c)):
 					map.place(id, c)
 					break
+	var fences: Array = Buildings.themes()[theme_id].keys().filter(func(id: String) -> bool:
+		return Buildings.get_def(id).has("habitat"))
+	for n in (rng.randi_range(1, 2) if not fences.is_empty() else 0):  # a habitat or two, painted beside a path
+		var id: String = fences[rng.randi() % fences.size()]
+		var r := Rect2i(Vector2i.ZERO, Vector2i(rng.randi_range(2, 4), rng.randi_range(2, 3)))
+		for c: Vector2i in _shuffled(rng, cells):
+			r.position = c
+			if map.paint_target(id, r).x == -1 and map.can_paint(id, r) and touches_path(map, ParkMap.rect_cells(r)):
+				map.paint(id, r)
+				break
 	var placed := 0
 	for c: Vector2i in _shuffled(rng, cells):
 		if placed == cfg["decor"]:
@@ -46,9 +56,9 @@ static func generate(theme_id: String, seed: int, size := "small") -> ParkMap:
 	map.money = ParkMap.START_MONEY
 	return map
 
-## True if any footprint cell of `id` at `origin` has a path tile as a 4-neighbour.
-static func touches_path(map: ParkMap, id: String, origin: Vector2i) -> bool:
-	for c in ParkMap.footprint(id, origin):
+## True if any of `cells` has a path tile as a 4-neighbour.
+static func touches_path(map: ParkMap, cells: Array) -> bool:
+	for c: Vector2i in cells:
 		for d in DIRS:
 			var o: Variant = map.occupied.get(c + d)
 			if o != null and Buildings.get_def(map.buildings[o])["role"] == "path":
@@ -57,7 +67,7 @@ static func touches_path(map: ParkMap, id: String, origin: Vector2i) -> bool:
 
 static func _pick(rng: RandomNumberGenerator, theme_id: String, role: String) -> String:
 	var cat: Dictionary = Buildings.themes()[theme_id]
-	var ids: Array = cat.keys().filter(func(id: String) -> bool: return cat[id]["role"] == role)
+	var ids: Array = cat.keys().filter(func(id: String) -> bool: return cat[id]["role"] == role and not cat[id].has("habitat"))
 	return ids[rng.randi() % ids.size()]
 
 ## Fisher-Yates with our rng (Array.shuffle uses the global one, which breaks determinism).
