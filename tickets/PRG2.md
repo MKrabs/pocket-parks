@@ -2,7 +2,7 @@
 id: PRG2
 title: Unlocks by park level: animals, fences, variants
 status: todo
-deps: HAB3, PRG1, VAR1
+deps: HAB3, PRG1, VAR1, TH1, TH2, TH3
 area: progression
 parent: 0.5
 human: false
