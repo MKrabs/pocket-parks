@@ -18,6 +18,8 @@ var _reason := Hud._label(13)
 var _sends: Array[Button] = []
 var _crimes := HBoxContainer.new()  # Wreck / Litter / Steal / Spy beside a building; hidden elsewhere
 var _offered: Array = []
+var _here := HBoxContainer.new()  # "Also here:" and a dot + name per other character in the park
+var also_here: Array = []         # [name, color] it shows (Net.others)
 
 func _ready() -> void:
 	var pbox := BuildBar.box(Palette.CREAM, 20)
@@ -34,6 +36,9 @@ func _ready() -> void:
 	var top := HBoxContainer.new()
 	top.add_theme_constant_override("separation", 14)
 	top.add_child(_title)
+	_here.add_theme_constant_override("separation", 6)
+	_here.hide()
+	top.add_child(_here)
 	var chip := PanelContainer.new()
 	chip.add_theme_stylebox_override("panel", BuildBar.box(Palette.CREAM))
 	chip.add_child(_ledger)
@@ -229,6 +234,26 @@ func show_crimes(kinds: Array) -> void:
 	for c in _crimes.get_children():
 		c.visible = not c.has_meta("kind") or c.get_meta("kind") in kinds
 	_crimes.visible = not kinds.is_empty()
+	_send.reset_size()
+	_send.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM, Control.PRESET_MODE_MINSIZE, 16)
+
+## Everyone else in the park we visit, the host too while their character is there; hidden when nobody is.
+func show_here(list: Array) -> void:
+	if list == also_here:
+		return
+	also_here = list
+	for c in _here.get_children():
+		c.queue_free()
+	_here.visible = not list.is_empty()
+	var head := Hud._label(14)
+	head.text = "Also here:"
+	head.modulate.a = 0.7
+	_here.add_child(head)
+	for p: Array in list:
+		_here.add_child(Hud.dot(p[1]))
+		var n := Hud._label(14)
+		n.text = p[0]
+		_here.add_child(n)
 	_send.reset_size()
 	_send.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM, Control.PRESET_MODE_MINSIZE, 16)
 

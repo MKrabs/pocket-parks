@@ -50,6 +50,7 @@ var _chasing := false
 var _ban_told := false  # this visit's "you're blacklisted here" toast is out
 var _struck := false    # we did a crime in person this (live) visit: Back home walks out through the gate first
 var _walking_out := false
+var _present: Array = []  # names of the characters in our park but ours, last frame (arrive / leave toasts)
 
 ## T cycles the active theme (zoo → festival → cinema); the build bar follows, placed buildings stay.
 ## Esc leaves place mode, or closes the card in Select mode.
@@ -159,6 +160,10 @@ func _ready() -> void:
 		net.park_name = park
 		net.colour = colour
 		hud.set_identity(park, IdentityCard.colour_of(colour))
+		for a in sim.avatars:  # our character (keyed by the stable id) shows the new name and colour
+			if a["name"] == net.player:
+				a["label"] = net.shown()
+				a["color"] = net.color
 		save())
 	add_child(identity)
 	if save_path != "" and net.nick == "":
@@ -243,8 +248,10 @@ func _process(delta: float) -> void:
 	zoo.show_wrecked(sim.closed)
 	toasts.floor_y = card.top() if card.is_open() else INF
 	zoo.map.money = sim.money  # the sim owns money while the day runs; building spends from the map
+	toasts.top = maxf(CrimeToasts.TOP, hud.right_bottom() + 10)
 	zoo.map.xp = sim.xp
 	net.level = ParkLevel.of(sim.xp)
+	_presence(Net.others(sim, net.player))
 	if visiting:
 		_visit_zoo.show_wrecked((net.visit_sim.closed if net.visit_sim else {}) if live else visits[0]["sim"].closed)
 		visit_panel.show_ledger(_inside(), sim.money)
@@ -259,6 +266,7 @@ func _process(delta: float) -> void:
 		if _walking_out and (me_.is_empty() or me_["cell"] == here()._entrance and me_["path"].is_empty()):
 			_walking_out = false
 			travel_home()
+		visit_panel.show_here(Net.others(here(), net.player))
 	else:
 		_hover(get_global_mouse_position(), get_viewport().get_mouse_position())
 	var me := my_avatar()
@@ -268,6 +276,19 @@ func _process(delta: float) -> void:
 		var at := IsoGrid.project(me["pos"])
 		cam.position = cam.position.lerp(at, 1.0 - exp(-FOLLOW_RATE * delta))
 		_chasing = not me["path"].is_empty() or cam.position.distance_to(at) > 2.0
+
+## Who is in our park in person: the HUD chip, and a toast as each one arrives or leaves (only while we're home).
+func _presence(list: Array) -> void:
+	var names := list.map(func(p: Array) -> String: return p[0])
+	if not visiting:
+		for n: String in names:
+			if not n in _present:
+				toasts.add("visiting", "%s is visiting" % n)
+		for n: String in _present:
+			if not n in names:
+				toasts.add("visiting", "%s left" % n)
+	_present = names
+	hud.set_visitors(list)
 
 ## The park on screen: ours, the bot park we visit, or the live mirror (null while it connects).
 func here() -> ParkSim:

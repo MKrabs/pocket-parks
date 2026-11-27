@@ -9,6 +9,7 @@ const MAX := 4
 const LIFE := 6.0
 const NO_ORIGIN := Vector2i(-1, -1)
 const TOP := 90.0  # below the hud's top-right chips
+var top := TOP  # main pushes this down while the presence chip shows, so toasts never cover it
 
 var items: Array[Dictionary] = []  # {panel, sub, event, age}, newest first
 var floor_y := INF  # toasts reaching below this are hidden (main sets it to the info card's top)
@@ -64,11 +65,12 @@ func add(kind: String, text: String, origin := NO_ORIGIN, event := {}) -> void:
 		_vanish(items.pop_back()["panel"])
 
 func _process(delta: float) -> void:
+	_col.position.y = top
 	for t in items.duplicate():
 		t["age"] += delta
 		t["sub"].visible = t["event"].get("witnessed", false)
 		var p: Control = t["panel"]
-		p.visible = p.position.y + p.size.y + TOP + 8 <= floor_y
+		p.visible = p.position.y + p.size.y + top + 8 <= floor_y
 		if t["age"] >= LIFE:
 			items.erase(t)
 			_vanish(t["panel"])

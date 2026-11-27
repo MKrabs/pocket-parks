@@ -6,7 +6,7 @@ extends Node2D
 signal clicked(origin: Vector2i, kind: String)
 
 const COLORS := {"wrecked": Palette.CORAL, "littered": Palette.SAND, "robbed": Palette.BUTTER, "spied": Palette.SKY,
-	"caught": Palette.MOSS, "wrongful": Palette.CORAL, "repaired": Palette.MOSS}
+	"caught": Palette.MOSS, "wrongful": Palette.CORAL, "repaired": Palette.MOSS, "visiting": Palette.GRASS}
 const WORD := {"wrecked": "Repair", "littered": "Clean", "robbed": "Robbed", "spied": "Spied"}
 const HEAD := 12.0  # pin head half size, screen px
 const RISE := 30.0  # tail tip to head centre, screen px
