@@ -6,6 +6,12 @@ and the game shows the latest entry in its "What's new" card.
 
 ## [Unreleased]
 
+### Changed
+- **Unlocks by park level:** new parks start with the plain Fence and one animal per fence type (otter, red panda,
+  puffin). Glass opens at park level 2, Wall at 3, Net at 4; the other animals arrive between levels 2 and 8; the 2×1
+  buildings open at level 2 and the 2×2 at level 4. Locked items stay in the bar and the animal picker, greyed, with
+  "Unlocks at park level N", and the "Level up!" card lists what each level brings.
+
 ## [0.4.0] - 2026-11-27: Habitats, animals and three new themes
 
 ### Added

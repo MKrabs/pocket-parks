@@ -12,6 +12,7 @@ func done() -> void:
 func _init() -> void:
 	var map := ParkMap.new()
 	map.money = 10000
+	map.xp = ParkLevel.THRESHOLDS[-1]  # everything unlocked (test_unlocks covers the gates)
 	var o := map.paint("habitat_glass", Rect2i(2, 2, 3, 3))
 	ok(o == Vector2i(2, 2), "a 3×3 glass habitat")
 

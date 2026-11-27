@@ -72,6 +72,11 @@ func shed_needs(id: String) -> int:
 	var n := buildings.values().filter(func(b: String) -> bool: return Buildings.get_def(b)["role"] == "staff").size()
 	return 0 if n < ParkLevel.cap("sheds", park_level()) else ParkLevel.needed("sheds", n + 1)
 
+## Park level building `id` (a fence style, a size variant) waits for, or 0 if it's open.
+func opens_at(id: String) -> int:
+	var lv := ParkLevel.building_opens(id)
+	return 0 if lv <= park_level() else lv
+
 func specs(shed: Vector2i) -> Array:
 	return specialties.get(shed, [])
 
@@ -181,7 +186,7 @@ func paint_cells(id: String, rect: Rect2i) -> Array[Vector2i]:
 
 func can_paint(id: String, rect: Rect2i) -> bool:
 	var n := paint_cells(id, rect).size()
-	return n > 0 and money >= n * Buildings.get_def(id)["cost"]
+	return n > 0 and money >= n * Buildings.get_def(id)["cost"] and opens_at(id) == 0
 
 ## Paint `rect` as habitat with fence `id` (new, or added to the one it touches). Returns its origin, or (-1,-1).
 func paint(id: String, rect: Rect2i) -> Vector2i:
@@ -253,7 +258,7 @@ func on_unowned(id: String, cell: Vector2i, rot := 0) -> bool:
 	return footprint(id, cell, rot).any(func(c: Vector2i) -> bool: return IsoGrid.in_bounds(c) and not owns(c))
 
 func can_place(id: String, cell: Vector2i, rot := 0) -> bool:
-	return fits(id, cell, rot) and money >= Buildings.get_def(id)["cost"] and shed_needs(id) == 0
+	return fits(id, cell, rot) and money >= Buildings.get_def(id)["cost"] and shed_needs(id) == 0 and opens_at(id) == 0
 
 func place(id: String, cell: Vector2i, rot := 0) -> bool:
 	if not can_place(id, cell, rot):
@@ -299,6 +304,8 @@ func animal_block(o: Vector2i, a: String) -> String:
 	var h: Dictionary = habitats.get(o, {})
 	if h.is_empty() or not a in Animals.picker(h["fence"]):
 		return "Not for this fence"
+	if ParkLevel.opens("animals", a) > park_level():
+		return "Unlocks at park level %d" % ParkLevel.opens("animals", a)
 	if h["animal"] != "" and h["animal"] != a and h.get("count", 0) > 0:
 		return "This habitat has %ss" % Animals.ALL[h["animal"]]["name"]
 	if h.get("count", 0) >= Animals.MAX:
