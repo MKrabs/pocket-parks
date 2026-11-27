@@ -251,6 +251,12 @@ func _building() -> void:
 	elif d["role"] in ["shop", "attraction", "entrance"]:
 		var t: Dictionary = sim.today.get(origin, {"guests": 0, "income": 0})
 		lines.append("Today: %d guests · $%d" % [t["guests"], t["income"]])
+	if d["role"] != "path":
+		var c := sim.path_charm(origin)
+		if not is_nan(c):
+			lines.append("Paths here: " + ParkSim.charm_word(c))
+			if ParkSim.charm_word(c) == "dull":
+				lines.append("Add decor or variety nearby")
 	if j.is_empty():
 		lines.append(_status())
 	body.text = "\n".join(lines)

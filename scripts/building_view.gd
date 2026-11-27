@@ -44,6 +44,11 @@ var site := -1.0:  # under construction: progress 0..1 (scaffold + ring); -1 = d
 		if s != site:
 			site = s
 			queue_redraw()
+var tint := Color(Palette.INK, 0.0):  # charm view: every part drawn in this colour (alpha 0 = off)
+	set(t):
+		if t != tint:
+			tint = t
+			queue_redraw()
 var site_upgrade := false  # the scaffold stands around the existing building instead of replacing it
 
 var turn := 0:  # quarter turns clockwise (0-3), as stored in ParkMap.rotations
@@ -172,7 +177,7 @@ func _draw() -> void:
 				_shaped(p, mid, 0.0, 0.0)
 				continue
 			var foot := Squircle.iso_points(IsoGrid.project(mid + p["at"] * grow), p["half"] * grow, 4.0, 48)
-			block(self, foot, p["h"] * grow, p["z"] * grow, p["color"])
+			block(self, foot, p["h"] * grow, p["z"] * grow, tint if tint.a > 0.0 else p["color"])
 	else:
 		_draw_wrecked(parts, mid, grow, broken)
 	for p: Dictionary in scaffold[1]:

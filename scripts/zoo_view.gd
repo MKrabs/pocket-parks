@@ -13,18 +13,22 @@ var hovered := GridView.NONE
 var lifted := GridView.NONE  # origin of the hovered building in Select mode
 var ghost: BuildingView
 var fx: Node2D  # where place/remove puffs go (main's Feedback); none in a visited park
+var charm := false  # charm view (C): paths tinted by charm, other buildings faded
 var sim: ParkSim  # your park: placing and upgrading open construction sites; none in a visited park (instant)
 
 func _ready() -> void:
 	rebuild()
 
-## Sites show their scaffold and progress; finished ones pop.
+## Sites show their scaffold and progress; finished ones pop. Charm view tints paths and fades the rest.
 func _process(_delta: float) -> void:
 	if not sim:
 		return
 	for v: BuildingView in get_children():
 		if v == ghost:
 			continue
+		var path: bool = Buildings.get_def(v.id)["role"] == "path"
+		v.tint = CharmView.tint(sim.charm(v.origin)) if charm and path else Color(Palette.INK, 0.0)
+		v.modulate.a = CharmView.FADE if charm and not path else 1.0
 		var j := sim.job_at(v.origin)
 		v.site_upgrade = not j.is_empty() and j["level"] > 1
 		v.site = -1.0 if j.is_empty() else 1.0 - float(j["left"]) / j["total"]
