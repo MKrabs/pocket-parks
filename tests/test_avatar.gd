@@ -59,7 +59,7 @@ func _init() -> void:
 	var guest := Net.new()
 	guest.sim = ParkSim.new(ParkMap.new(), 1)
 	guest.map = ParkMap.new()
-	guest.color = Palette.CLAY
+	guest.colour = "CLAY"
 	guest.start()
 	ok(guest.join("127.0.0.1", host.port), "client socket opens")
 	ok(pump(host, guest, func() -> bool: return guest.visit_sim != null and guest.visit_sim.avatars.size() == 2),

@@ -35,6 +35,7 @@ var transition := CloudTransition.new()
 var card := InfoCard.new()
 var net := Net.new()
 var chat := ChatLog.new()
+var identity := IdentityCard.new()
 var live := false  # the park on screen is a real one over the network (net.visit_sim), not a bot park
 var _joining := {}  # a typed-address offer waiting for its park to answer (we stay home meanwhile)
 var bots := true  # bot friends send groups into your park (tests switch them off)
@@ -72,7 +73,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 ## Say a line through our character: a real park's host relays it, a bot park just shows it, at home our net does both.
 func say(text: String) -> bool:
 	if visiting and not live:
-		_hear(net.player, net.color, text.strip_edges().left(Net.SAY_MAX))
+		_hear(net.shown(), net.color, text.strip_edges().left(Net.SAY_MAX))
 		return true
 	return net.say(text)
 
@@ -147,10 +148,20 @@ func _ready() -> void:
 	offers = Visit.offers(rng)
 	hud.visit_pressed.connect(open_picker)
 	hud.new_park.connect(new_park)
+	hud.name_pressed.connect(open_identity)
+	hud.set_identity(net.park_name, IdentityCard.colour_of(net.colour))
 	add_child(hud)
+	identity.saved.connect(func(nick: String, park: String, colour: String) -> void:
+		net.nick = nick
+		net.park_name = park
+		net.colour = colour
+		hud.set_identity(park, IdentityCard.colour_of(colour))
+		save())
+	add_child(identity)
+	if save_path != "" and net.nick == "":
+		open_identity.call_deferred()  # first start (or a save from before SOC1): choose who you are
 	net.sim = sim
 	net.map = zoo.map
-	net.park_name = hud.park_name.text
 	net.theme = Buildings.active
 	net.map_changed.connect(func() -> void:
 		if live:
@@ -173,7 +184,7 @@ func _ready() -> void:
 			_hear(name, color, text))
 	chat.typed.connect(say)
 	add_child(net)  # net.player is set from here on
-	sim.join_avatar(net.player, net.color)
+	sim.join_avatar(net.shown(), net.color)
 	visit_panel.picked.connect(travel_to)
 	visit_panel.sent.connect(send)
 	visit_panel.home.connect(travel_home)
@@ -314,7 +325,7 @@ func travel_to(offer: Dictionary) -> Tween:
 
 ## go_home() behind the cloud transition, clouds rolling the other way.
 func travel_home() -> Tween:
-	return transition.play(cam, "Home", go_home, false)
+	return transition.play(cam, net.park_name, go_home, false)
 
 ## Swap the view to the offer's park (reusing its sim if we were already there). A live offer connects to its game.
 func visit(offer: Dictionary) -> void:
@@ -336,14 +347,19 @@ func visit(offer: Dictionary) -> void:
 	_visit_walkers = WalkerView.new()
 	_visit_walkers.sim = v["sim"]
 	_visit_walkers.me = Visit.ME
-	(v["sim"] as ParkSim).join_avatar(net.player, net.color)
+	(v["sim"] as ParkSim).join_avatar(net.shown(), net.color)
 	_enter_visit(offer["name"])
+
+## The identity card, filled with who we are now (a first start suggests the login as the name).
+func open_identity() -> void:
+	var login := OS.get_environment("USER") if OS.has_environment("USER") else OS.get_environment("USERNAME")
+	identity.open(net.nick if net.nick != "" else login.capitalize().left(IdentityCard.NAME_MAX), net.park_name, net.colour)
 
 ## The Visit picker, with our own address for a friend to type.
 func open_picker() -> void:
 	visit_panel.source = func() -> Dictionary:
 		var ip := Net.local_address(IP.get_local_addresses())
-		return {"nearby": net.offers(), "bots": offers, "listening": net.udp_port, "player": net.player,
+		return {"nearby": net.offers(), "bots": offers, "listening": net.udp_port, "player": net.shown(),
 			"own": "%s:%d" % [ip, net.port] if ip != "" and net.port > 0 else ""}
 	visit_panel.open()
 
@@ -417,7 +433,7 @@ func go_home() -> void:
 	visiting = false
 	if not live:
 		(visits[0]["sim"] as ParkSim).leave_avatar(net.player)
-	sim.join_avatar(net.player, net.color)  # back at our gate
+	sim.join_avatar(net.shown(), net.color)  # back at our gate
 	grid.map = zoo.map
 	live = false
 	net.leave()

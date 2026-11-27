@@ -161,7 +161,13 @@ func _live_choice(o: Dictionary) -> void:
 		var w := f.get_string_size(o["name"], HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 		var at := Vector2((b.size.x - w) / 2 - 12, b.size.y / 2 - f.get_height(fs) / 2)
 		b.draw_colored_polygon(Squircle.points(at, Vector2(7, 7), 4.0, 24), Palette.GRASS)
-		b.draw_colored_polygon(Squircle.points(at, Vector2(4.5, 4.5), 4.0, 24), Palette.MOSS))
+		b.draw_colored_polygon(Squircle.points(at, Vector2(4.5, 4.5), 4.0, 24), Palette.MOSS)
+		var who := "%s · %s" % [o["player"], o["theme"]]  # their colour chip just left of the second line
+		var col := IdentityCard.colour_of(o.get("colour", ""))
+		var cw := f.get_string_size(who, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+		var cat := Vector2((b.size.x - cw) / 2 - 12, b.size.y / 2 + f.get_height(fs) / 2)
+		b.draw_colored_polygon(Squircle.points(cat, Vector2(6.5, 6.5), 4.0, 24), Palette.shade(col, 0.12))
+		b.draw_colored_polygon(Squircle.points(cat, Vector2(5, 5), 4.0, 24), col))
 
 func _choice(o: Dictionary, text: String) -> Button:
 	var b := Hud._button(text, func() -> void:

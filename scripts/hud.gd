@@ -5,6 +5,7 @@ extends CanvasLayer
 
 signal visit_pressed
 signal new_park  # F9's card, confirmed
+signal name_pressed  # the park name in the top-left was clicked
 
 const MARGIN := 16
 const SPEEDS := [0, 1, 3]
@@ -19,6 +20,8 @@ var progress := 0.0  # 0..1 of the way to the next level (park level comes in L1
 var park_name := _label(20)
 var guests := _label(18)
 var money := _label(20)
+var colour := Palette.SKY  # your colour, on the chip before the park name
+var _dot := Control.new()
 var mood := 0  # 1 happy, 0 neutral, -1 sad (drawn as a face)
 var speed_buttons: Array[Button] = []
 var visit: Button
@@ -53,7 +56,8 @@ func set_level(lv: int, p: float) -> void:
 func _ready() -> void:
 	_target = sim.money
 	_shown = sim.money
-	park_name.text = "Pocket Zoo"
+	if park_name.text == "":
+		park_name.text = "Pocket Zoo"
 
 	# top-left: badge, name, day bar
 	var left := _panel()
@@ -65,7 +69,22 @@ func _ready() -> void:
 	var lcol := VBoxContainer.new()
 	lcol.add_theme_constant_override("separation", 4)
 	lcol.alignment = BoxContainer.ALIGNMENT_CENTER
-	lcol.add_child(park_name)
+	var name_row := HBoxContainer.new()  # colour chip + park name: click to open the identity card
+	name_row.add_theme_constant_override("separation", 6)
+	_dot.custom_minimum_size = Vector2(14, 14)
+	_dot.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_dot.draw.connect(func() -> void:
+		var c := _dot.size * 0.5
+		_dot.draw_colored_polygon(Squircle.points(c, Vector2(7, 7), 4.0, 24), Palette.shade(colour, 0.12))
+		_dot.draw_colored_polygon(Squircle.points(c, Vector2(5.5, 5.5), 4.0, 24), colour))
+	name_row.add_child(_dot)
+	name_row.add_child(park_name)
+	name_row.mouse_filter = Control.MOUSE_FILTER_STOP
+	name_row.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	name_row.gui_input.connect(func(e: InputEvent) -> void:
+		if e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT:
+			name_pressed.emit())
+	lcol.add_child(name_row)
 	var drow := HBoxContainer.new()
 	drow.add_theme_constant_override("separation", 8)
 	_clock.custom_minimum_size = Vector2(110, 6)
@@ -216,6 +235,12 @@ func _process(delta: float) -> void:
 		_card.reset_size()
 		_card.set_anchors_and_offsets_preset(Control.PRESET_CENTER, Control.PRESET_MODE_MINSIZE)
 	_card.visible = over
+
+## Park name and colour chip in the top-left.
+func set_identity(park: String, c: Color) -> void:
+	park_name.text = park
+	colour = c
+	_dot.queue_redraw()
 
 ## F9: the small "start a new park?" card in the centre.
 func confirm_new_park() -> void:

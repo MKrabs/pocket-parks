@@ -9,10 +9,12 @@ extends Node
 #        owed and blueprints are running totals; the visitor applies owed minus what it already got from `from`, and
 #        only for a seq newer than the last one it applied, so a replay or a reconnect never pays twice.
 #        live also carries avatars [name, color, pos, walking]: every character in the host's park, its own included.
-# Visitor → host: hello {t, player, color, level} once connected (the host adds its avatar), send {t, kind, level} per
-# person (the host runs sim.send_paid: refused at the send limit, otherwise the price comes off the ledger; `inside`
-# carries the limit), move {t, cell} to walk its avatar there, say {t, text} to talk. A visitor's avatar leaves when it
-# disconnects. Host → every visitor: say {t, name, color, text}, any line said in its park (the sender's own too).
+# Announce: {id, name (park), player, nick, colour, port, theme}; nick and colour are optional (older copies).
+# Visitor → host: hello {t, player, nick, colour, color, level} once connected (the host adds its avatar, named by nick),
+# send {t, kind, level} per person (the host runs sim.send_paid: refused at the send limit, otherwise the price comes
+# off the ledger; `inside` carries the limit), move {t, cell} to walk its avatar there, say {t, text} to talk. A
+# visitor's avatar leaves when it disconnects. Host → every visitor: say {t, name, color, text}, any line said in its
+# park (the sender's own too). Ledgers are keyed by `player` (stable id); avatars and chat by the shown name.
 
 signal map_changed  # the visited park's layout arrived or changed: rebuild its ZooView
 signal lost         # the visited park went away (host closed, or never answered)
@@ -30,21 +32,25 @@ const SAY_MAX := 80  # chat line length
 const CONNECT_TIMEOUT_MS := 4000  # join(): an address that never answers is dropped (lost) after about this long
 
 var park_name := "Pocket Zoo"
-var player := ""
-var color := Palette.SKY  # our character
+var player := ""   # stable id: the key other parks' ledgers use; never shown once a nick is chosen
+var nick := ""     # the name you chose (IdentityCard); "" until then
+var colour := "SKY"  # an IdentityCard.COLOURS key
+var color: Color:  # our character's colour, from `colour`
+	get: return IdentityCard.colour_of(colour)
 var level := 1      # our park level, told to hosts in hello and each send (send limit = 3 + level)
 var theme := "zoo"
 var sim: ParkSim  # our park, as visitors see it
 var map: ParkMap
 var port := 0       # our ENet server port (0 = not hosting)
 var udp_port := 0   # our discovery port (0 = not listening)
-var nearby: Dictionary = {}  # announcer id -> {name, player, port, theme, ip, seen (s)}
+var nearby: Dictionary = {}  # announcer id -> {name, player, colour, port, theme, ip, seen (s)}; player = their nick
 var visit_map: ParkMap  # mirror of the park we are visiting (null when home)
 var visit_sim: ParkSim  # only ever written from the wire, never stepped
 var visit_ledger := {}  # sim.sent_by(us) in the park we visit, for the Send panel
 var seq := 0            # host: ledger messages ever sent (saved, so a restart never reuses a number)
 var got := {}           # visitor: host player -> {seq, owed} last applied (saved)
-var _names := {}        # host: visitor peer -> its player name (from hello)
+var _names := {}        # host: visitor peer -> its player id (from hello): the ledger key
+var _shown := {}        # host: visitor peer -> the name its character and chat lines show (nick, else id)
 var _told := {}         # host: visitor peer -> the [owed, blueprints, inside] last sent to it
 var _hello := false
 var _id := ""
@@ -86,8 +92,9 @@ func start() -> void:
 		_send(_host, peer, _map_msg()))
 	_host.peer_disconnected.connect(func(peer: int) -> void:
 		_visitors -= 1
-		if sim and _names.has(peer):
-			sim.leave_avatar(_names[peer])
+		if sim and _shown.has(peer):
+			sim.leave_avatar(_shown[peer])
+		_shown.erase(peer)
 		_names.erase(peer)  # their people stay in the park; the ledger waits for the next visit
 		_told.erase(peer))
 	for p in range(DISCO_PORT, DISCO_PORT + DISCO_PORTS):
@@ -129,7 +136,8 @@ func poll(delta: float) -> void:
 func announce() -> void:
 	if port == 0:
 		return
-	var msg := var_to_bytes({"id": _id, "name": park_name, "player": player, "port": port, "theme": theme})
+	var msg := var_to_bytes({"id": _id, "name": park_name, "player": player, "nick": nick, "colour": colour, "port": port,
+		"theme": theme})
 	for ip in ["255.255.255.255", "127.0.0.1"] + Net.broadcasts(IP.get_local_addresses()):
 		for p in range(DISCO_PORT, DISCO_PORT + DISCO_PORTS):
 			_udp.set_dest_address(ip, p)
@@ -141,15 +149,16 @@ func _listen() -> void:
 		var ip := _udp.get_packet_ip()
 		if not d is Dictionary or not d.has_all(["id", "name", "player", "port", "theme"]) or d["id"] == _id:
 			continue
-		nearby[d["id"]] = {"name": str(d["name"]), "player": str(d["player"]), "port": int(d["port"]),
-			"theme": str(d["theme"]), "ip": ip, "seen": _time}
+		var who := str(d.get("nick", ""))
+		nearby[d["id"]] = {"name": str(d["name"]), "player": who if who != "" else str(d["player"]),
+			"colour": str(d.get("colour", "SKY")), "port": int(d["port"]), "theme": str(d["theme"]), "ip": ip, "seen": _time}
 
 ## Nearby parks as picker offers (by player name), each with live = true.
 func offers() -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	for k: String in nearby:
 		var n: Dictionary = nearby[k]
-		out.append({"name": n["name"], "player": n["player"], "theme": n["theme"], "ip": n["ip"], "port": n["port"], "live": true})
+		out.append({"name": n["name"], "player": n["player"], "colour": n["colour"], "theme": n["theme"], "ip": n["ip"], "port": n["port"], "live": true})
 	out.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a["player"] < b["player"])
 	return out
 
@@ -225,7 +234,7 @@ func say(text: String) -> bool:
 	if _client:
 		_send(_client, 1, {"t": "say", "text": text})
 	else:
-		_say(player, color, text)
+		_say(shown(), color, text)
 	return true
 
 ## Host: a line said in our park, shown here and sent to every visitor.
@@ -234,13 +243,21 @@ func _say(name: String, c: Color, text: String) -> void:
 	if _visitors > 0:
 		_send(_host, 0, {"t": "say", "name": name, "color": c, "text": text})
 
-## What the save keeps of us: our name (the sender id in other parks), the host seq and what we were paid.
+## What the save keeps of us: our id (the sender id in other parks), who we chose to be, the host seq and what we
+## were paid.
 func state() -> Dictionary:
-	return {"player": player, "seq": seq, "got": got}
+	return {"player": player, "nick": nick, "park": park_name, "colour": colour, "seq": seq, "got": got}
+
+## The name others see: the chosen nick, else the id.
+func shown() -> String:
+	return nick if nick != "" else player
 
 ## Before start(): pick up a saved state().
 func load_state(d: Dictionary) -> void:
 	player = str(d.get("player", ""))
+	nick = str(d.get("nick", ""))  # optional keys: saves from before SOC1 load without them
+	park_name = str(d.get("park", park_name))
+	colour = str(d.get("colour", colour))
 	seq = int(d.get("seq", 0))
 	got = d.get("got", {})
 
@@ -263,7 +280,7 @@ func _poll_client() -> void:
 		return
 	if status == MultiplayerPeer.CONNECTION_CONNECTED and not _hello:
 		_hello = true
-		_send(_client, 1, {"t": "hello", "player": player, "color": color, "level": level})
+		_send(_client, 1, {"t": "hello", "player": player, "nick": nick, "colour": colour, "color": color, "level": level})
 		_client.get_peer(1).set_timeout(0, 5000, 30000)  # ENet's defaults again, once connected
 		joined.emit()
 	while _client and _client.get_available_packet_count() > 0:
@@ -297,21 +314,23 @@ func _live_msg() -> Dictionary:
 func _hear(peer: int, m: Dictionary) -> void:
 	if m.get("t") == "hello":
 		_names[peer] = str(m.get("player", ""))
+		var nk := str(m.get("nick", "")).strip_edges()
+		_shown[peer] = nk if nk != "" else _names[peer]
 		if sim:
-			sim.join_avatar(_names[peer], m["color"] if m.get("color") is Color else Palette.SKY)
+			sim.join_avatar(_shown[peer], m["color"] if m.get("color") is Color else IdentityCard.colour_of(str(m.get("colour", "SKY"))))
 			sim.sender_levels[_names[peer]] = clampi(int(m.get("level", 1)), 1, ParkLevel.MAX)
 	elif m.get("t") == "send" and _names.has(peer) and sim and m.get("kind") in ParkSim.KINDS:
 		sim.send_paid(m["kind"], _names[peer], clampi(int(m.get("level", 1)), 1, ParkLevel.MAX))
 	elif m.get("t") == "move" and _names.has(peer) and sim and m.get("cell") is Vector2i:
-		sim.move_avatar(_names[peer], m["cell"])
+		sim.move_avatar(_shown[peer], m["cell"])
 	elif m.get("t") == "say" and _names.has(peer) and m.get("text") is String:
 		var c := Palette.SKY
 		for a in sim.avatars if sim else []:
-			if a["name"] == _names[peer]:
+			if a["name"] == _shown[peer]:
 				c = a["color"]
 		var text: String = m["text"].strip_edges().left(SAY_MAX)
 		if text != "":
-			_say(_names[peer], c, text)
+			_say(_shown[peer], c, text)
 
 ## Host: each visitor whose ledger entry (or people inside) changed gets its new totals.
 func _tell() -> void:

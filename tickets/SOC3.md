@@ -19,3 +19,5 @@ since:
 ## Acceptance
 In-process test: two clients join one host, and each sees the other in "also here"; the host sees both; a leave updates
 everyone. Shots of the chip and the visit title row. `./gd check` ok.
+
+> **note:** SOC1 + SOC2 merged: show `net.shown()` names (nick, else id) and `IdentityCard.colour_of(colour)` everywhere in presence. The host keys avatars and chat by the shown name (`_shown[peer]`) and ledgers by the stable id (`_names[peer]`). Never show the id when a nick exists.
