@@ -43,6 +43,7 @@ var level_card := PanelContainer.new()
 var _level_text := _label(16)
 var _level_title := _label(24)
 var new_card := PanelContainer.new()  # F9: start a new park?
+var whats_new: PanelContainer  # built on first open (open_whats_new)
 var blacklist_open := false  # the Blacklist chip under the park name, unfolded
 var _bl := VBoxContainer.new()
 var _bl_drawn: Array = []  # [open, ban_days, blacklist] it was last built for
@@ -170,9 +171,21 @@ func _ready() -> void:
 		speed_buttons.append(b)
 		srow.add_child(b)
 	speeds.add_child(srow)
-	add_child(speeds)
-	speeds.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT, Control.PRESET_MODE_MINSIZE, MARGIN)
-	speeds.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	var bcol := VBoxContainer.new()  # version label (opens What's new), then the speed buttons
+	bcol.add_theme_constant_override("separation", 4)
+	var ver := _button("v" + Changelog.version(), open_whats_new)
+	ver.flat = true
+	ver.modulate.a = 0.5
+	ver.add_theme_font_size_override("font_size", 13)
+	ver.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	ver.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	for k in ["normal", "hover", "pressed", "hover_pressed"]:
+		ver.add_theme_stylebox_override(k, StyleBoxEmpty.new())
+	bcol.add_child(ver)
+	bcol.add_child(speeds)
+	add_child(bcol)
+	bcol.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT, Control.PRESET_MODE_MINSIZE, MARGIN)
+	bcol.grow_vertical = Control.GROW_DIRECTION_BEGIN
 
 	# bottom-right: Visit, a big round button with a cloud
 	visit = _button("Visit", visit_pressed.emit)
@@ -350,6 +363,54 @@ static func dot(c: Color) -> Control:
 		d.draw_colored_polygon(Squircle.points(at, Vector2(7, 7), 4.0, 24), Palette.shade(c, 0.12))
 		d.draw_colored_polygon(Squircle.points(at, Vector2(5.5, 5.5), 4.0, 24), c))
 	return d
+
+## The What's new card: the newest released section of CHANGELOG.md, centred and scrollable.
+func open_whats_new() -> void:
+	if not whats_new:
+		var s := Changelog.latest(FileAccess.get_file_as_string(Changelog.PATH))
+		whats_new = PanelContainer.new()
+		var box := BuildBar.box(Palette.CREAM, 20)
+		box.set_content_margin_all(22)
+		whats_new.add_theme_stylebox_override("panel", box)
+		var col := VBoxContainer.new()
+		col.add_theme_constant_override("separation", 10)
+		var title := _label(24)
+		title.add_theme_font_override("font", Palette.FONT_BOLD)
+		title.text = "What's new in %s" % s.get("version", Changelog.version())
+		col.add_child(title)
+		if s.get("title", "") != "":
+			var sub := _label(15)
+			sub.text = s["title"]
+			sub.modulate.a = 0.7
+			col.add_child(sub)
+		var rt := RichTextLabel.new()
+		rt.bbcode_enabled = true
+		rt.text = Changelog.to_bbcode(s.get("body", "Nothing yet."))
+		rt.custom_minimum_size = Vector2(540, 340)
+		rt.add_theme_font_override("normal_font", Palette.FONT)
+		rt.add_theme_font_override("bold_font", Palette.FONT_BOLD)
+		rt.add_theme_font_size_override("normal_font_size", 15)
+		rt.add_theme_font_size_override("bold_font_size", 15)
+		rt.add_theme_color_override("default_color", Palette.INK)
+		rt.add_theme_constant_override("paragraph_separation", 6)
+		var sb := rt.get_v_scroll_bar()
+		for k in ["scroll", "grabber", "grabber_highlight", "grabber_pressed"]:
+			var st := _flat({"scroll": Palette.shade(Palette.CREAM, 0.04), "grabber": Palette.STONE}.get(k, Palette.shade(Palette.STONE, 0.12)))
+			st.content_margin_left = 3
+			st.content_margin_right = 3
+			sb.add_theme_stylebox_override(k, st)
+		col.add_child(rt)
+		var nice := _button("Nice", func() -> void: Motion.vanish(whats_new, false).finished.connect(whats_new.hide))
+		nice.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		col.add_child(nice)
+		whats_new.add_child(col)
+		add_child(whats_new)
+	whats_new.modulate.a = 1.0
+	whats_new.show()
+	whats_new.reset_size()
+	whats_new.set_anchors_and_offsets_preset(Control.PRESET_CENTER, Control.PRESET_MODE_MINSIZE)
+	whats_new.pivot_offset = whats_new.size * 0.5
+	Motion.pop(whats_new)
 
 ## F9: the small "start a new park?" card in the centre.
 func confirm_new_park() -> void:

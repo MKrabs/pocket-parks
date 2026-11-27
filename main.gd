@@ -43,6 +43,7 @@ var _acc := 0.0  # sim ticks owed
 var _reported := 0  # sim.events already toasted
 var _rng := RandomNumberGenerator.new()
 var save_path := ""  # set in _ready when this is the real game (not a test, not a ./gd shot)
+var seen_version := ""  # the version whose What's new card was last shown (in the save)
 var _unsaved := 0  # sim ticks since the last save
 var follow := true  # F: the camera follows your character while it walks
 const FOLLOW_RATE := 3.0  # camera catch-up per second
@@ -116,6 +117,7 @@ func _ready() -> void:
 		bar.stolen.assign(saved["stolen"].filter(func(id: Variant) -> bool: return id is String and not Buildings.get_def(id).is_empty()))
 		net.load_state(saved.get("net", {}))
 		bar.pinned = saved.get("bar_pinned", false) == true
+		seen_version = str(saved.get("seen_version", ""))
 	zoo.sim = sim
 	_rng.seed = 1
 	zoo.money_changed.connect(_on_map_changed)
@@ -171,6 +173,9 @@ func _ready() -> void:
 	add_child(identity)
 	if save_path != "" and net.nick == "":
 		open_identity.call_deferred()  # first start (or a save from before SOC1): choose who you are
+	elif save_path != "" and Changelog.should_show(seen_version, Changelog.version(), saved.is_empty()):
+		hud.open_whats_new.call_deferred()
+	seen_version = Changelog.version()
 	net.sim = sim
 	net.map = zoo.map
 	net.theme = Buildings.active
@@ -231,6 +236,7 @@ func save() -> void:
 	if save_path != "":
 		var d := SaveGame.pack(zoo.map, sim, hud.day, bar.stolen, net.state())
 		d["bar_pinned"] = bar.pinned  # ponytail: a UI pref riding in the park save; own settings file if more prefs come
+		d["seen_version"] = seen_version
 		SaveGame.write(save_path, d)
 
 func _notification(what: int) -> void:
