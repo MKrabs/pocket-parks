@@ -48,8 +48,9 @@ static func generate(theme_id: String, seed: int, size := "small") -> ParkMap:
 				var o := map.paint(id, r)
 				var offer := Animals.picker(map.habitats[o]["fence"])
 				var k := absi(hash(o))  # not from rng: the rest of the layout stays as it was
-				map.habitats[o]["animal"] = offer[k % offer.size()]
-				map.habitats[o]["count"] = 2 + k % (Animals.MAX - 1)
+				if not offer.is_empty():  # animal-free areas (the festival's picnic lawn) stay empty
+					map.habitats[o]["animal"] = offer[k % offer.size()]
+					map.habitats[o]["count"] = 2 + k % (Animals.MAX - 1)
 				break
 	var placed := 0
 	for c: Vector2i in _shuffled(rng, cells):

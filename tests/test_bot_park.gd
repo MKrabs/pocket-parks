@@ -39,7 +39,8 @@ func check(theme: String, s: int, size: String) -> void:
 	var cfg: Dictionary = BotPark.SIZES[size]
 	var painted := map.habitats.size()
 	ok(count.get("attraction", 0) - painted == cfg["attractions"], tag + " attraction count %d" % count.get("attraction", 0))
-	ok((painted >= 1 and painted <= 2) == (theme == "zoo"), tag + " zoo parks paint a habitat or two (%d)" % painted)
+	var paints: bool = Buildings.themes()[theme].keys().any(func(id: String) -> bool: return Buildings.get_def(id).has("habitat"))
+	ok((painted >= 1 and painted <= 2) == paints, tag + " themes with habitats or lawns paint one or two, others none (%d)" % painted)
 	ok(count.get("shop", 0) == cfg["shops"], tag + " shop count")
 	ok(count.get("decor", 0) > 0, tag + " has decor")
 	# Flood from the entrance over path tiles; every path tile must be reached.
