@@ -298,6 +298,10 @@ func _charm_of(cell: Vector2i) -> float:
 		if closed.has(o):
 			c -= CHARM_WRECKED
 		water = water or d.get("specialty", "") == "water"
+		for it: Dictionary in _map.habitats.get(o, {}).get("items", []):  # habitat decor in view counts like decor
+			if it["cells"].any(func(k: Vector2i) -> bool: return absi(k.x - cell.x) <= CHARM_REACH and absi(k.y - cell.y) <= CHARM_REACH):
+				decor += Animals.ITEMS[it["id"]]["appeal"]
+				water = water or "water" in Animals.ITEM_TERRAIN[it["id"]]
 		if d["role"] == "decor":
 			decor += d["appeal"]
 		elif ids.has(id):

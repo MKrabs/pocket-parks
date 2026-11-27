@@ -96,7 +96,9 @@ func _hear(name: String, color: Color, text: String) -> void:
 	(_visit_walkers if visiting else walkers).say(name, text)
 
 func escape() -> void:
-	if zoo.selected != "":
+	if zoo.item != "":
+		zoo.place_item(GridView.NONE, "")
+	elif zoo.selected != "":
 		bar.clear()
 	else:
 		card.close()
@@ -106,6 +108,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	var mb := event as InputEventMouseButton
 	if mb and mb.pressed and mb.button_index == MOUSE_BUTTON_RIGHT and not zoo.painting():
 		bar.clear()  # painting a habitat: right-drag removes cells instead (Esc leaves)
+		zoo.place_item(GridView.NONE, "")
 
 func _ready() -> void:
 	zoo.map.start_small()
@@ -331,10 +334,11 @@ func walk_to(cell: Vector2i) -> bool:
 
 ## Select mode: lift the person or building under the mouse and name it in the tooltip.
 func _hover(world: Vector2, screen: Vector2) -> void:
-	var g := person_at(world) if zoo.selected == "" else -1
-	var s := staff_at(world) if zoo.selected == "" and g < 0 else -1
+	var free := zoo.selected == "" and zoo.item == ""
+	var g := person_at(world) if free else -1
+	var s := staff_at(world) if free and g < 0 else -1
 	var cell := IsoGrid.to_cell(world)
-	var o: Vector2i = zoo.map.occupied.get(cell, GridView.NONE) if zoo.selected == "" and g < 0 and s < 0 else GridView.NONE
+	var o: Vector2i = zoo.map.occupied.get(cell, GridView.NONE) if free and g < 0 and s < 0 else GridView.NONE
 	walkers.hovered = g
 	walkers.hovered_staff = s
 	if o != zoo.lifted:
@@ -345,7 +349,8 @@ func _hover(world: Vector2, screen: Vector2) -> void:
 	elif s >= 0:
 		text = (sim.staff[s]["kind"] as String).capitalize()
 	elif o != GridView.NONE:
-		text = InfoCard.building_name(zoo.map, o)
+		var i := zoo.map.item_at(o, cell)
+		text = InfoCard.building_name(zoo.map, o) if i < 0 else Animals.ITEMS[zoo.map.habitats[o]["items"][i]["id"]]["name"]
 	card.hover(text, screen)
 
 func _guest(id: int) -> Dictionary:
@@ -634,6 +639,12 @@ func _on_cell_clicked(cell: Vector2i, button: MouseButton, shift := false) -> vo
 	if visiting:
 		walk_to(cell)  # someone else's park: you walk and send people, you don't build or accuse
 		return
+	if zoo.item != "":  # decorating a habitat: back to its card unless Shift keeps placing
+		var o := zoo.item_in
+		if zoo.on_click(cell) and not (shift or Input.is_key_pressed(KEY_SHIFT)):
+			zoo.place_item(GridView.NONE, "")
+			card.show_building(o)
+		return
 	var id := zoo.selected
 	if id == "" and (shift or Input.is_key_pressed(KEY_SHIFT)):
 		walk_to(cell)  # Shift+click: plain clicks stay for selecting
@@ -655,6 +666,7 @@ func select_at(cell: Vector2i, world: Vector2) -> void:
 		card.show_staff(s)
 	elif zoo.map.occupied.has(cell):
 		card.show_building(zoo.map.occupied[cell])
+		card.item = zoo.map.item_at(card.origin, cell)  # a habitat's decor item: the card offers to remove it
 	elif zoo.map.buyable(ParkMap.plot_of(cell)):
 		card.show_plot(ParkMap.plot_of(cell))
 	else:
@@ -668,7 +680,17 @@ func _on_card_action(what: String) -> void:
 	if what.begins_with("spec_"):
 		zoo.map.toggle_specialty(o, what.trim_prefix("spec_"))
 		return
+	if what.begins_with("item_"):  # decorate: the ghost, limited to this habitat
+		bar.clear()
+		card.close()
+		zoo.place_item(o, what.trim_prefix("item_"))
+		return
 	match what:
+		"remove_item":
+			zoo.map.money = sim.money
+			if zoo.map.remove_item(o, card.item):
+				card.item = -1
+				zoo.rebuild()
 		"buy":
 			zoo.map.money = sim.money
 			if zoo.map.buy(card.plot):

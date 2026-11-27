@@ -16,6 +16,8 @@ var fx: Node2D  # where place/remove puffs go (main's Feedback); none in a visit
 var charm := false  # charm view (C): paths tinted by charm, other buildings faded
 var drag_from := GridView.NONE  # painting a habitat: the cell the drag started on
 var erasing := false  # that drag is a right-drag (removes cells)
+var item := ""  # decor item being placed in habitat `item_in`, or ""
+var item_in := GridView.NONE
 var sim: ParkSim  # your park: placing and upgrading open construction sites; none in a visited park (instant)
 
 func _ready() -> void:
@@ -69,6 +71,8 @@ func rebuild() -> void:
 			dome.z_index = 2 * front
 			add_child(dome)
 			var h: Dictionary = map.habitats[o]
+			for it: Dictionary in h.get("items", []):
+				add_child(_item_view(it))
 			for i in h.get("count", 0):
 				add_child(AnimalView.of(h["animal"], h, i))
 			continue
@@ -98,6 +102,16 @@ func update_ghost() -> void:
 	if ghost:
 		ghost.queue_free()
 		ghost = null
+	if item != "" and hovered != GridView.NONE:
+		ghost = BuildingView.new(item)
+		ghost.turn = turn
+		ghost.z_index = 1000
+		ghost.position = IsoGrid.to_screen(hovered)
+		var why := map.item_block(item_in, item, hovered, turn)
+		ghost.modulate = Color(Palette.CREAM if why == "" else Palette.CORAL, 0.7)
+		ghost.label = why
+		add_child(ghost)
+		return
 	if selected == "" or hovered == GridView.NONE:
 		return
 	if painting():
@@ -171,6 +185,7 @@ func rotate_ghost(dir: int) -> void:
 
 func select(id: String) -> void:
 	selected = id
+	item = ""
 	drag_from = GridView.NONE
 	update_ghost()
 
@@ -185,8 +200,34 @@ func highlight(origin: Vector2i) -> void:
 		if v != ghost:
 			v.position = IsoGrid.to_screen(v.origin) - Vector2(0, LIFT if v.origin == origin else 0.0)
 
-## Place the selected building at `cell`. True if it was placed.
+## Start placing decor item `id` in habitat `o` ("" stops).
+func place_item(o: Vector2i, id: String) -> void:
+	selected = ""
+	item = id
+	item_in = o
+	update_ghost()
+
+## One decor item of a habitat, drawn like a building; flat ones (pools) lie under the animals on their cells.
+func _item_view(it: Dictionary) -> BuildingView:
+	var v := BuildingView.new(it["id"])
+	v.origin = it["cells"][0]
+	v.turn = it.get("turn", 0)
+	v.position = IsoGrid.to_screen(v.origin)
+	var flat: bool = Animals.ITEMS[it["id"]].get("flat", false)
+	v.z_index = 2 * (v.origin.x + v.origin.y if flat else ParkMap.depth(it["id"], v.origin, v.turn))
+	return v
+
+## Place the selected building (or decor item) at `cell`. True if it was placed.
 func on_click(cell: Vector2i) -> bool:
+	if item != "":
+		if sim:
+			map.money = sim.money
+		if not map.place_item(item_in, item, cell, turn):
+			return false
+		rebuild()  # hands money and comfort (→ appeal) to the sim
+		if fx:
+			Motion.puff_at(fx, Feedback.base_of(item, cell, turn), Motion.DUST_SIZE)
+		return true
 	if selected == "" or not (sim.build(selected, cell, turn) if sim else map.place(selected, cell, turn)):
 		return false
 	rebuild()

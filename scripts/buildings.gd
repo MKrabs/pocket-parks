@@ -26,7 +26,7 @@ static func get_def(id: String) -> Dictionary:
 	for t: Dictionary in themes().values():
 		if t.has(id):
 			return t[id]
-	return {}
+	return Animals.ITEMS.get(id, {})  # habitat decor items
 
 ## Building ids of the active theme, in catalog order.
 static func ids() -> Array:

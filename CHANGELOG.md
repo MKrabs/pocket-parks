@@ -12,6 +12,10 @@ and the game shows the latest entry in its "What's new" card.
   its card: pick an animal from the portraits, see what it needs (room, water, rocks, trees, a shelter, e.g. "needs
   20% more water"), check the comfort bar, and buy up to 4. Happy animals wander, rest and swim, and draw more guests.
   Unhappy ones hide or pace, and the habitat draws fewer. The starting habitat comes with two red pandas.
+- **Habitat decor:** the habitat card has a row of items: Pool, Big Pool, Rocks, Rock Ridge, Tree, Shelter and
+  Waterfall. Click one, then click inside the habitat to place it (R turns it, right-click or Esc cancels, Shift keeps
+  placing). Each one adds water, rocks, trees or a shelter toward your animals' needs, and charms the paths nearby.
+  Click a placed item to remove it for half its price back.
 
 ### Changed
 - **Habitats instead of enclosures:** Attractions → Habitat, pick a fence (wood Fence, or Glass, Net and Wall for
