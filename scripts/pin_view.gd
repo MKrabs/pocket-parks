@@ -6,7 +6,8 @@ extends Node2D
 signal clicked(origin: Vector2i, kind: String)
 
 const COLORS := {"wrecked": Palette.CORAL, "littered": Palette.SAND, "robbed": Palette.BUTTER, "spied": Palette.SKY,
-	"caught": Palette.MOSS, "wrongful": Palette.CORAL, "repaired": Palette.MOSS, "visiting": Palette.GRASS}
+	"caught": Palette.MOSS, "wrongful": Palette.CORAL, "repaired": Palette.MOSS, "visiting": Palette.GRASS,
+	"levelup": Palette.BUTTER}
 const WORD := {"wrecked": "Repair", "littered": "Clean", "robbed": "Robbed", "spied": "Spied"}
 const HEAD := 12.0  # pin head half size, screen px
 const RISE := 30.0  # tail tip to head centre, screen px
@@ -166,6 +167,9 @@ static func glyph(ci: CanvasItem, kind: String, at: Vector2, k := 1.0, alpha := 
 		"robbed":  # coin with a minus
 			ci.draw_colored_polygon(Squircle.points(at, Vector2(6.5, 6.5) * k, 3.0, 28), c)
 			ci.draw_colored_polygon(Squircle.points(at, Vector2(3.6, 1.2) * k, 4.0, 16), light)
+		"levelup":  # chevron up
+			ci.draw_colored_polygon(Transform2D(0.0, Vector2(k, k), 0.0, at) * PackedVector2Array([Vector2(0, -5.5), Vector2(6, 0.5),
+				Vector2(3.4, 2.8), Vector2(0, -0.6), Vector2(-3.4, 2.8), Vector2(-6, 0.5)]), c)
 		_:  # coin
 			ci.draw_colored_polygon(Squircle.points(at, Vector2(6.5, 6.5) * k, 3.0, 24), c)
 			ci.draw_colored_polygon(Squircle.points(at, Vector2(1.6, 3.6) * k, 4.0, 16), Color(Palette.shade(COLORS[kind], 0.1), alpha))

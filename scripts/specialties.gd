@@ -1,6 +1,32 @@
 class_name Specialties
-# Builder specialties (docs/design/game.md → Building). All are available, no XP or training.
-# A building def may carry "specialty" (an id below) and "mode": "only" (specialist-only) or "faster" (2× for the specialist).
+# Builder specialties (docs/design/game.md → Building). All are available; each one a builder has levels up from XP.
+# A building def may carry "specialty" (an id below) and "mode": "only" (specialist-only) or "faster" (anyone at 1×).
+# The specialist builds its specialty's buildings at LEVEL_SPEED of its level in it.
+
+const XP_JOB := 1   # each specialty a builder has, per finished job outside it
+const XP_SPEC := 3  # the job's own specialty, per finished job
+const LEVEL_XP := [0, 10, 30]  # XP a specialty needs for Lv 1, 2, 3
+const LEVEL_SPEED := [1.5, 2.0, 3.0]  # work per tick on its buildings at Lv 1, 2, 3
+
+## Specialty level (1–3) at `xp`.
+static func level(xp: int) -> int:
+	return LEVEL_XP.filter(func(t: int) -> bool: return xp >= t).size()
+
+## Fraction of the way from this level to the next (1.0 at max).
+static func progress(xp: int) -> float:
+	var lv := level(xp)
+	return 1.0 if lv >= LEVEL_XP.size() else float(xp - LEVEL_XP[lv - 1]) / (LEVEL_XP[lv] - LEVEL_XP[lv - 1])
+
+## A finished job on building `id` adds XP to each of `specs` in `xp` (spec -> int). Returns the ones that levelled up.
+static func award(xp: Dictionary, specs: Array, id: String) -> Array:
+	var own: String = Buildings.get_def(id).get("specialty", "")
+	var up: Array = []
+	for s: String in specs:
+		var before := level(xp.get(s, 0))
+		xp[s] = xp.get(s, 0) + (XP_SPEC if s == own else XP_JOB)
+		if level(xp[s]) > before:
+			up.append(s)
+	return up
 
 const ALL := {
 	"landscaper": {"name": "Landscaper", "glyph": "L", "color": Palette.MOSS},
@@ -15,15 +41,16 @@ const ALL := {
 static func for_theme(t: String) -> Array:
 	return ALL.keys().filter(func(s: String) -> bool: return ALL[s].get("theme", t) == t)
 
-## Work per tick a builder with `specs` puts into building `id`: 0 = can't (specialist-only), 1, or 2 (faster).
-static func speed(specs: Array, id: String) -> int:
+## Work per tick a builder with `specs` (and `xp`: spec -> int) puts into building `id`: 0 = can't (specialist-only),
+## 1, or its specialist's LEVEL_SPEED.
+static func speed(specs: Array, id: String, xp := {}) -> float:
 	var d := Buildings.get_def(id)
 	var s: String = d.get("specialty", "")
 	if s == "":
-		return 1
-	if d["mode"] == "only":
-		return 1 if s in specs else 0
-	return 2 if s in specs else 1
+		return 1.0
+	if s in specs:
+		return LEVEL_SPEED[level(xp.get(s, 0)) - 1]
+	return 0.0 if d["mode"] == "only" else 1.0
 
 ## The specialty a building can't be built without, or "".
 static func required(id: String) -> String:

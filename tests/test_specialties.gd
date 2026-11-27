@@ -38,9 +38,9 @@ func _init() -> void:
 	ok(work_ticks(sim_with([[]]), "snack_stand", Vector2i(5, 8)) == 200, "generalist: snack stand at 1×")
 	ok(work_ticks(sim_with([["water"]]), "snack_stand", Vector2i(5, 8)) == 200, "wrong specialist: 1×")
 	ok(work_ticks(sim_with([[]]), "path", Vector2i(5, 6)) == 0, "paths stay instant")
-	# faster: 2× with the specialist
-	ok(work_ticks(sim_with([["carpenter"]]), "snack_stand", Vector2i(5, 8)) == 100, "carpenter: snack stand at 2×")
-	ok(Specialties.speed([], "tree") == 1 and Specialties.speed(["landscaper"], "tree") == 2, "tree: landscaper faster")
+	# faster: 1.5× with a Lv 1 specialist
+	ok(work_ticks(sim_with([["carpenter"]]), "snack_stand", Vector2i(5, 8)) == 134, "carpenter: snack stand at 1.5×")
+	ok(Specialties.speed([], "tree") == 1 and Specialties.speed(["landscaper"], "tree") == 1.5, "tree: landscaper faster")
 
 	# specialist-only: waits for the specialist, and says so
 	var sim := sim_with([[], ["heavy"]])
@@ -90,8 +90,8 @@ func _init() -> void:
 	ok(m.spec_choices(shed) == ["landscaper", "water", "carpenter", "projection"], "cinema: shared + Projection")
 	ok(m.toggle_specialty(shed, "projection"), "pick Projection")
 	ok(Specialties.required("cin_big") == "projection", "Big Screen needs Projection")
-	ok(Specialties.speed([], "cin_big") == 0 and Specialties.speed(["projection"], "cin_big") == 1, "Big Screen: specialist-only")
-	ok(Specialties.speed([], "cin_room") == 1 and Specialties.speed(["projection"], "cin_room") == 2, "Screen Room: faster")
+	ok(Specialties.speed([], "cin_big") == 0 and Specialties.speed(["projection"], "cin_big") == 1.5, "Big Screen: specialist-only")
+	ok(Specialties.speed([], "cin_room") == 1 and Specialties.speed(["projection"], "cin_room") == 1.5, "Screen Room: faster")
 	Buildings.use("festival")
 	ok(m.spec_choices(shed).has("projection"), "a picked specialty still shows after a theme swap")
 	ok(not m.toggle_specialty(shed, "aviary"), "festival: no Aviary to pick")

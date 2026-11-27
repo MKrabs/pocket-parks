@@ -53,6 +53,18 @@ func _ready() -> void:
 			b.add_theme_stylebox_override(k, BuildBar.box(Specialties.ALL[s]["color"]))
 		for k in ["normal", "hover", "pressed", "hover_pressed"]:
 			(b.get_theme_stylebox(k) as StyleBoxFlat).set_content_margin_all(5)
+		for k in ["pressed", "hover_pressed"]:
+			(b.get_theme_stylebox(k) as StyleBoxFlat).content_margin_bottom = 11  # room for the XP bar
+		b.draw.connect(func() -> void:  # a picked specialty's XP bar along the button's bottom
+			if not b.button_pressed:
+				return
+			var w := b.size.x - 16.0
+			var f := Specialties.progress(map.spec_xp.get(origin, {}).get(s, 0))
+			b.draw_colored_polygon(Squircle.points(Vector2(b.size.x * 0.5, b.size.y - 7.0), Vector2(w * 0.5, 2.5), 4.0, 32),
+				Palette.shade(Specialties.ALL[s]["color"], 0.3))
+			if f > 0.0:
+				b.draw_colored_polygon(Squircle.points(Vector2(8.0 + w * f * 0.5, b.size.y - 7.0), Vector2(maxf(w * f * 0.5, 2.5), 2.5), 4.0, 32),
+					Palette.CREAM))
 		specs.add_child(b)
 	ban_row.add_theme_constant_override("separation", 8)
 	ban_row.add_child(Hud._button("−", func() -> void: days = maxi(days - 1, 1)))
@@ -266,6 +278,7 @@ func _building() -> void:
 		for b: Button in specs.get_children():
 			b.visible = b.get_meta("spec") in map.spec_choices(origin)
 			b.set_pressed_no_signal(b.get_meta("spec") in map.specs(origin))
+			b.queue_redraw()
 
 	var cost := map.upgrade_cost(origin)
 	upgrade.visible = Buildings.upgradable(id) and j.is_empty()
@@ -323,12 +336,20 @@ func _builder_line() -> String:
 		return "Builder shed · houses one builder"
 	var j := sim.job_of(b)
 	var doing := "resting at home" if j.is_empty() else "building the %s" % Buildings.get_def(j["id"])["name"]
-	var have: Array = map.specs(origin).map(func(s: String) -> String: return Specialties.ALL[s]["name"])
+	var have: Array = map.specs(origin).map(func(s: String) -> String: return spec_line(map, origin, s))
 	var free := ParkLevel.cap("specialties", map.park_level()) - have.size()
-	var spec := "Specialty: pick one below" if have.is_empty() else ("Specialties: " if have.size() > 1 else "Specialty: ") + " + ".join(have)
-	if free > 0 and not have.is_empty():
-		spec += " · pick a second"
-	return "Builder shed · home of %s\n%s is %s\n%s" % [b["name"], b["name"], doing, spec]
+	if have.is_empty():
+		have.append("Specialty: pick one below")
+	elif free > 0:
+		have.append("Pick a second specialty below")
+	return "Builder shed · home of %s\n%s is %s\n%s" % [b["name"], b["name"], doing, "\n".join(have)]
+
+## "Water Lv 2 · ×2 · 14/30 XP" (or "max"): level, build speed on its buildings, XP to the next level for the builder at `shed`.
+static func spec_line(m: ParkMap, shed: Vector2i, s: String) -> String:
+	var xp: int = m.spec_xp.get(shed, {}).get(s, 0)
+	var lv := Specialties.level(xp)
+	var next := "max" if lv >= Specialties.LEVEL_XP.size() else "%d/%d XP" % [xp, Specialties.LEVEL_XP[lv]]
+	return "%s Lv %d · ×%s · %s" % [Specialties.ALL[s]["name"], lv, str(Specialties.LEVEL_SPEED[lv - 1]).trim_suffix(".0"), next]
 
 ## The building's state in words: wrecked (with the reopen countdown), littered, robbed, spied, or open.
 func _status() -> String:

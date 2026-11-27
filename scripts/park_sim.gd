@@ -103,6 +103,7 @@ var _gate: Array = []               # [kind, sender] waiting to enter
 var jobs: Array[Dictionary] = []     # sites: {origin, id, level (being built), left, total (work ticks), paid, builder ("" = waiting)}
 var builders: Array[Dictionary] = [] # one per finished shed: {name, shed (origin), pos (fractional cell), state: home|walk|work}
 var finished: Array[Vector2i] = []   # sites done; the view pops them and clears this
+var leveled: Array[Dictionary] = []  # {shed, name, spec, level} specialty level-ups; main toasts them and clears this
 var avatars: Array[Dictionary] = []  # player characters, not guests (no spending, mood): {name, color, cell, pos, path}
                                      # + like an actor: sender (= name), kind (worst crime so far), crimes, loot, spied, event, strike (ticks)
 var blacklist: Dictionary = {}       # player name -> in-game days left (counts down in new_day)
@@ -962,9 +963,9 @@ func _home(shed: Vector2i) -> Vector2:
 func _site(j: Dictionary) -> Vector2:
 	return Vector2(j["origin"]) + Vector2(_map.size(j["id"], _map.rotation(j["origin"]))) - Vector2(0.4, 0.4)  # front corner
 
-## Work per tick `b` puts into site `j` (Specialties.speed: 0 = not its specialty, 1, or 2).
-func speed_on(b: Dictionary, j: Dictionary) -> int:
-	return Specialties.speed(_map.specs(b["shed"]), j["id"])
+## Work per tick `b` puts into site `j` (Specialties.speed: 0 = not its specialty, 1, or its level's speed).
+func speed_on(b: Dictionary, j: Dictionary) -> float:
+	return Specialties.speed(_map.specs(b["shed"]), j["id"], _map.spec_xp.get(b["shed"], {}))
 
 ## Waiting sites (oldest first) get the fastest free builder that can build them; builders walk there in a
 ## straight line, work, then walk home. Specialist-only sites wait for a matching builder.
@@ -975,7 +976,7 @@ func _step_builders() -> void:
 			j["builder"] = ""  # its builder dropped the specialty this site needs
 		if j["builder"] != "":
 			continue
-		var best := 0
+		var best := 0.0
 		for b in builders:
 			if job_of(b).is_empty() and speed_on(b, j) > best:
 				best = speed_on(b, j)
@@ -998,4 +999,6 @@ func _step_builders() -> void:
 			if j["level"] > 1:
 				_map.levels[j["origin"]] = j["level"]
 			finished.append(j["origin"])
+			for s: String in Specialties.award(_map.spec_xp.get_or_add(b["shed"], {}), _map.specs(b["shed"]), j["id"]):
+				leveled.append({"shed": b["shed"], "name": b["name"], "spec": s, "level": Specialties.level(_map.spec_xp[b["shed"]][s])})
 			load_map(_map)

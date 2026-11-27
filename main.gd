@@ -539,6 +539,11 @@ func advance(ticks: int) -> void:
 	for e: Dictionary in sim.events.slice(_reported):
 		toasts.add(e["kind"], _report(e), e["origin"], e)
 	_reported = sim.events.size()
+	for u: Dictionary in sim.leveled:
+		toasts.add("levelup", "%s is now a Lv %d %s specialist" % [u["name"], u["level"], Specialties.ALL[u["spec"]]["name"]], u["shed"])
+		if zoo.view_at(u["shed"]):
+			Motion.bounce(zoo.view_at(u["shed"]))
+	sim.leveled.clear()
 
 ## A bot friend sends people in (shuffled, so actors hide among the guests).
 func send_group(bot: String, kinds: Array) -> void:
