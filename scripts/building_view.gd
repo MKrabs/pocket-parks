@@ -101,7 +101,8 @@ static func _holds(p: Dictionary, at: Vector2) -> bool:
 
 ## How this building breaks, seeded by its origin so it always breaks the same way.
 ## fallen: indices into turned() that slide off; shift (tiles) and tilt of where they land; drop: px they fall;
-## chips: part index -> corner signs cut out of its top; rubble: parts lying around the footprint.
+## chips: part index -> corner signs cut out of its top; rubble: parts lying around the footprint;
+## gap: outline angle where shaped parts break (a breach in a wall, a tear in a dome).
 static func wreck_plan(building_id: String, turn: int, at: Vector2i) -> Dictionary:
 	var parts := turned(building_id, turn)
 	var fp := ParkMap.size(building_id, turn)
@@ -115,7 +116,7 @@ static func wreck_plan(building_id: String, turn: int, at: Vector2i) -> Dictiona
 	if top >= FALL_MIN_TOP:
 		drop = top
 		for i in parts.size():
-			if parts[i]["z"] >= top * FALL_FROM:
+			if parts[i]["z"] >= top * FALL_FROM and not parts[i].has("kind"):  # shaped parts break in place
 				fallen.append(i)
 				drop = minf(drop, parts[i]["z"])
 	var axis := rng.randi_range(0, 1)  # slides off a front side (+x or +y), so it lands in view
@@ -127,7 +128,7 @@ static func wreck_plan(building_id: String, turn: int, at: Vector2i) -> Dictiona
 	var corners := [Vector2(-1, -1), Vector2(1, -1), Vector2(-1, 1), Vector2(1, 1)]
 	for i in parts.size():
 		var p: Dictionary = parts[i]
-		if i not in fallen and p["h"] >= 6.0 and p["half"].x >= 0.2 and p["half"].y >= 0.2:
+		if i not in fallen and not p.has("kind") and p["h"] >= 6.0 and p["half"].x >= 0.2 and p["half"].y >= 0.2:
 			var a := rng.randi_range(0, 3)
 			chips[i] = [corners[a], corners[(a + rng.randi_range(1, 3)) % 4]]
 	var rubble: Array = []
@@ -137,7 +138,8 @@ static func wreck_plan(building_id: String, turn: int, at: Vector2i) -> Dictiona
 		var color := Palette.STONE if rng.randf() < 0.5 else Palette.WOOD
 		var half := Vector2(rng.randf_range(0.06, 0.12), rng.randf_range(0.05, 0.1))
 		rubble.append(Buildings.part(Vector2(cos(ang) * r.x, sin(ang) * r.y), half, rng.randf_range(3.0, 6.0), color))
-	return {"fallen": fallen, "shift": shift, "tilt": tilt, "drop": drop, "chips": chips, "rubble": rubble}
+	var gap := rng.randf_range(0.15, PI / 2 - 0.15)  # outline angle facing the viewer
+	return {"fallen": fallen, "shift": shift, "tilt": tilt, "drop": drop, "chips": chips, "rubble": rubble, "gap": gap}
 
 func _draw() -> void:
 	var b: Dictionary = Buildings.get_def(id)
@@ -166,6 +168,9 @@ func _draw() -> void:
 		grow = 1.0 + 0.14 * (level - 1)  # decor: a bigger canopy
 	if broken == 0.0 or parts.is_empty():
 		for p in parts:
+			if p.has("kind"):
+				_shaped(p, mid, 0.0, 0.0)
+				continue
 			var foot := Squircle.iso_points(IsoGrid.project(mid + p["at"] * grow), p["half"] * grow, 4.0, 48)
 			block(self, foot, p["h"] * grow, p["z"] * grow, p["color"])
 	else:
@@ -236,6 +241,9 @@ func _draw_wrecked(parts: Array, mid: Vector2, grow: float, b: float) -> void:
 		var p: Dictionary = parts[i]
 		if i in plan["fallen"]:
 			continue
+		if p.has("kind"):
+			_shaped(p, mid, k, plan["gap"])
+			continue
 		var c := _tint(p["color"])
 		var at: Vector2 = IsoGrid.project(mid + p["at"] * grow)
 		var half: Vector2 = p["half"] * grow * s
@@ -262,6 +270,197 @@ func _draw_wrecked(parts: Array, mid: Vector2, grow: float, b: float) -> void:
 	front.sort_custom(func(x: Array, y: Array) -> bool: return x[0] < y[0])
 	for f in front:
 		f[1].call()
+
+## A shaped part (see Buildings.shaped): one silhouette. k = how wrecked (0..1), gap = where it breaks.
+func _shaped(p: Dictionary, mid: Vector2, k: float, gap: float) -> void:
+	var at := IsoGrid.project(mid + p["at"])
+	var c := _tint(p["color"])
+	match p["kind"]:
+		"dome":
+			_dome(at - Vector2(0, p["z"]), p["half"], p["h"] * (1.0 - DOME_SAG * k), c, k, gap)
+		"water":
+			var h: float = p["h"] * (1.0 - WATER_DRAIN * k)  # drains through the cracked glass
+			block(self, Squircle.iso_points(at, p["half"], 4.0, 48), h, p["z"], c)
+			var shine := Squircle.iso_points(at + Vector2(-5, -p["z"] - h), p["half"] * 0.6, 4.0, 48)
+			draw_colored_polygon(shine, c.lerp(Palette.CLOUD, 0.35))
+		_:
+			_ring_shape(at - Vector2(0, p["z"]), p, c, k, gap)
+
+# Shaped parts (tuning):
+const RING_STEPS := 96  # outline samples of a ring
+const THICK := {"wall": 0.16, "glass": 0.05, "fence": 0.0}  # ring thickness, tiles
+const BREACH := 0.6  # wrecked ring: half width of the breach, radians of outline
+const BREACH_DEPTH := 0.85  # share of the height knocked out at its middle
+const GLASS_ALPHA := 0.3
+const DOME_ALPHA := 0.32
+const DOME_N := 2.5  # dome profile superellipse exponent (2 = round, 4 = boxy)
+const DOME_SAG := 0.2  # wrecked dome: share of its height lost
+const WATER_DRAIN := 0.45  # wrecked tank: share of the water lost
+
+## A ring along the squircle outline, only its far (side -1) or near (side 1) half, segments back to front.
+## Wall: STONE faces with a darker base and a lighter cap band. Glass: translucent panels with a highlight stripe
+## under a STONE rim. Fence: two thin rails with a post on each diagonal. Wrecked: a breach notched in at `gap`.
+func _ring_shape(base: Vector2, p: Dictionary, c: Color, k: float, gap: float) -> void:
+	var kind: String = p["kind"]
+	var half: Vector2 = p["half"]
+	var out := Squircle.points(Vector2.ZERO, half, 4.0, RING_STEPS)
+	var inn := Squircle.points(Vector2.ZERO, half - Vector2.ONE * THICK[kind], 4.0, RING_STEPS)
+	var hs := PackedFloat32Array()  # height at each outline point
+	for i in RING_STEPS:
+		var d := absf(angle_difference(TAU * i / RING_STEPS, gap))
+		hs.append(p["h"] * (1.0 - k * BREACH_DEPTH * (1.0 - smoothstep(0.0, BREACH, d))))
+	var segs: Array = []
+	for i in RING_STEPS:
+		var j := (i + 1) % RING_STEPS
+		var depth := out[i].x + out[i].y + out[j].x + out[j].y
+		if (depth < 0.0) == (p["side"] < 0):
+			segs.append([depth, i, j])
+	segs.sort_custom(func(x: Array, y: Array) -> bool: return x[0] < y[0])
+	var rim := _tint(Palette.STONE)
+	for s: Array in segs:
+		var i: int = s[1]
+		var j: int = s[2]
+		var oa := base + IsoGrid.project(out[i])
+		var ob := base + IsoGrid.project(out[j])
+		var ha := hs[i]
+		var hb := hs[j]
+		var nrm := (ob - oa).orthogonal()
+		if kind == "fence":
+			var col := Palette.shade(c, _side_shade(nrm if nrm.y > 0.0 else -nrm))
+			for y in [p["h"] * 0.45, p["h"] - 2.5]:
+				_band(oa, ob, ha, hb, y, y + 2.5, col)
+			if i % (RING_STEPS / 4) == RING_STEPS / 8:  # a post every quarter of the outline (~2.5 tiles)
+				block(self, Squircle.iso_points(oa, Vector2(0.07, 0.07), 4.0, 16), ha + 2.0, 0.0, c)
+			continue
+		var ia := base + IsoGrid.project(inn[i])
+		var ib := base + IsoGrid.project(inn[j])
+		var nin := (ib - ia).orthogonal()
+		if nin.y < 0.0:
+			_face(ia, ib, ha, hb, -nin, kind, c, rim)
+		if nrm.y > 0.0:
+			_face(oa, ob, ha, hb, nrm, kind, c, rim)
+		var up_a := Vector2(0, -ha)
+		var up_b := Vector2(0, -hb)
+		_poly([oa + up_a, ob + up_b, ib + up_b, ia + up_a], rim if kind == "glass" else c)
+
+## One visible face of a wall or glass segment between outline points a and b (heights ha, hb).
+func _face(a: Vector2, b: Vector2, ha: float, hb: float, nrm: Vector2, kind: String, c: Color, rim: Color) -> void:
+	var amt := _side_shade(nrm)
+	var h := maxf(ha, hb)
+	if kind == "glass":
+		_band(a, b, ha, hb, 0.0, h - 3.0, Color(Palette.shade(c, amt), GLASS_ALPHA))
+		if nrm.y > 0.0:  # outer panels catch the light
+			_band(a, b, ha, hb, h * 0.55, h * 0.68, Color(Palette.CLOUD, 0.45))
+		_band(a, b, ha, hb, h - 3.0, h, Palette.shade(rim, amt))
+		return
+	_band(a, b, ha, hb, 0.0, 4.0, Palette.shade(c, amt + 0.1))  # darker base
+	_band(a, b, ha, hb, 4.0, h - 3.0, Palette.shade(c, amt))
+	_band(a, b, ha, hb, h - 3.0, h, Palette.shade(c, amt - 0.07))  # cap band
+
+## The strip of a face between heights lo and hi (px), cut down to the face's height at each end.
+func _band(a: Vector2, b: Vector2, ha: float, hb: float, lo: float, hi: float, col: Color) -> void:
+	_poly([a - Vector2(0, minf(lo, ha)), b - Vector2(0, minf(lo, hb)), b - Vector2(0, minf(hi, hb)), a - Vector2(0, minf(hi, ha))], col)
+
+## Polygon with repeated corners dropped; skipped if it collapses below a triangle.
+func _poly(pts: Array, col: Color) -> void:
+	var out := PackedVector2Array()
+	for q: Vector2 in pts:
+		if out.is_empty() or not q.is_equal_approx(out[-1]):
+			out.append(q)
+	if out.size() > 2 and out[0].is_equal_approx(out[-1]):
+		out.remove_at(out.size() - 1)
+	if out.size() >= 3 and absf(_area(out)) > 0.5:
+		draw_colored_polygon(out, col)
+
+static func _area(pts: PackedVector2Array) -> float:
+	var s := 0.0
+	for i in pts.size():
+		s += pts[i - 1].cross(pts[i])
+	return s * 0.5
+
+## Side shading as in block(): left-facing lighter, right-facing darker.
+static func _side_shade(nrm: Vector2) -> float:
+	return lerpf(0.12, 0.22, clampf(nrm.normalized().x * 0.5 + 0.5, 0.0, 1.0))
+
+## Point on a dome over a squircle footprint: g = footprint outline point, th = elevation 0..PI/2.
+static func _dome_at(base: Vector2, g: Vector2, th: float, h: float) -> Vector2:
+	var e := 2.0 / DOME_N
+	return base + IsoGrid.project(g * pow(cos(th), e)) - Vector2(0, h * pow(sin(th), e))
+
+## Translucent dome: faint back net arcs, the shell (and a paler upper layer), a highlight arc, then the front arcs
+## and a WOOD footing ring. Wrecked: a torn flap open towards `gap`, the nearest arc snapped and sagging.
+func _dome(base: Vector2, half: Vector2, h: float, c: Color, k: float, gap: float) -> void:
+	var foot := Squircle.points(Vector2.ZERO, half, 4.0, 48)
+	var pts := PackedVector2Array()
+	for t in 9:
+		for g in foot:
+			pts.append(_dome_at(base, g, PI / 2 * t / 8.0, h))
+	var hull := Geometry2D.convex_hull(pts)
+	var upper := PackedVector2Array()
+	for g in foot:
+		upper.append(_dome_at(base + Vector2(-3, 0), g * 0.8, PI / 2 * 0.62, h))
+	upper = Geometry2D.convex_hull(upper + PackedVector2Array([_dome_at(base, foot[0], PI / 2, h)]))
+	var wood := _tint(Palette.WOOD)
+	var net_back: Array = []
+	var net_front: Array = []
+	var snap := roundi(clampf(gap / (PI / 4) - 0.5, 0.0, 3.0))  # the arc nearest the tear
+	for m in 4:
+		var a := PI / 8 + m * PI / 4
+		var line: Array = []  # [point, depth sign]
+		for w in 33:  # up one side (w < 16) and down the other
+			var th := PI / 2 * (w / 16.0 if w <= 16 else (32 - w) / 16.0)
+			var az := a + PI if w < 16 else a
+			var g := Vector2(half.x * signf(cos(az)) * sqrt(absf(cos(az))), half.y * signf(sin(az)) * sqrt(absf(sin(az))))
+			var hh := h
+			if m == snap and k > 0.0:
+				var d := absf(w - 23.0) / 16.0
+				if d < 0.2 * k:
+					line.append(null)  # the snapped gap
+					continue
+				hh *= 1.0 - k * 0.5 * (1.0 - smoothstep(0.0, 0.5, d))
+			line.append([_dome_at(base, g, th, hh), (g.x + g.y) * cos(th) >= 0.0])
+		var run := PackedVector2Array()
+		var front := false
+		for q in line + [null]:
+			if q == null or (run.size() > 0 and q[1] != front):
+				if run.size() > 1:
+					(net_front if front else net_back).append(run)
+				run = PackedVector2Array([run[-1]]) if q != null and run.size() > 0 else PackedVector2Array()
+			if q != null:
+				run.append(q[0])
+				front = q[1]
+	for r: PackedVector2Array in net_back:
+		draw_polyline(r, Color(wood, 0.45), 1.5, true)
+	var shell := [hull]
+	if k > 0.0:  # a jagged flap torn open from the footing up towards the top
+		var g := Vector2(half.x * sqrt(cos(gap)), half.y * sqrt(sin(gap)))
+		var tip := _dome_at(base, g, 1.05, h)
+		var low := _dome_at(base, g, 0.0, h) + Vector2(0, 8)
+		var w := 26.0 * k
+		var tear := PackedVector2Array([low + Vector2(-w, 0), tip.lerp(low, 0.5) + Vector2(-w * 0.7, 0), tip + Vector2(-w * 0.3, 5),
+			tip + Vector2(0, -3), tip + Vector2(w * 0.35, 7), tip.lerp(low, 0.45) + Vector2(w * 0.6, 0), low + Vector2(w, 0)])
+		shell = Geometry2D.clip_polygons(hull, tear)
+	for s: PackedVector2Array in shell:
+		if not Geometry2D.is_polygon_clockwise(s) == Geometry2D.is_polygon_clockwise(hull):
+			continue
+		draw_colored_polygon(s, Color(c, DOME_ALPHA))
+		draw_polyline(s + PackedVector2Array([s[0]]), Color(Palette.shade(c, 0.2), 0.5), 1.5, true)  # soft outline
+	draw_colored_polygon(upper, Color(Palette.CLOUD, 0.14))
+	var r := Rect2(hull[0], Vector2.ZERO)
+	for q in hull:
+		r = r.expand(q)
+	var arc := PackedVector2Array()
+	for i in 13:
+		var t := deg_to_rad(195.0 + 55.0 * i / 12.0)
+		arc.append(r.get_center() + Vector2(cos(t) * r.size.x, sin(t) * r.size.y) * 0.5 * 0.8)
+	draw_polyline(arc, Color(Palette.CLOUD, 0.7), 3.0, true)
+	var ring := PackedVector2Array()
+	for g in foot:
+		ring.append(base + IsoGrid.project(g))
+	ring.append(ring[0])
+	draw_polyline(ring, wood, 2.5, true)
+	for run: PackedVector2Array in net_front:
+		draw_polyline(run, wood, 2.0, true)
 
 ## `foot` with `cut` taken out of it (the outline that keeps foot's winding, so block() still finds its front sides).
 static func _chipped(foot: PackedVector2Array, cut: PackedVector2Array) -> PackedVector2Array:
