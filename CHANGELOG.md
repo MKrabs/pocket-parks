@@ -6,6 +6,9 @@ and the game shows the latest entry in its "What's new" card.
 
 ## [Unreleased]
 
+### Fixed
+- Two copies of the game started under the same computer login could get the same player id and mix up their characters. Ids are now much longer and stay unique.
+
 ### Changed
 - **Unlocks by park level:** new parks start with the plain Fence and one animal per fence type (otter, red panda,
   puffin). Glass opens at park level 2, Wall at 3, Net at 4; the other animals arrive between levels 2 and 8; the 2×1

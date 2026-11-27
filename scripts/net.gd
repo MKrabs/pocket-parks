@@ -80,7 +80,9 @@ func _exit_tree() -> void:
 func start() -> void:
 	if player == "":
 		var user := OS.get_environment("USER")
-		player = "%s%02d" % [user if user != "" else OS.get_environment("USERNAME"), randi_range(10, 99)]
+		# A stable id that other parks' ledgers, characters and bans key on. Two random digits collided (same login,
+		# several copies or players): 6 hex digits make that a one-in-16-million chance. Saved, so it never changes.
+		player = "%s-%06x" % [user if user != "" else OS.get_environment("USERNAME"), randi() & 0xFFFFFF]
 	_id = "%s-%d" % [player, randi()]
 	for p in range(GAME_PORT, GAME_PORT + 20):
 		var probe := PacketPeerUDP.new()  # quiet test first: ENet logs an error for a taken port
