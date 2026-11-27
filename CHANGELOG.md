@@ -12,6 +12,14 @@ and the game shows the latest entry in its "What's new" card.
   the cost. Drag again from inside or along the edge to grow it into L shapes and more; right-drag removes cells.
   A builder puts up the fence, and bigger habitats draw more guests. The old Enclosure, Water Tank, Aviary and
   Reinforced Enclosure are gone; new parks start with a small fenced habitat.
+### Added
+- **Builders level up:** every finished job gives a builder XP, and more for jobs in their specialty. Each specialty
+  goes from Lv 1 to Lv 3 and builds its buildings ×1.5, ×2, then ×3 as fast. A second specialty levels on its own. A
+  toast says when someone levels up, and the shed card shows each specialty's level, speed and XP bar.
+
+### Changed
+- A new specialist now starts at ×1.5 on their specialty's buildings (it was ×2), and specialist-only buildings get the
+  speed bonus too.
 
 ## [0.3.0] - 2026-11-27: A nicer park
 

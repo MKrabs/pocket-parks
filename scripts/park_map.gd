@@ -14,6 +14,7 @@ var levels: Dictionary = {}     # origin cell -> level 2..3 (absent = 1)
 var rotations: Dictionary = {}  # origin cell -> quarter turns 1..3 (absent = 0)
 var xp := 0                     # park XP (ParkLevel); the sim owns it while the day runs, like money
 var specialties: Dictionary = {}  # builder shed origin -> Array of Specialties ids its builder picked
+var spec_xp: Dictionary = {}  # builder shed origin -> {specialty id -> XP}; kept if a specialty is dropped and re-picked
 var owned: Dictionary = {}  # plot coord -> true. Empty = no plots, every cell is yours (bot parks)
 var bought := 0  # plots bought beyond the start area
 # Painted habitats (docs/design/game.md → Habitats): origin (its smallest cell) -> {cells, fence, animal, items}.
@@ -277,6 +278,7 @@ func remove_at(cell: Vector2i, back := -1) -> bool:
 	rotations.erase(origin)
 	specialties.erase(origin)
 	habitats.erase(origin)
+	spec_xp.erase(origin)
 	return true
 
 ## What removing the building at `origin` gives back: half of all it cost (1×, +1×, +2× per level).
