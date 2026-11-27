@@ -7,18 +7,20 @@ const HAPPY := 60.0   # mood at or above this on the way out counts as happy (sa
 # Total XP needed to reach level i + 1 (index 0 = level 1).
 const THRESHOLDS := [0, 30, 80, 150, 250, 380, 550, 760, 1000, 1300]
 const MAX := 10
-# Park level -> what it raises. Later: themes. `plots` = land plots you may buy beyond the start area.
+# Park level -> what it raises or opens. `plots` = land plots you may buy beyond the start area. `variants` = the
+# biggest size variant you may build (index in Buildings.family: 1 = the 2×1, 2 = the 2×2). `fences` (habitat
+# styles) and `animals` (Animals ids) list what opens there; anything not listed is open from the start.
 const UNLOCKS := {
-	2: {"building_level": 2, "plots": 1},
-	3: {"sheds": 2},
-	4: {"building_level": 3, "plots": 2},
-	5: {"sheds": 3},
-	6: {"specialties": 2, "plots": 3},
+	2: {"building_level": 2, "plots": 1, "variants": 1, "fences": ["glass"], "animals": ["capybara"]},
+	3: {"sheds": 2, "fences": ["wall"], "animals": ["klipspringer"]},
+	4: {"building_level": 3, "plots": 2, "variants": 2, "fences": ["net"], "animals": ["hornbill"]},
+	5: {"sheds": 3, "animals": ["platypus"]},
+	6: {"specialties": 2, "plots": 3, "animals": ["takin"]},
 	7: {"sheds": 4},
-	8: {"plots": 4},
+	8: {"plots": 4, "animals": ["shoebill"]},
 	10: {"plots": 5},
 }
-const BASE := {"building_level": 1, "sheds": 1, "specialties": 1, "plots": 0}
+const BASE := {"building_level": 1, "sheds": 1, "specialties": 1, "plots": 0, "variants": 0}
 
 static func of(xp: int) -> int:
 	var lv := 1
@@ -48,12 +50,30 @@ static func needed(key: String, value: int) -> int:
 			return l
 	return -1
 
+## Park level where `name` in list `key` (fences, animals) opens: 1 if it isn't listed.
+static func opens(key: String, name: String) -> int:
+	for l: int in UNLOCKS:
+		if name in UNLOCKS[l].get(key, []):
+			return l
+	return 1
+
+## Park level building `id` opens at: its fence style for a habitat, else its size variant.
+static func building_opens(id: String) -> int:
+	var d := Buildings.get_def(id)
+	if d.has("habitat"):
+		return opens("fences", d["habitat"])
+	var i := Buildings.family(id).find(id)
+	return 1 if i <= 0 else needed("variants", i)
+
 ## Card lines for what level `lv` unlocks.
 static func describe(lv: int) -> Array[String]:
 	var out: Array[String] = []
 	for k: String in UNLOCKS.get(lv, {}):
-		var v: int = UNLOCKS[lv][k]
+		var v: Variant = UNLOCKS[lv][k]
 		match k:
+			"variants": out.append("Bigger buildings: the %s size" % ["2×1", "2×2"][v - 1])
+			"fences": out.append("%s habitats" % ", ".join(v.map(func(f: String) -> String: return f.capitalize())))
+			"animals": out.append("New animal: %s" % ", ".join(v.map(func(a: String) -> String: return Animals.ALL[a]["name"])))
 			"building_level": out.append("Buildings up to Lv %d" % v)
 			"sheds": out.append("%d builder sheds" % v)
 			"specialties": out.append("A second builder specialty")

@@ -53,6 +53,7 @@ func _init() -> void:
 	# Buying: price, one species, up to MAX, only the fence's category; appeal reaches the sim.
 	var m := ParkMap.new()
 	m.money = 1 << 20
+	m.xp = ParkLevel.THRESHOLDS[-1]  # everything unlocked (test_unlocks covers the gates)
 	m.place("zoo_gate", Vector2i(4, 11))
 	for x in range(5, 12):
 		m.place("path", Vector2i(x, 11))

@@ -359,6 +359,9 @@ func _habitat() -> String:
 	for b: Button in picks.get_children():
 		b.visible = b.get_meta("animal") in offer
 		b.set_pressed_no_signal(b.get_meta("animal") == pick)
+		var opens := ParkLevel.opens("animals", b.get_meta("animal"))  # locked: greyed, still pickable to read its needs
+		b.modulate.a = 0.45 if opens > map.park_level() else 1.0
+		b.tooltip_text = "Unlocks at park level %d" % opens if opens > map.park_level() else ""
 	for b: Button in decor.get_children():
 		var d: Dictionary = Animals.ITEMS[b.get_meta("item")]
 		b.text = "$%d" % d["cost"]

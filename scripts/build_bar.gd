@@ -70,16 +70,20 @@ func set_shown(on: bool) -> void:
 func _process(delta: float) -> void:
 	step(delta, get_viewport().get_mouse_position(), get_viewport().get_visible_rect().size.y)
 	handle.position = panel.position + Vector2((panel.size.x - HANDLE.x) / 2, 2 - HANDLE.y)
-	# Shed items wait for the park level: disabled, with the level that unlocks the next one.
+	# Shed items, fence styles and size variants wait for the park level: greyed, with the level that unlocks them.
 	if not map:
 		return
 	for b: Button in row.get_children():
 		var id: String = b.get_meta("id")
-		if id == "" or Buildings.get_def(id)["role"] != "staff":
+		if id == "":
 			continue
 		var why := shed_text(map.shed_needs(id))
+		var text := why.replace(" at ", "\nat ")
+		if map.opens_at(id) > 0:  # keep the name: a stepped-to fence or size says which one waits
+			why = "Unlocks at park level %d" % map.opens_at(id)
+			text = "%s\n%s" % [Buildings.get_def(id)["name"], why]
 		b.disabled = why != ""
-		b.text = why.replace(" at ", "\nat ") if why != "" else b.get_meta("text")
+		b.text = text if why != "" else b.get_meta("text")
 
 static func box(c: Color, radius: int = RADIUS) -> StyleBoxFlat:
 	var s := StyleBoxFlat.new()
@@ -269,15 +273,15 @@ func button(text: String, id: String, group: ButtonGroup) -> Button:
 	b.toggle_mode = true
 	b.button_group = group
 	b.custom_minimum_size = Vector2(96, 0)
+	b.add_theme_stylebox_override("disabled", box(Palette.STONE))
 	if Buildings.family(id).size() > 1:
-		for k in ["normal", "hover", "pressed", "hover_pressed"]:
+		for k in ["normal", "hover", "pressed", "hover_pressed", "disabled"]:
 			(b.get_theme_stylebox(k) as StyleBoxFlat).content_margin_left = 22
 			(b.get_theme_stylebox(k) as StyleBoxFlat).content_margin_right = 22
 		b.add_child(arrow(b, -1))
 		b.add_child(arrow(b, 1))
 	b.set_meta("id", id)
 	b.set_meta("text", text)
-	b.add_theme_stylebox_override("disabled", box(Palette.STONE))
 	b.add_theme_color_override("font_disabled_color", Color(Palette.INK, 0.55))
 	b.set_meta("tab", tab_of(id))
 	var need := Specialties.required(id)

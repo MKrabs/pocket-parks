@@ -36,6 +36,7 @@ func _initialize() -> void:
 	for other in ["hotdog_stand", "fest_taco"]:
 		var m := ParkMap.new()
 		m.money = 1 << 30
+		m.xp = ParkLevel.THRESHOLDS[-1]  # everything unlocked (test_unlocks covers the gates)
 		m.place("zoo_gate", Vector2i(0, 7))
 		for x in range(1, 11):
 			m.place("path", Vector2i(x, 7))

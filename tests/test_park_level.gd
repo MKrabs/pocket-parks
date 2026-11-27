@@ -26,7 +26,8 @@ func _init() -> void:
 		ok(ParkLevel.cap("sheds", lv) == sheds[lv - 1], "sheds at level %d" % lv)
 	ok(ParkLevel.cap("specialties", 5) == 1 and ParkLevel.cap("specialties", 6) == 2, "second specialty at 6")
 	ok(ParkLevel.needed("building_level", 3) == 4 and ParkLevel.needed("sheds", 5) == -1, "needed level")
-	ok(ParkLevel.describe(4) == ["Buildings up to Lv 3", "Buy up to 2 land plots"] and ParkLevel.describe(9).is_empty(), "card lines")
+	ok(ParkLevel.describe(4) == ["Buildings up to Lv 3", "Buy up to 2 land plots", "Bigger buildings: the 2×2 size",
+		"Net habitats", "New animal: Hornbill"] and ParkLevel.describe(9).is_empty(), "card lines")
 
 	# upgrades refused beyond the park's max building level
 	var m := ParkMap.new()

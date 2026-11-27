@@ -14,6 +14,7 @@ static func generate(theme_id: String, seed: int, size := "small") -> ParkMap:
 	var cfg: Dictionary = SIZES[size]
 	var map := ParkMap.new()
 	map.money = 1 << 30  # bots build for free; can_place still checks every cell
+	map.xp = ParkLevel.THRESHOLDS[-1]  # and have everything unlocked
 	var y0 := rng.randi_range(4, IsoGrid.SIZE.y - 5)
 	map.place(_pick(rng, theme_id, "entrance"), Vector2i(0, y0))
 	var path: String = _pick(rng, theme_id, "path")
