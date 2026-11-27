@@ -10,6 +10,7 @@ signal name_pressed  # the park name in the top-left was clicked
 const MARGIN := 16
 const SPEEDS := [0, 1, 3]
 const VISIT_SIZE := 96.0
+const DOTS_MAX := 6  # presence dots on the chip; more visitors still count in the text
 
 var sim: ParkSim
 var speed := 1  # sim steps per tick of game time; 0 = paused
@@ -42,6 +43,11 @@ var level_card := PanelContainer.new()
 var _level_text := _label(16)
 var _level_title := _label(24)
 var new_card := PanelContainer.new()  # F9: start a new park?
+var visitors: Array = []  # [name, color] of everyone in our park in person, us aside (Net.others)
+var names_open := false   # the presence chip lists names (hover or click) instead of the count
+var _here_chip: PanelContainer
+var _here_dots := HBoxContainer.new()
+var _here_label := _label(14)
 
 ## Mood face for an average happiness (0..100).
 static func face_for(happiness: float) -> int:
@@ -113,9 +119,24 @@ func _ready() -> void:
 	_face.draw.connect(_draw_face)
 	rrow.add_child(_chip_of(Palette.CREAM, [_face]))
 	right.add_child(rrow)
-	add_child(right)
-	right.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT, Control.PRESET_MODE_MINSIZE, MARGIN)
-	right.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	var rcol := VBoxContainer.new()  # money panel, and under it the presence chip
+	rcol.add_theme_constant_override("separation", 6)
+	rcol.add_child(right)
+	_here_dots.add_theme_constant_override("separation", 3)
+	_here_label.modulate.a = 0.8
+	_here_chip = _chip_of(Palette.CREAM, [_here_dots, _here_label])
+	_here_chip.size_flags_horizontal = Control.SIZE_SHRINK_END
+	_here_chip.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	_here_chip.mouse_entered.connect(func() -> void: _open_names(true))
+	_here_chip.mouse_exited.connect(func() -> void: _open_names(false))
+	_here_chip.gui_input.connect(func(e: InputEvent) -> void:
+		if e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT:
+			_open_names(not names_open))
+	_here_chip.hide()
+	rcol.add_child(_here_chip)
+	add_child(rcol)
+	rcol.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT, Control.PRESET_MODE_MINSIZE, MARGIN)
+	rcol.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 
 	# bottom-left: speed
 	var speeds := _panel()
@@ -241,6 +262,36 @@ func set_identity(park: String, c: Color) -> void:
 	park_name.text = park
 	colour = c
 	_dot.queue_redraw()
+
+## Who is in our park in person (Net.others): the chip under the money shows their dots and "2 visiting", or
+## their names while hovered or clicked open; hidden when nobody is.
+func set_visitors(list: Array) -> void:
+	if list == visitors:
+		return
+	visitors = list
+	_here_chip.visible = not list.is_empty()
+	for c in _here_dots.get_children():
+		c.queue_free()
+	for p: Array in list.slice(0, DOTS_MAX):
+		_here_dots.add_child(dot(p[1]))
+	_open_names(names_open)
+
+func _open_names(open: bool) -> void:
+	names_open = open
+	_here_label.text = ", ".join(visitors.map(func(p: Array) -> String: return p[0])) if open \
+		else "%d visiting" % visitors.size()
+
+## A small colour dot for a person (presence).
+static func dot(c: Color) -> Control:
+	var d := Control.new()
+	d.custom_minimum_size = Vector2(14, 14)
+	d.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	d.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	d.draw.connect(func() -> void:
+		var at := d.size * 0.5
+		d.draw_colored_polygon(Squircle.points(at, Vector2(7, 7), 4.0, 24), Palette.shade(c, 0.12))
+		d.draw_colored_polygon(Squircle.points(at, Vector2(5.5, 5.5), 4.0, 24), c))
+	return d
 
 ## F9: the small "start a new park?" card in the centre.
 func confirm_new_park() -> void:

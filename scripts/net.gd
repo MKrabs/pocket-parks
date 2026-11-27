@@ -9,6 +9,7 @@ extends Node
 #        owed and blueprints are running totals; the visitor applies owed minus what it already got from `from`, and
 #        only for a seq newer than the last one it applied, so a replay or a reconnect never pays twice.
 #        live also carries avatars [name, color, pos, walking]: every character in the host's park, its own included.
+#        That list is the presence too ("also here", others()): a leave drops out of the next live message.
 # Announce: {id, name (park), player, nick, colour, port, theme}; nick and colour are optional (older copies).
 # Visitor → host: hello {t, player, nick, colour, color, level} once connected (the host adds its avatar, named by nick),
 # send {t, kind, level} per person (the host runs sim.send_paid: refused at the send limit, otherwise the price comes
@@ -251,6 +252,15 @@ func state() -> Dictionary:
 ## The name others see: the chosen nick, else the id.
 func shown() -> String:
 	return nick if nick != "" else player
+
+## Presence: everyone whose character is in `s` but `me`, as [name, color], in order of arrival.
+## ponytail: by shown name, so a visitor with your own nick hides too; key avatars by peer if namesakes show up.
+static func others(s: ParkSim, me: String) -> Array:
+	var out := []
+	for a in s.avatars if s else []:
+		if a["name"] != me:
+			out.append([a["name"], a["color"]])
+	return out
 
 ## Before start(): pick up a saved state().
 func load_state(d: Dictionary) -> void:

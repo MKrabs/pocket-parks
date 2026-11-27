@@ -47,6 +47,7 @@ var _unsaved := 0  # sim ticks since the last save
 var follow := true  # F: the camera follows your character while it walks
 const FOLLOW_RATE := 3.0  # camera catch-up per second
 var _chasing := false
+var _present: Array = []  # names of the characters in our park but ours, last frame (arrive / leave toasts)
 
 ## T cycles the active theme (zoo → festival → cinema); the build bar follows, placed buildings stay.
 ## Esc leaves place mode, or closes the card in Select mode.
@@ -152,10 +153,15 @@ func _ready() -> void:
 	hud.set_identity(net.park_name, IdentityCard.colour_of(net.colour))
 	add_child(hud)
 	identity.saved.connect(func(nick: String, park: String, colour: String) -> void:
+		var was := net.shown()
 		net.nick = nick
 		net.park_name = park
 		net.colour = colour
 		hud.set_identity(park, IdentityCard.colour_of(colour))
+		for a in sim.avatars:  # our character takes the new name (else it would count as a visitor)
+			if a["name"] == was:
+				a["name"] = net.shown()
+				a["color"] = net.color
 		save())
 	add_child(identity)
 	if save_path != "" and net.nick == "":
@@ -241,9 +247,11 @@ func _process(delta: float) -> void:
 	zoo.map.money = sim.money  # the sim owns money while the day runs; building spends from the map
 	zoo.map.xp = sim.xp
 	net.level = ParkLevel.of(sim.xp)
+	_presence(Net.others(sim, net.shown()))
 	if visiting:
 		_visit_zoo.show_wrecked((net.visit_sim.closed if net.visit_sim else {}) if live else visits[0]["sim"].closed)
 		visit_panel.show_ledger(_inside(), sim.money)
+		visit_panel.show_here(Net.others(here(), net.shown()))
 	else:
 		_hover(get_global_mouse_position(), get_viewport().get_mouse_position())
 	var me := my_avatar()
@@ -254,6 +262,19 @@ func _process(delta: float) -> void:
 		cam.position = cam.position.lerp(at, 1.0 - exp(-FOLLOW_RATE * delta))
 		_chasing = not me["path"].is_empty() or cam.position.distance_to(at) > 2.0
 
+## Who is in our park in person: the HUD chip, and a toast as each one arrives or leaves (only while we're home).
+func _presence(list: Array) -> void:
+	var names := list.map(func(p: Array) -> String: return p[0])
+	if not visiting:
+		for n: String in names:
+			if not n in _present:
+				toasts.add("visiting", "%s is visiting" % n)
+		for n: String in _present:
+			if not n in names:
+				toasts.add("visiting", "%s left" % n)
+	_present = names
+	hud.set_visitors(list)
+
 ## The park on screen: ours, the bot park we visit, or the live mirror (null while it connects).
 func here() -> ParkSim:
 	return net.visit_sim if live else visits[0]["sim"] if visiting else sim
@@ -262,13 +283,13 @@ func here() -> ParkSim:
 func my_avatar() -> Dictionary:
 	var s := here()
 	for a in s.avatars if s else []:
-		if a["name"] == net.player:
+		if a["name"] == net.shown():
 			return a
 	return {}
 
 ## Walk our character to `cell` along paths. A real park's host does the walking.
 func walk_to(cell: Vector2i) -> bool:
-	return net.move_avatar(cell) if live else here().move_avatar(net.player, cell)
+	return net.move_avatar(cell) if live else here().move_avatar(net.shown(), cell)
 
 ## Select mode: lift the person or building under the mouse and name it in the tooltip.
 func _hover(world: Vector2, screen: Vector2) -> void:
@@ -396,7 +417,7 @@ func _enter_visit(title: String) -> void:
 	grid.map = null  # bot parks own all their land
 	for n in [zoo, walkers, pins, fx, bar, hud]:
 		n.hide()
-	sim.leave_avatar(net.player)  # we're away: our character is in the other park
+	sim.leave_avatar(net.shown())  # we're away: our character is in the other park
 	add_child(_visit_zoo)
 	add_child(_visit_walkers)
 	visiting = true
@@ -432,7 +453,7 @@ func go_home() -> void:
 		return
 	visiting = false
 	if not live:
-		(visits[0]["sim"] as ParkSim).leave_avatar(net.player)
+		(visits[0]["sim"] as ParkSim).leave_avatar(net.shown())
 	sim.join_avatar(net.shown(), net.color)  # back at our gate
 	grid.map = zoo.map
 	live = false

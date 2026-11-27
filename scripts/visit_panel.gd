@@ -15,6 +15,8 @@ var _title := Hud._label(18)
 var _ledger := Hud._label(15)
 var _reason := Hud._label(13)
 var _sends: Array[Button] = []
+var _here := HBoxContainer.new()  # "Also here:" and a dot + name per other character in the park
+var also_here: Array = []         # [name, color] it shows (Net.others)
 
 func _ready() -> void:
 	var pbox := BuildBar.box(Palette.CREAM, 20)
@@ -31,6 +33,9 @@ func _ready() -> void:
 	var top := HBoxContainer.new()
 	top.add_theme_constant_override("separation", 14)
 	top.add_child(_title)
+	_here.add_theme_constant_override("separation", 6)
+	_here.hide()
+	top.add_child(_here)
 	var chip := PanelContainer.new()
 	chip.add_theme_stylebox_override("panel", BuildBar.box(Palette.CREAM))
 	chip.add_child(_ledger)
@@ -200,6 +205,26 @@ func show_ledger(t: Dictionary, money: int) -> void:
 		b.disabled = full
 	_reason.text = ("Full: at most %d of yours inside at once (3 + your park level). Send more when some leave." if full
 		else "Up to %d of yours inside at once (3 + your park level).") % t["limit"]
+
+## Everyone else in the park we visit, the host too while their character is there; hidden when nobody is.
+func show_here(list: Array) -> void:
+	if list == also_here:
+		return
+	also_here = list
+	for c in _here.get_children():
+		c.queue_free()
+	_here.visible = not list.is_empty()
+	var head := Hud._label(14)
+	head.text = "Also here:"
+	head.modulate.a = 0.7
+	_here.add_child(head)
+	for p: Array in list:
+		_here.add_child(Hud.dot(p[1]))
+		var n := Hud._label(14)
+		n.text = p[0]
+		_here.add_child(n)
+	_send.reset_size()
+	_send.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM, Control.PRESET_MODE_MINSIZE, 16)
 
 ## Our people in the park (the gate queue included).
 static func inside(t: Dictionary) -> int:
