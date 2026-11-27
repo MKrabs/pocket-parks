@@ -55,7 +55,7 @@ var _struck := false    # we did a crime in person this (live) visit: Back home 
 var _walking_out := false
 var _present: Array = []  # names of the characters in our park but ours, last frame (arrive / leave toasts)
 
-## T cycles the active theme (zoo → festival → cinema); the build bar follows, placed buildings stay.
+## T cycles the active theme (zoo → festival → cinema → conference); the build bar follows, placed buildings stay.
 ## Esc leaves place mode, or closes the card in Select mode. 1/2/3 while placing pick a size variant.
 func _unhandled_key_input(event: InputEvent) -> void:
 	var k := event as InputEventKey

@@ -13,6 +13,9 @@ and the game shows the latest entry in its "What's new" card.
   A builder puts up the fence, and bigger habitats draw more guests. The old Enclosure, Water Tank, Aviary and
   Reinforced Enclosure are gone; new parks start with a small fenced habitat.
 ### Added
+- **Conference theme:** a fourth theme with a Registration Desk entrance, carpet paths, a big Main Stage (needs the new
+  Tech specialist), Booths in three sizes (Booth, Expo Stand, Pavilion), a Coffee Bar, office plants and roll-up
+  banners. Press **T** to switch to it, and conference parks now turn up when you visit.
 - **Builders level up:** every finished job gives a builder XP, and more for jobs in their specialty. Each specialty
   goes from Lv 1 to Lv 3 and builds its buildings ×1.5, ×2, then ×3 as fast. A second specialty levels on its own. A
   toast says when someone levels up, and the shed card shows each specialty's level, speed and XP bar.
