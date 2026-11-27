@@ -68,15 +68,21 @@ static func catalog() -> Dictionary:
 		"fest_hall": {"name": "Food Hall", "role": "shop", "price": 13, "capacity": 7, "footprint": Vector2i(2, 2), "cost": 200,
 			"specialty": "carpenter", "mode": "faster",
 			"parts": [
+				# a market hall: wooden deck, food counters, two peaked tents side by side, a flag on each
 				P.call(Vector2.ZERO, Vector2(0.92, 0.92), 3, Palette.WOOD),
-				P.call(Vector2.ZERO, Vector2(0.78, 0.78), 18, Palette.CLOUD, 3),
-				P.call(Vector2(0.8, 0), Vector2(0.03, 0.4), 9, Palette.CLAY, 3),  # doors
-				P.call(Vector2(0, 0.8), Vector2(0.4, 0.03), 9, Palette.CLAY, 3),
-				P.call(Vector2.ZERO, Vector2(0.9, 0.9), 4, Palette.CORAL, 21),  # stepped tent roof
-				P.call(Vector2.ZERO, Vector2(0.6, 0.6), 4, Palette.CORAL, 25),
-				P.call(Vector2.ZERO, Vector2(0.3, 0.3), 4, Palette.BUTTER, 29),
-				P.call(Vector2.ZERO, Vector2(0.04, 0.04), 12, Palette.WOOD, 33),
-				P.call(Vector2(0.1, 0), Vector2(0.1, 0.03), 6, Palette.BUTTER, 39),  # flag
+				P.call(Vector2.ZERO, Vector2(0.78, 0.78), 9, Palette.CLOUD, 3),  # counters
+				P.call(Vector2(0.8, 0), Vector2(0.03, 0.5), 4, Palette.BUTTER, 7),
+				P.call(Vector2(0, 0.8), Vector2(0.5, 0.03), 4, Palette.BUTTER, 7),
+				P.call(Vector2(-0.42, 0), Vector2(0.48, 0.9), 4, Palette.CORAL, 12),  # back tent
+				P.call(Vector2(-0.42, 0), Vector2(0.32, 0.62), 5, Palette.CLOUD, 16),
+				P.call(Vector2(-0.42, 0), Vector2(0.16, 0.34), 6, Palette.CORAL, 21),
+				P.call(Vector2(-0.42, 0), Vector2(0.03, 0.03), 12, Palette.WOOD, 27),
+				P.call(Vector2(-0.34, 0), Vector2(0.08, 0.02), 5, Palette.BUTTER, 34),
+				P.call(Vector2(0.42, 0), Vector2(0.48, 0.9), 4, Palette.CORAL, 12),  # front tent
+				P.call(Vector2(0.42, 0), Vector2(0.32, 0.62), 5, Palette.CLOUD, 16),
+				P.call(Vector2(0.42, 0), Vector2(0.16, 0.34), 6, Palette.CORAL, 21),
+				P.call(Vector2(0.42, 0), Vector2(0.03, 0.03), 12, Palette.WOOD, 27),
+				P.call(Vector2(0.5, 0), Vector2(0.08, 0.02), 5, Palette.BUTTER, 34),
 			]},
 		"fest_lemon": {"name": "Lemonade Stand", "role": "shop", "price": 4, "capacity": 2, "footprint": Vector2i(1, 1), "cost": 55,
 			"specialty": "carpenter", "mode": "faster", "variants": ["fest_lemon", "fest_juice", "fest_tea"],
@@ -130,13 +136,16 @@ static func catalog() -> Dictionary:
 		"fest_cake": {"name": "Cake Pavilion", "role": "shop", "price": 12, "capacity": 7, "footprint": Vector2i(2, 2), "cost": 190,
 			"specialty": "carpenter", "mode": "faster",
 			"parts": [
-				P.call(Vector2.ZERO, Vector2(0.86, 0.86), 14, Palette.CLOUD),
-				P.call(Vector2(0.88, 0), Vector2(0.03, 0.34), 9, Palette.CLAY, 2),  # doors
-				P.call(Vector2(0, 0.88), Vector2(0.34, 0.03), 9, Palette.CLAY, 2),
-				P.call(Vector2.ZERO, Vector2(0.9, 0.9), 3, Palette.CORAL, 14),  # icing
-				P.call(Vector2.ZERO, Vector2(0.58, 0.58), 9, Palette.CLOUD, 17),
-				P.call(Vector2.ZERO, Vector2(0.62, 0.62), 3, Palette.CORAL, 26),
-				P.call(Vector2.ZERO, Vector2(0.04, 0.04), 9, Palette.BUTTER, 29),  # candle
+				# a three-tier cake: each tier smaller, CORAL icing on every one, a candle on top
+				P.call(Vector2.ZERO, Vector2(0.86, 0.86), 11, Palette.CLOUD),
+				P.call(Vector2(0.87, 0), Vector2(0.03, 0.3), 8, Palette.CLAY),  # doors
+				P.call(Vector2(0, 0.87), Vector2(0.3, 0.03), 8, Palette.CLAY),
+				P.call(Vector2.ZERO, Vector2(0.9, 0.9), 3, Palette.CORAL, 11),  # icing
+				P.call(Vector2.ZERO, Vector2(0.6, 0.6), 9, Palette.BUTTER, 14),
+				P.call(Vector2.ZERO, Vector2(0.64, 0.64), 3, Palette.CORAL, 23),
+				P.call(Vector2.ZERO, Vector2(0.34, 0.34), 8, Palette.CLOUD, 26),
+				P.call(Vector2.ZERO, Vector2(0.37, 0.37), 2, Palette.CORAL, 34),
+				P.call(Vector2.ZERO, Vector2(0.04, 0.04), 9, Palette.BUTTER, 36),  # candle
 			]},
 		"fest_lantern": {"name": "Lantern Tree", "role": "decor", "appeal": 3, "footprint": Vector2i(1, 1), "cost": 30,
 			"specialty": "landscaper", "mode": "faster",

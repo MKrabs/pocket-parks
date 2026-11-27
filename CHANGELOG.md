@@ -11,6 +11,17 @@ and the game shows the latest entry in its "What's new" card.
   puffin). Glass opens at park level 2, Wall at 3, Net at 4; the other animals arrive between levels 2 and 8; the 2×1
   buildings open at level 2 and the 2×2 at level 4. Locked items stay in the bar and the animal picker, greyed, with
   "Unlocks at park level N", and the "Level up!" card lists what each level brings.
+- **Big shops look their part:** the Burger Diner is a long diner with a giant burger and a terrace table, the Lobby
+  Café a picture palace with a marquee and a blade sign, the Pavilion an open hall under a floating roof, the Food Hall
+  two peaked tents, and the Cake Pavilion a three-tier cake.
+- **Player characters stand out:** they are clearly bigger than guests, with a soft outline in their colour.
+- **Land you can buy** is paler, so it's easy to tell from your own. The plot on an open "Land for sale" card glows.
+
+### Fixed
+- A long habitat card no longer slides under the money chip: it stops below it and its contents scroll.
+- The bar's pin button looks like a push pin, not a magnifying glass.
+- An L-shaped net habitat gets joined domes over its cells instead of one dome over the empty corner.
+- "Lost the connection" and "Couldn't reach" toasts show an unplugged cable instead of the wrecked hammer.
 
 ## [0.4.0] - 2026-11-27: Habitats, animals and three new themes
 

@@ -43,12 +43,17 @@ static func catalog() -> Dictionary:
 		"conf_pavilion": {"name": "Pavilion", "role": "attraction", "appeal": 11, "capacity": 8, "footprint": Vector2i(2, 2), "cost": 190,
 			"specialty": "carpenter", "mode": "faster",
 			"parts": [
-				P.call(Vector2.ZERO, Vector2(0.8, 0.8), 22, Palette.CLOUD),
-				P.call(Vector2.ZERO, Vector2(0.88, 0.88), 4, Palette.SKY, 22),  # roof
-				P.call(Vector2(0.81, 0), Vector2(0.02, 0.4), 12, Palette.SKY, 5),  # open front, glowing screen
-				P.call(Vector2(0, 0.81), Vector2(0.4, 0.02), 12, Palette.BUTTER, 5),
-				P.call(Vector2.ZERO, Vector2(0.26, 0.26), 8, Palette.CLOUD, 26),  # sign on the roof
-				P.call(Vector2.ZERO, Vector2(0.18, 0.18), 2, Palette.CLAY, 34),
+				# open and modern: a stone plinth, slim columns, a glass core, one wide floating roof
+				P.call(Vector2.ZERO, Vector2(0.92, 0.92), 3, Palette.STONE),
+				P.call(Vector2(-0.72, -0.72), Vector2(0.06, 0.06), 26, Palette.WOOD, 3),  # columns
+				P.call(Vector2(0.72, -0.72), Vector2(0.06, 0.06), 26, Palette.WOOD, 3),
+				P.call(Vector2(-0.72, 0.72), Vector2(0.06, 0.06), 26, Palette.WOOD, 3),
+				P.call(Vector2.ZERO, Vector2(0.44, 0.44), 20, Palette.SKY, 3),  # glass core
+				P.call(Vector2(0.45, 0), Vector2(0.02, 0.26), 10, Palette.BUTTER, 6),  # glowing screens
+				P.call(Vector2(0, 0.45), Vector2(0.26, 0.02), 10, Palette.CLOUD, 6),
+				P.call(Vector2(0.72, 0.72), Vector2(0.06, 0.06), 26, Palette.WOOD, 3),
+				P.call(Vector2.ZERO, Vector2(0.92, 0.92), 3, Palette.CLOUD, 29),  # floating roof
+				P.call(Vector2.ZERO, Vector2(0.26, 0.26), 2, Palette.SKY, 32),  # skylight
 			]},
 		"conf_coffee": {"name": "Coffee Bar", "role": "shop", "price": 4, "capacity": 3, "footprint": Vector2i(1, 1), "cost": 60,
 			"specialty": "carpenter", "mode": "faster",

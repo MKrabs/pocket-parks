@@ -14,6 +14,11 @@ var map: ParkMap:  # whose land: unowned cells are muted, buyable plots get a fo
 	set(m):
 		map = m
 		queue_redraw()
+var lit_plot := NONE:  # plot whose card is open: its cells glow BUTTER (main sets it every frame)
+	set(p):
+		if p != lit_plot:
+			lit_plot = p
+			queue_redraw()
 var tile_hover := false:  # tint the hovered tile (place mode only; Select mode lifts buildings instead)
 	set(on):
 		tile_hover = on
@@ -53,6 +58,8 @@ func _draw() -> void:
 			var col := Palette.GRASS if (x + y) % 2 == 0 else Palette.GRASS_DARK
 			if map and not map.owns(cell):
 				col = Palette.GRASS_PALE
+				if ParkMap.plot_of(cell) == lit_plot:
+					col = col.lerp(Palette.BUTTER, 0.6)
 			if cell == hovered and tile_hover:
 				col = Palette.SKY
 			draw_colored_polygon(Squircle.iso_points(IsoGrid.to_screen(cell), Vector2(0.47, 0.47), 6.0, 48), col)

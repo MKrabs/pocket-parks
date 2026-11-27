@@ -7,6 +7,7 @@ func _init() -> void:
 	var zoo := ZooView.new()
 	zoo.map.money = 1 << 20
 	var m := zoo.map
+	m.xp = ParkLevel.THRESHOLDS[-1]  # every fence style unlocked
 	for x in 20:
 		m.place("path", Vector2i(x, 9))
 	var fences := ["habitat", "habitat_glass", "habitat_net", "habitat_wall"]

@@ -39,6 +39,8 @@ func busy() -> bool:
 
 ## One frame of auto-hide: up when the mouse arrives near the bottom (or busy), down after HIDE_AFTER away.
 func step(delta: float, mouse: Vector2, screen_h: float) -> void:
+	if Engine.get_write_movie_path() != "":  # ./gd shot has no mouse: keep the bar up for screenshots
+		return
 	var near := mouse.y >= screen_h - NEAR or (shown and (panel.get_global_rect().grow(8).has_point(mouse)
 		or handle.get_global_rect().has_point(mouse)))
 	if (near and not _was_near) or (busy() and not shown):
@@ -151,12 +153,14 @@ func _ready() -> void:
 	for k in ["normal", "hover", "pressed", "hover_pressed"]:
 		(pin.get_theme_stylebox(k) as StyleBoxFlat).set_content_margin_all(5)
 	pin.toggled.connect(func(on: bool) -> void: pinned = on)
-	pin.draw.connect(func() -> void:  # a push pin: round head, short needle
-		var c := pin.size / 2
-		var ink := Color(Palette.INK, 0.7)
-		pin.draw_line(c + Vector2(-1, 1), c + Vector2(-6, 6), ink, 2.0, true)
-		pin.draw_circle(c + Vector2(2, -2), 5.0, Palette.CORAL)
-		pin.draw_circle(c + Vector2(2, -2), 5.0, Palette.shade(Palette.CORAL, 0.22), false, 1.5, true))
+	pin.draw.connect(func() -> void:  # a push pin seen from the side, tilted: cap, waist, flange, needle
+		var dark := Palette.shade(Palette.CORAL, 0.22)
+		pin.draw_set_transform(pin.size / 2 + Vector2(0, 1), deg_to_rad(35))
+		pin.draw_line(Vector2(0, 2), Vector2(0, 9), Color(Palette.INK, 0.7), 1.6, true)
+		pin.draw_colored_polygon(Squircle.points(Vector2(0, 1.5), Vector2(6, 1.5)), dark)  # flange
+		pin.draw_colored_polygon(PackedVector2Array([Vector2(-2.5, -6), Vector2(2.5, -6), Vector2(3.5, 0.5), Vector2(-3.5, 0.5)]), Palette.CORAL)
+		pin.draw_colored_polygon(Squircle.points(Vector2(0, -8), Vector2(4.5, 2.4)), Palette.CORAL)  # cap
+		pin.draw_set_transform(Vector2.ZERO))
 	tabs.add_child(pin)
 	col.add_child(tabs)
 	row.add_theme_constant_override("separation", 8)

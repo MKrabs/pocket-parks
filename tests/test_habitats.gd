@@ -54,6 +54,9 @@ func _init() -> void:
 	ok(moved[o] == Vector2i(6, 0) and m.habitats.has(Vector2i(6, 0)) and m.occupied[Vector2i(6, 5)] == Vector2i(6, 0), "origin moves to the smallest cell")
 	ok(ParkMap.connected([Vector2i(0, 0), Vector2i(1, 0)]) and not ParkMap.connected([Vector2i(0, 0), Vector2i(1, 1)]), "diagonal doesn't connect")
 	ok(ParkMap.outline(ParkMap.rect_cells(Rect2i(0, 0, 3, 3))).size() == 12, "3×3 outline: 12 sides")
+	ok(ParkMap.rects(ParkMap.rect_cells(Rect2i(2, 2, 3, 3))) == [Rect2i(2, 2, 3, 3)], "a rectangle is one dome")
+	var ell: Array = ParkMap.rect_cells(Rect2i(0, 0, 4, 2)) + ParkMap.rect_cells(Rect2i(0, 2, 2, 2))  # an L, its corner empty
+	ok(ParkMap.rects(ell) == [Rect2i(0, 0, 4, 2), Rect2i(0, 2, 2, 2)], "an L is two domes, none over the empty corner")
 	# ownership
 	var mine := ParkMap.new()
 	mine.start_small()

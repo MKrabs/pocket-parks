@@ -39,13 +39,18 @@ static func catalog() -> Dictionary:
 		"burger_diner": {"name": "Burger Diner", "role": "shop", "price": 12, "capacity": 7, "footprint": Vector2i(2, 2), "cost": 190,
 			"specialty": "carpenter", "mode": "faster",
 			"parts": [
-				B.part(Vector2.ZERO, Vector2(0.82, 0.82), 22, Palette.CLOUD),
-				B.part(Vector2(0.84, 0), Vector2(0.03, 0.56), 8, Palette.SKY, 8),  # windows
-				B.part(Vector2(0, 0.84), Vector2(0.56, 0.03), 8, Palette.SKY, 8),
-				B.part(Vector2.ZERO, Vector2(0.92, 0.92), 6, Palette.CLAY, 22),
-				B.part(Vector2.ZERO, Vector2(0.3, 0.3), 5, Palette.BUTTER, 28),  # the burger sign
-				B.part(Vector2.ZERO, Vector2(0.33, 0.33), 4, Palette.WOOD, 33),
-				B.part(Vector2.ZERO, Vector2(0.28, 0.28), 7, Palette.BUTTER, 37),
+				# a long low diner at the back, a terrace table out front, a giant burger on a pole
+				B.part(Vector2(0, -0.32), Vector2(0.82, 0.5), 15, Palette.CLOUD),
+				B.part(Vector2(0.83, -0.32), Vector2(0.03, 0.34), 6, Palette.SKY, 5),  # windows
+				B.part(Vector2(0, 0.19), Vector2(0.6, 0.03), 6, Palette.SKY, 5),
+				B.part(Vector2(0, -0.32), Vector2(0.9, 0.58), 4, Palette.CLAY, 15),  # flat roof
+				B.part(Vector2(-0.5, 0.5), Vector2(0.04, 0.04), 30, Palette.WOOD),  # the burger sign
+				B.part(Vector2(-0.5, 0.5), Vector2(0.3, 0.3), 5, Palette.BUTTER, 30),
+				B.part(Vector2(-0.5, 0.5), Vector2(0.33, 0.33), 3, Palette.WOOD, 35),
+				B.part(Vector2(-0.5, 0.5), Vector2(0.28, 0.28), 7, Palette.BUTTER, 38),
+				B.part(Vector2(0.45, 0.5), Vector2(0.15, 0.15), 6, Palette.CLOUD),  # terrace table
+				B.part(Vector2(0.45, 0.5), Vector2(0.03, 0.03), 12, Palette.WOOD, 6),
+				B.part(Vector2(0.45, 0.5), Vector2(0.27, 0.27), 3, Palette.CORAL, 18),  # parasol
 			]},
 		"pond": {"name": "Pond", "role": "attraction", "appeal": 5, "capacity": 6, "footprint": Vector2i(2, 2), "cost": 80,
 			"specialty": "water", "mode": "faster",

@@ -6,6 +6,7 @@ extends CanvasLayer
 signal action(name: String)  # "upgrade", "repair", "demolish", "accuse", "buy"
 
 const WIDTH := 270.0
+const BAR := 6.0  # scrollbar width when the body scrolls
 const BOTTOM := Hud.MARGIN * 2 + Hud.VISIT_SIZE  # card bottom sits above the Visit button; toasts above it stop at top()
 
 var sim: ParkSim
@@ -38,14 +39,19 @@ var decor := HBoxContainer.new()  # decor item buttons ("item_<id>"): click one,
 var item := -1  # the habitat's decor item that was clicked (index into its items), or -1
 var remove_item := _action("remove_item")
 var tip := Hud._label(14)
+var ceiling := 0.0  # screen y the card may not grow above (main: below the hud's top-right column); the body scrolls
 var _panel := PanelContainer.new()
+var _scroll := ScrollContainer.new()
+var _col := VBoxContainer.new()
+var _pad := MarginContainer.new()  # room on the right for the scrollbar, which overlays the content
 var _tip := PanelContainer.new()
 var _slide: Tween
 
 func _ready() -> void:
 	_panel.add_theme_stylebox_override("panel", BuildBar.box(Palette.CREAM, 22))
 	_panel.custom_minimum_size = Vector2(WIDTH, 0)
-	var col := VBoxContainer.new()
+	var col := _col
+	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	col.add_theme_constant_override("separation", 8)
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	warning.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -120,7 +126,18 @@ func _ready() -> void:
 		hab.add_child(c)
 	for c in [title, body, hab, specs, upgrade, repair, demolish, ban_row, accuse, buy, warning]:
 		col.add_child(c)
-	_panel.add_child(col)
+	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	var bar := _scroll.get_v_scroll_bar()
+	bar.custom_minimum_size.x = BAR
+	for k in ["scroll", "grabber", "grabber_highlight", "grabber_pressed"]:
+		var s := BuildBar.box(Color(Palette.STONE, 0.6) if k == "scroll" else Palette.shade(Palette.STONE, 0.12 if k == "grabber" else 0.22), int(BAR / 2))
+		s.set_content_margin_all(0)
+		s.set_border_width_all(0)
+		bar.add_theme_stylebox_override(k, s)
+	_pad.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_pad.add_child(col)
+	_scroll.add_child(_pad)
+	_panel.add_child(_scroll)
 	_panel.visible = false
 	add_child(_panel)
 	_tip.add_theme_stylebox_override("panel", BuildBar.box(Palette.CREAM, 12))
@@ -276,7 +293,14 @@ func _process(_delta: float) -> void:
 		accuse.visible = true
 		warning.visible = true
 	ban_row.visible = visitor != ""
+	var room := _panel.get_viewport_rect().size.y - BOTTOM - ceiling - _panel.get_theme_stylebox("panel").get_minimum_size().y
+	var need := _col.get_combined_minimum_size()
+	var gap := BAR + 4.0 if need.y > room else 0.0
+	_pad.add_theme_constant_override("margin_right", int(gap))
+	_scroll.custom_minimum_size = Vector2(need.x + gap, minf(need.y, room))
 	_panel.reset_size()
+	if not (_slide and _slide.is_running()):  # a scrolling card is a bar wider: keep its right edge
+		_panel.position.x = _panel.get_viewport_rect().size.x - _panel.size.x - 16
 	_panel.position.y = _panel.get_viewport_rect().size.y - _panel.size.y - BOTTOM
 
 ## What staff member `s` does at its level (+ `ahead` levels), in words.
