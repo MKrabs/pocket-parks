@@ -3,7 +3,7 @@
 Isometric park builder in Godot 4.6 (GDScript). You build and run a park; themes (zoo,
 festival, ...) are data packs. Conflict is implicit: you visit parks and send in guests and hidden bad actors. **The game definition
 lives in `docs/design/game.md`. Read it before any gameplay ticket.** Current phase:
-prototype 3, visiting and sending people (bot parks stand in for friends). Everything that doc marks
+0.3 "a nicer park" (see the Roadmap in the design doc). Everything that doc marks
 Parked stays parked.
 
 ## Roles
@@ -46,6 +46,8 @@ Godot binary: `$GODOT`, default `~/Downloads/Godot_v4.6.2-stable_linux.x86_64`.
   and name the guess in the handoff.
 - **Parked means don't design it or scaffold for it.** See `docs/design/game.md` → Parked.
 - New ideas become one-line tickets right away, so nothing lives only in chat.
+- **Changelog:** every ticket that changes what a player sees or does adds a line under `## [Unreleased]` in
+  `CHANGELOG.md` (Added / Changed / Fixed, player words, no ticket IDs). Claude turns Unreleased into a version.
 
 ## Godot conventions
 - GDScript, typed (`var x: int`). Tabs for indentation.
@@ -62,6 +64,7 @@ Godot binary: `$GODOT`, default `~/Downloads/Godot_v4.6.2-stable_linux.x86_64`.
 - **Colours:** natural, slightly pastel, only from `scripts/palette.gd` (no Color
   literals elsewhere). Extruded shapes: top face = base colour, sides use
   `Palette.shade(c, 0.12 / 0.22)`.
-- **Forms:** semi-rounded squircles (superellipse, n ≈ 4), never sharp boxes or full
-  circles. Soft, low-contrast outlines if any.
+- **Forms:** semi-rounded squircles (superellipse, n ≈ 4) for solid objects, never sharp boxes. Where the real thing
+  has another shape (dome, continuous wall, glass, water in a basin, nets, rails), draw that as **one clear silhouette**,
+  not many small blocks. See `docs/design/game.md` → Shape language. Soft, low-contrast outlines if any.
 - Isometric 2:1 tiles. Background `Palette.CREAM`.
