@@ -54,6 +54,30 @@ const LEVEL_TIME := [1.0, 1.5, 2.5]  # × build time for building level 1 / upgr
 const BUILDER_SPEED := 0.15
 const AVATAR_SPEED := 0.25  # tiles per tick
 const BUILDER_NAMES := ["Bo", "Ada", "Kit", "Nell", "Rio", "Pip", "Sol", "June"]
+# Park charm (docs/design/game.md → Park charm): each path tile scores the cells within CHARM_REACH, about -1..1.
+const CHARM_REACH := 2
+const CHARM_DECOR := 0.04        # + per decor appeal point in view (tree 2, fountain 8) ...
+const CHARM_DECOR_MAX := 0.5     #   ... capped
+const CHARM_WATER := 0.2         # + any water in view (a building built by the water specialty: fountain, pond, tank)
+const CHARM_VARIETY := 0.08      # + per distinct building id in view beyond the first ...
+const CHARM_VARIETY_MAX := 0.32  #   ... capped
+const CHARM_REPEAT := 0.15       # − per extra copy of the same non-decor id in view ("seen it", anti-spam)
+const CHARM_GRASS := 0.2         # + open grass (free cells), full at CHARM_GRASS_FULL of them
+const CHARM_GRASS_FULL := 8
+const CHARM_PACKED := 0.25       # − packed clutter: fewer than CHARM_PACKED_BELOW free cells in view
+const CHARM_PACKED_BELOW := 3
+const CHARM_LITTER := 0.12       # − per littered tile in view
+const CHARM_WRECKED := 0.3       # − per wrecked building in view
+# Strolls: the walk since the last stop, judged on arrival. Spending scales with mood (spend_factor).
+const STROLL_MIN := 6            # tiles; shorter walks are neutral
+const LOVELY := 0.35             # average charm at or above: a lovely stroll
+const DULL := -0.1               # at or below: a dull walk
+const STROLL_MOOD := 6.0
+const STROLL_SPEND := 0.3        # ± on the purchase at that stop
+const SKIP_BELOW := 30.0         # mood under this: often skip buying (always after a dull walk)
+const SKIP_CHANCE := 0.5
+const FULL_FROM := 70.0          # mood from this: full price; 30..70 ramps from MIN_SPEND to 1
+const MIN_SPEND := 0.7
 
 var money: int
 var tick := 0
@@ -90,6 +114,8 @@ var _entrance := Vector2i(-1, -1)
 var _paths: Array[Vector2i] = []
 var _targets: Array[Dictionary] = []  # reachable attractions/shops: origin, role, appeal, capacity, price, door, inside
 var _decor: Dictionary = {}           # cell -> mood per tick from nearby decor
+var _charm: Dictionary = {}           # path cell -> charm; cleared on map change, rebuilt when litter/wrecks change
+var _charm_key := 0
 var _appeal := 0.0
 var _gone_mood := 0.0
 var _gone := 0
@@ -159,6 +185,7 @@ func _load(map: ParkMap) -> void:
 	_paths.clear()
 	_targets.clear()
 	_decor.clear()
+	_charm.clear()
 	_appeal = 0.0
 	_map = map
 	_sync_builders()
@@ -212,6 +239,69 @@ func _door(fp: Array[Vector2i]) -> Vector2i:
 				best = n
 				best_len = p.size()
 	return best
+
+## Charm of path tile `cell` (about -1..1; 0 for anything that isn't a path).
+func charm(cell: Vector2i) -> float:
+	var key := hash([litter.keys(), closed.keys()])
+	if _charm.is_empty() or key != _charm_key:
+		_charm_key = key
+		for p in _paths:
+			_charm[p] = _charm_of(p)
+	return _charm.get(cell, 0.0)
+
+func _charm_of(cell: Vector2i) -> float:
+	var free := 0
+	var seen := {}  # origin -> true, each building in view once
+	var c := 0.0
+	for dx in range(-CHARM_REACH, CHARM_REACH + 1):
+		for dy in range(-CHARM_REACH, CHARM_REACH + 1):
+			var k := cell + Vector2i(dx, dy)
+			if not IsoGrid.in_bounds(k):
+				continue
+			if litter.has(k):
+				c -= CHARM_LITTER
+			if not _map.occupied.has(k):
+				free += 1
+			else:
+				seen[_map.occupied[k]] = true
+	var decor := 0.0
+	var water := false
+	var ids := {}  # building id -> copies in view
+	for o: Vector2i in seen:
+		var id: String = _map.buildings[o]
+		var d := Buildings.leveled(id, _map.level(o))
+		if d["role"] == "path" or d["role"] == "entrance":
+			continue
+		if closed.has(o):
+			c -= CHARM_WRECKED
+		water = water or d.get("specialty", "") == "water"
+		if d["role"] == "decor":
+			decor += d["appeal"]
+		elif ids.has(id):
+			c -= CHARM_REPEAT
+		ids[id] = true
+	c += minf(decor * CHARM_DECOR, CHARM_DECOR_MAX)
+	c += CHARM_WATER if water else 0.0
+	c += minf(maxi(ids.size() - 1, 0) * CHARM_VARIETY, CHARM_VARIETY_MAX)
+	c += CHARM_GRASS * minf(float(free) / CHARM_GRASS_FULL, 1.0)
+	c -= CHARM_PACKED if free < CHARM_PACKED_BELOW else 0.0
+	return clampf(c, -1.0, 1.0)
+
+## What share of a price `g` pays at a shop: 0 = skipped. Mood curve, then the stroll bonus.
+func spend_factor(g: Dictionary) -> float:
+	var stroll: String = g.get("stroll", "")
+	if g["mood"] < SKIP_BELOW and (stroll == "dull" or _rng.randf() < SKIP_CHANCE):
+		return 0.0
+	var f := lerpf(MIN_SPEND, 1.0, clampf((g["mood"] - SKIP_BELOW) / (FULL_FROM - SKIP_BELOW), 0.0, 1.0))
+	return f * (1.0 + STROLL_SPEND if stroll == "lovely" else 1.0 - STROLL_SPEND if stroll == "dull" else 1.0)
+
+## The walk since the last stop is over: judge it, then start counting the next one.
+func _judge_stroll(g: Dictionary) -> void:
+	var avg: float = g["walk_charm"] / g["walk_tiles"] if g["walk_tiles"] > 0 else 0.0
+	g["stroll"] = "" if g["walk_tiles"] < STROLL_MIN else "lovely" if avg >= LOVELY else "dull" if avg <= DULL else ""
+	g["mood"] += STROLL_MOOD if g["stroll"] == "lovely" else -STROLL_MOOD if g["stroll"] == "dull" else 0.0
+	g["walk_tiles"] = 0
+	g["walk_charm"] = 0.0
 
 func step() -> void:
 	if tick >= DAY_TICKS:
@@ -329,7 +419,8 @@ func _spawn(kind := "guest", sender := "") -> void:
 	# ponytail: actors never stop for "wants"; they leave by the stay table (or by mood)
 	g.merge({"id": spawned, "mood": 50.0, "state": "walk", "target": -1, "visits": 0, "wait": 0, "litter_in": 0,
 		"wants": _rng.randi_range(2, 4) if kind == "guest" else 1 << 20,
-		"sender": sender, "spent": ENTRY_FEE, "crimes": 0, "loot": 0, "spied": [], "wanted": false, "event": {}})
+		"sender": sender, "spent": ENTRY_FEE, "crimes": 0, "loot": 0, "spied": [], "wanted": false, "event": {},
+		"stroll": "", "walk_tiles": 0, "walk_charm": 0.0})  # stroll: last walk's verdict, "lovely" | "dull" | ""
 	guests.append(g)
 	spawned += 1
 	money += ENTRY_FEE
@@ -461,7 +552,12 @@ func _walk(w: Dictionary, speed: float) -> bool:
 func _step_guest(g: Dictionary) -> bool:
 	match g["state"]:
 		"walk":
-			if _walk(g, GUEST_SPEED):
+			var from: Vector2i = g["cell"]
+			var there := _walk(g, GUEST_SPEED)
+			if g["cell"] != from:  # GUEST_SPEED < 1: at most one new tile per tick
+				g["walk_tiles"] += 1
+				g["walk_charm"] += charm(g["cell"])
+			if there:
 				_arrive(g)
 		"queue":
 			g["wait"] += 1
@@ -520,6 +616,7 @@ func _pick(g: Dictionary) -> void:
 	_leave(g)
 
 func _arrive(g: Dictionary) -> void:
+	_judge_stroll(g)
 	var t: Dictionary = _targets[g["target"]]
 	if closed.has(t["origin"]):
 		g["mood"] -= 10
@@ -542,19 +639,22 @@ func _finish(g: Dictionary) -> void:
 	if g["visits"] == 1:
 		served += 1
 		xp += ParkLevel.XP_SERVED
+	var paid := 0
 	if t["role"] == "shop":
-		money += t["price"]
-		income += t["price"]
-		cash_events.append({"tick": tick, "origin": t["origin"], "amount": t["price"]})
-		g["spent"] += t["price"]
+		paid = roundi(t["price"] * spend_factor(g))
+	if paid > 0:
+		money += paid
+		income += paid
+		cash_events.append({"tick": tick, "origin": t["origin"], "amount": paid})
+		g["spent"] += paid
 		g["mood"] += 5
 		if _rng.randf() < LITTER_CHANCE:
 			g["litter_in"] = _rng.randi_range(5, 40)  # dropped a few steps down the path
-	else:
+	elif t["role"] != "shop":
 		g["mood"] += t["appeal"] * 1.5
 	var d: Dictionary = today.get_or_add(t["origin"], {"guests": 0, "income": 0})
 	d["guests"] += 1
-	d["income"] += t["price"] if t["role"] == "shop" else 0
+	d["income"] += paid
 	g["mood"] = minf(g["mood"], 100.0)
 	if g["kind"] != "guest" and (g["kind"] != "thief" or t["role"] == "shop"):
 		_strike(g, t)

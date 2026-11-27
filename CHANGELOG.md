@@ -6,6 +6,14 @@ and the game shows the latest entry in its "What's new" card.
 
 ## [Unreleased]
 
+### Added
+- **Park charm:** guests now rate the walk between stops. A long walk past decor, water, open grass and a mix of
+  buildings is a lovely stroll: they cheer up and spend more at the next stop. A long walk past rows of the same stand,
+  packed paving, litter or wrecks is a dull walk: they grumble and spend less.
+
+### Changed
+- What guests spend depends on their mood. Happy guests pay in full, and unhappy ones often skip buying.
+
 ## [0.2.0] - 2026-11-27: Visit in person
 
 ### Added
