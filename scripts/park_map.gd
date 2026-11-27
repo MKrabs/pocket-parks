@@ -130,6 +130,29 @@ static func rect_cells(rect: Rect2i) -> Array[Vector2i]:
 			out.append(Vector2i(x, y))
 	return out
 
+## A few rectangles that exactly cover `cs` (greedy: widest run from the first free cell, then as many full rows down).
+static func rects(cs: Array) -> Array[Rect2i]:
+	var left := {}
+	for c: Vector2i in cs:
+		left[c] = true
+	var sorted := cs.duplicate()
+	sorted.sort_custom(func(a: Vector2i, b: Vector2i) -> bool: return a.y < b.y or (a.y == b.y and a.x < b.x))
+	var out: Array[Rect2i] = []
+	for c: Vector2i in sorted:
+		if not left.has(c):
+			continue
+		var w := 1
+		while left.has(c + Vector2i(w, 0)):
+			w += 1
+		var h := 1
+		while range(w).all(func(i: int) -> bool: return left.has(c + Vector2i(i, h))):
+			h += 1
+		var r := Rect2i(c, Vector2i(w, h))
+		for k in rect_cells(r):
+			left.erase(k)
+		out.append(r)
+	return out
+
 ## Outline of a set of cells: [cell, dir] for every side whose neighbour is outside the set.
 static func outline(cs: Array) -> Array:
 	var out: Array = []

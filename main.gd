@@ -196,10 +196,10 @@ func _ready() -> void:
 			_visit_zoo.rebuild())
 	net.lost.connect(func() -> void:
 		if live:
-			toasts.add("wrecked", "Lost the connection: back home")
+			toasts.add("offline", "Lost the connection: back home")
 			travel_home()
 		elif not _joining.is_empty():
-			toasts.add("wrecked", "Couldn't reach %s" % _joining["name"])
+			toasts.add("offline", "Couldn't reach %s" % _joining["name"])
 			_joining = {})
 	net.joined.connect(func() -> void:
 		if not _joining.is_empty():
@@ -273,6 +273,8 @@ func _process(delta: float) -> void:
 		_acc -= 1.0
 	zoo.show_wrecked(sim.closed)
 	toasts.floor_y = card.top() if card.is_open() else INF
+	grid.lit_plot = card.plot
+	card.ceiling = hud.right_bottom() + Hud.MARGIN
 	zoo.map.money = sim.money  # the sim owns money while the day runs; building spends from the map
 	toasts.top = maxf(CrimeToasts.TOP, hud.right_bottom() + 10)
 	zoo.map.xp = sim.xp
@@ -435,7 +437,7 @@ func join_address(text: String) -> void:
 		return
 	var shown: String = a["ip"] if a["port"] == Net.GAME_PORT else "%s:%d" % [a["ip"], a["port"]]
 	if not net.join(a["ip"], a["port"]):
-		toasts.add("wrecked", "Couldn't reach %s" % shown)
+		toasts.add("offline", "Couldn't reach %s" % shown)
 		return
 	_joining = {"name": shown, "player": "", "theme": "", "ip": a["ip"], "port": a["port"], "live": true, "joined": true}
 
@@ -443,7 +445,7 @@ func join_address(text: String) -> void:
 func _visit_live(offer: Dictionary) -> void:
 	var ok_ := net.visit_map != null if offer.get("joined", false) else net.join(offer["ip"], offer["port"])
 	if not ok_:  # a typed address is already connected (or dropped during the clouds)
-		toasts.add("wrecked", "Couldn't reach %s" % offer["name"])
+		toasts.add("offline", "Couldn't reach %s" % offer["name"])
 		return
 	live = true
 	_visit_zoo = ZooView.new()

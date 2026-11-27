@@ -1,7 +1,7 @@
 class_name HabitatView
 extends BuildingView
 # Draws a painted habitat (ParkMap.habitats): a ground-coloured floor and its fence along the outline, in the fence's
-# style: wood rails, glass panels, a stone wall, a low hedge round a picnic lawn (festival), or a low net footing under one dome over the bounding area.
+# style: wood rails, glass panels, a stone wall, a low hedge round a picnic lawn (festival), or a low net footing under domes (one per rectangle of the habitat, joined).
 # ZooView splits a habitat into layers so walkers and buildings sort right: one "floor" under everything, one
 # "fence" per cell (its outline sides, depth-sorted like a 1×1 building), one "dome". The preview draws "all".
 
@@ -57,12 +57,13 @@ func _draw() -> void:
 		if site >= 0.0 and (cell == origin or cell == GridView.NONE):
 			_ring(Vector2(0, -RAIL_H - 26))
 	if layer in ["dome", "all"] and fence == "net":
-		var r := Rect2(Vector2(cells[0]), Vector2.ZERO)
-		for c: Vector2i in cells:
-			r = r.expand(Vector2(c)).expand(Vector2(c) + Vector2.ONE)
-		var half := r.size * 0.5 - Vector2(0.06, 0.06)
-		var h := 26.0 + 12.0 * minf(r.size.x, r.size.y)
-		_dome(_at(r.get_center() - Vector2(0.5, 0.5)), half, h * (1.0 if site < 0.0 else maxf(site, 0.05)), Palette.SKY, 0.0, 0.0)
+		var rs := ParkMap.rects(cells)  # one dome per rectangle, back to front, so an L leaves its empty corner open
+		rs.sort_custom(func(a: Rect2i, b: Rect2i) -> bool: return a.get_center().x + a.get_center().y < b.get_center().x + b.get_center().y)
+		for ri in rs:
+			var r := Rect2(ri)
+			var half := r.size * 0.5 - Vector2(0.06, 0.06)
+			var h := 26.0 + 12.0 * minf(r.size.x, r.size.y)
+			_dome(_at(r.get_center() - Vector2(0.5, 0.5)), half, h * (1.0 if site < 0.0 else maxf(site, 0.05)), Palette.SKY, 0.0, 0.0)
 	if label != "":
 		_pill(_at(Vector2(cells[0])) + Vector2(0, -RAIL_H - 34))
 

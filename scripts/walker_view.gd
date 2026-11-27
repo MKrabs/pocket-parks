@@ -75,7 +75,7 @@ func _process(delta: float) -> void:
 		b.hide()
 		for a in sim.avatars:
 			if a.get("label", a["name"]) == n:  # chat lines carry the shown name
-				b.position = IsoGrid.project(a["pos"]) - Vector2(0, LIFT + 35.0)
+				b.position = IsoGrid.project(a["pos"]) - Vector2(0, LIFT + 40.0)
 				b.show()
 	for l in _layers:
 		l.queue_redraw()
@@ -112,10 +112,11 @@ func _draw_row(ci: Node2D, d: int) -> void:
 			"avatar":  # a bigger bean in the player's colour, a cap one shade darker, a name tag above
 				var a: Dictionary = e[1]
 				var col: Color = a["color"]
-				_bean(ci, a["pos"], 5, Vector2(6.5, 8.0), col, Palette.shade(col, 0.22), not a["path"].is_empty())
+				_bean(ci, a["pos"], 5, Vector2(8.5, 10.5), col, Palette.shade(col, 0.22), not a["path"].is_empty(),
+					Color(Palette.INK, 0.0), 0.0, Palette.shade(col, 0.35), 2.0)
 				var name: String = a.get("label", a["name"])
 				var w := Palette.FONT_BOLD.get_string_size(name, HORIZONTAL_ALIGNMENT_LEFT, -1, TAG_FONT).x
-				var tag := IsoGrid.project(a["pos"]) - Vector2(0, LIFT + 27.0)
+				var tag := IsoGrid.project(a["pos"]) - Vector2(0, LIFT + 32.0)
 				var striking: bool = a.get("strike", 0) > 0  # exposed: the tag turns CORAL while it does its crime
 				ci.draw_colored_polygon(Squircle.points(tag, Vector2(w * 0.5 + 4.0, TAG_FONT * 0.6), 4.0, 24),
 					Palette.CORAL if striking else Color(Palette.CLOUD, 0.92))
@@ -143,7 +144,7 @@ static func spot(g: Dictionary) -> Vector2:
 	return g["pos"] + Vector2(sin(id * 12.9898), cos(id * 78.233)) * 0.22
 
 ## Squircle bean standing on the path, soft shadow, optional cap and chest mark. `half` in px.
-func _bean(ci: Node2D, p: Vector2, phase: int, half: Vector2, col: Color, cap: Color, walking: bool, mark := Color(Palette.INK, 0.0), hop := 0.0) -> void:
+func _bean(ci: Node2D, p: Vector2, phase: int, half: Vector2, col: Color, cap: Color, walking: bool, mark := Color(Palette.INK, 0.0), hop := 0.0, line := Color(Palette.INK, 0.3), width := 1.0) -> void:
 	var foot := IsoGrid.project(p) - Vector2(0, LIFT)
 	var bob := absf(sin(_time * 9.0 + phase)) * 1.5 if walking else 0.0
 	ci.draw_colored_polygon(Squircle.points(foot, Vector2(half.x, half.x * 0.5), 4.0, 16), Color(Palette.INK, 0.15))
@@ -151,7 +152,7 @@ func _bean(ci: Node2D, p: Vector2, phase: int, half: Vector2, col: Color, cap: C
 	var body := Squircle.points(foot - Vector2(0, half.y + bob), half, 4.0, 20)
 	ci.draw_colored_polygon(body, col)
 	body.append(body[0])
-	ci.draw_polyline(body, Color(Palette.INK, 0.3), 1.0, true)
+	ci.draw_polyline(body, line, width, true)
 	if cap.a > 0.0:
 		var top := Squircle.points(foot - Vector2(0, half.y * 2.0 + bob - 0.5), Vector2(half.x * 0.9, half.y * 0.35), 4.0, 16)
 		ci.draw_colored_polygon(top, cap)

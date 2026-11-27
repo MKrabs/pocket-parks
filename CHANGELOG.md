@@ -22,6 +22,17 @@ and the game shows the latest entry in its "What's new" card.
 ### Fixed
 - People still inside when the day ends now settle up: sent guests pay their sender's share, and thieves and spies
   deliver what they carried, as if they had left through the gate.
+- **Big shops look their part:** the Burger Diner is a long diner with a giant burger and a terrace table, the Lobby
+  Café a picture palace with a marquee and a blade sign, the Pavilion an open hall under a floating roof, the Food Hall
+  two peaked tents, and the Cake Pavilion a three-tier cake.
+- **Player characters stand out:** they are clearly bigger than guests, with a soft outline in their colour.
+- **Land you can buy** is paler, so it's easy to tell from your own. The plot on an open "Land for sale" card glows.
+
+### Fixed
+- A long habitat card no longer slides under the money chip: it stops below it and its contents scroll.
+- The bar's pin button looks like a push pin, not a magnifying glass.
+- An L-shaped net habitat gets joined domes over its cells instead of one dome over the empty corner.
+- "Lost the connection" and "Couldn't reach" toasts show an unplugged cable instead of the wrecked hammer.
 
 ## [0.4.0] - 2026-11-27: Habitats, animals and three new themes
 

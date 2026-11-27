@@ -41,12 +41,15 @@ static func catalog() -> Dictionary:
 		"cin_cafe": {"name": "Lobby Café", "role": "shop", "price": 12, "capacity": 7, "footprint": Vector2i(2, 2), "cost": 180,
 			"specialty": "carpenter", "mode": "faster",
 			"parts": [
-				P.call(Vector2.ZERO, Vector2(0.82, 0.82), 22, Palette.CLAY),
-				P.call(Vector2(0.84, 0), Vector2(0.03, 0.56), 5, Palette.BUTTER, 13),  # marquee lights
-				P.call(Vector2(0, 0.84), Vector2(0.56, 0.03), 5, Palette.BUTTER, 13),
-				P.call(Vector2.ZERO, Vector2(0.9, 0.9), 4, Palette.CLOUD, 22),
-				P.call(Vector2.ZERO, Vector2(0.2, 0.2), 12, Palette.CLOUD, 26),  # the cup sign
-				P.call(Vector2.ZERO, Vector2(0.16, 0.16), 1, Palette.WOOD, 38),
+				# a stepped picture-palace front with a marquee canopy and a tall blade sign on the roof
+				P.call(Vector2.ZERO, Vector2(0.76, 0.76), 18, Palette.CLAY),
+				P.call(Vector2(0.77, 0), Vector2(0.03, 0.28), 9, Palette.WOOD),  # doors
+				P.call(Vector2(0, 0.77), Vector2(0.28, 0.03), 9, Palette.WOOD),
+				P.call(Vector2.ZERO, Vector2(0.88, 0.88), 3, Palette.BUTTER, 11),  # marquee canopy
+				P.call(Vector2(-0.12, -0.12), Vector2(0.5, 0.5), 7, Palette.CLAY, 18),  # stepped top
+				P.call(Vector2(0.45, -0.45), Vector2(0.05, 0.2), 32, Palette.CORAL, 18),  # blade sign
+				P.call(Vector2(0.47, -0.45), Vector2(0.04, 0.13), 24, Palette.BUTTER, 22),
+				P.call(Vector2(-0.12, -0.12), Vector2(0.17, 0.17), 9, Palette.CLOUD, 25),  # the cup
 			]},
 		"cin_poster": {"name": "Poster Wall", "role": "decor", "appeal": 3, "footprint": Vector2i(1, 1), "cost": 30,
 			"parts": [
