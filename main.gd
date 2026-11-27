@@ -3,10 +3,11 @@ extends Node2D
 
 # Inside the owned 12×12 start area (cells 4..15). Every attraction and shop touches the path along y=11 from the gate.
 const SEED := [
-	["zoo_gate", Vector2i(4, 11)], ["enclosure", Vector2i(6, 8)], ["pond", Vector2i(14, 9)], ["snack_stand", Vector2i(12, 12)],
+	["zoo_gate", Vector2i(4, 11)], ["pond", Vector2i(14, 9)], ["snack_stand", Vector2i(12, 12)],
 	["snack_stand", Vector2i(9, 12)], ["tree", Vector2i(14, 6)], ["tree", Vector2i(15, 14)], ["tree", Vector2i(7, 15)],
 	["tree", Vector2i(11, 15)], ["tree", Vector2i(10, 5)], ["builder_shed", Vector2i(6, 12)],
 ]
+const SEED_HABITAT := Rect2i(6, 8, 3, 3)  # a small wood-fence habitat on the path
 # Bot "friends" stand in for real ones: every SEND_EVERY ticks one sends a mixed group into your park.
 const BOTS := ["Mia", "Theo"]
 const SEND_EVERY := 30 * ParkSim.TPS
@@ -67,7 +68,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		Buildings.use(ts[(ts.find(Buildings.active) + 1) % ts.size()])
 		net.theme = Buildings.active
 		bar.fill()
-	elif k.physical_keycode in [KEY_1, KEY_2, KEY_3] and bar.placing:
+	elif k.physical_keycode in [KEY_1, KEY_2, KEY_3, KEY_4] and bar.placing:
 		bar.variant(k.physical_keycode - KEY_1)
 	elif k.physical_keycode == KEY_R:
 		zoo.rotate_ghost(-1 if k.shift_pressed else 1)
@@ -103,8 +104,8 @@ func escape() -> void:
 ## Right-click anywhere on the world cancels place mode.
 func _unhandled_input(event: InputEvent) -> void:
 	var mb := event as InputEventMouseButton
-	if mb and mb.pressed and mb.button_index == MOUSE_BUTTON_RIGHT:
-		bar.clear()
+	if mb and mb.pressed and mb.button_index == MOUSE_BUTTON_RIGHT and not zoo.painting():
+		bar.clear()  # painting a habitat: right-drag removes cells instead (Esc leaves)
 
 func _ready() -> void:
 	zoo.map.start_small()
@@ -129,6 +130,7 @@ func _ready() -> void:
 	add_child(zoo)
 	grid.cell_hovered.connect(zoo.on_hover)
 	grid.cell_clicked.connect(_on_cell_clicked)
+	grid.released.connect(zoo.drag_end)
 
 	walkers.sim = sim
 	add_child(walkers)
@@ -233,6 +235,7 @@ func _seed() -> void:
 	zoo.map.money = 1 << 30  # seed without running out
 	for s in SEED:
 		zoo.map.place(s[0], s[1])
+	zoo.map.paint("habitat", SEED_HABITAT)
 	for x in range(5, 16):
 		zoo.map.place("path", Vector2i(x, 11))
 	zoo.map.money = ParkMap.START_MONEY  # the seeded zoo is free
@@ -616,6 +619,9 @@ func _nearest(world: Vector2, cells: Array) -> int:
 
 ## Left-click on the ground: place in place mode (back to Select unless painting or Shift), else select.
 func _on_cell_clicked(cell: Vector2i, button: MouseButton, shift := false) -> void:
+	if zoo.painting() and not visiting and button in [MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT]:
+		zoo.drag_start(cell, button == MOUSE_BUTTON_RIGHT)
+		return
 	if button != MOUSE_BUTTON_LEFT:
 		return
 	if visiting:

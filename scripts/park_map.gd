@@ -16,6 +16,11 @@ var xp := 0                     # park XP (ParkLevel); the sim owns it while the
 var specialties: Dictionary = {}  # builder shed origin -> Array of Specialties ids its builder picked
 var owned: Dictionary = {}  # plot coord -> true. Empty = no plots, every cell is yours (bot parks)
 var bought := 0  # plots bought beyond the start area
+# Painted habitats (docs/design/game.md → Habitats): origin (its smallest cell) -> {cells, fence, animal, items}.
+# Each is also a building: buildings[origin] = its fence's habitat id, occupied[cell] = origin for every cell.
+var habitats: Dictionary = {}
+const HABITAT_MIN := 4
+const DIRS: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
 
 ## Your park: own only the start area; the rest is for sale.
 func start_small() -> void:
@@ -105,7 +110,134 @@ func rotation(origin: Vector2i) -> int:
 
 ## Cells covered by the building at `origin`.
 func cells(origin: Vector2i) -> Array[Vector2i]:
+	if habitats.has(origin):
+		var out: Array[Vector2i] = []
+		out.assign(habitats[origin]["cells"])
+		return out
 	return footprint(buildings[origin], origin, rotation(origin))
+
+## Cells of `rect` (end exclusive).
+static func rect_cells(rect: Rect2i) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	for x in range(rect.position.x, rect.end.x):
+		for y in range(rect.position.y, rect.end.y):
+			out.append(Vector2i(x, y))
+	return out
+
+## Outline of a set of cells: [cell, dir] for every side whose neighbour is outside the set.
+static func outline(cs: Array) -> Array:
+	var out: Array = []
+	for c: Vector2i in cs:
+		for d in DIRS:
+			if not c + d in cs:
+				out.append([c, d])
+	return out
+
+## True if `cs` is one 4-connected region.
+static func connected(cs: Array) -> bool:
+	if cs.is_empty():
+		return true
+	var seen := {cs[0]: true}
+	var todo: Array = [cs[0]]
+	while not todo.is_empty():
+		var c: Vector2i = todo.pop_back()
+		for d in DIRS:
+			if c + d in cs and not seen.has(c + d):
+				seen[c + d] = true
+				todo.append(c + d)
+	return seen.size() == cs.size()
+
+## The habitat painting `rect` with fence `id` would add to: the one the rectangle overlaps or touches, or
+## (-1,-1) for a new one. (-2,-2) if it touches two, or one with another fence (not allowed).
+func paint_target(id: String, rect: Rect2i) -> Vector2i:
+	var found := Vector2i(-1, -1)
+	for c in rect_cells(rect.grow(1)):
+		if (c.x == rect.position.x - 1 or c.x == rect.end.x) and (c.y == rect.position.y - 1 or c.y == rect.end.y):
+			continue  # diagonal corners don't count as touching
+		var o: Variant = occupied.get(c)
+		if o == null or not habitats.has(o) or o == found:
+			continue
+		if found.x >= 0 or buildings[o] != id:
+			return Vector2i(-2, -2)
+		found = o
+	return found
+
+## New cells painting `rect` would add, or [] if any cell can't be painted (not yours, taken, off the map).
+func paint_cells(id: String, rect: Rect2i) -> Array[Vector2i]:
+	var target := paint_target(id, rect)
+	var out: Array[Vector2i] = []
+	if target.x == -2:
+		return out
+	for c in rect_cells(rect):
+		if occupied.get(c) == target and target.x >= 0:
+			continue
+		if not IsoGrid.in_bounds(c) or occupied.has(c) or not owns(c):
+			return [] as Array[Vector2i]
+		out.append(c)
+	if target.x < 0 and out.size() < HABITAT_MIN:
+		return [] as Array[Vector2i]
+	return out
+
+func can_paint(id: String, rect: Rect2i) -> bool:
+	var n := paint_cells(id, rect).size()
+	return n > 0 and money >= n * Buildings.get_def(id)["cost"]
+
+## Paint `rect` as habitat with fence `id` (new, or added to the one it touches). Returns its origin, or (-1,-1).
+func paint(id: String, rect: Rect2i) -> Vector2i:
+	if not can_paint(id, rect):
+		return Vector2i(-1, -1)
+	var add := paint_cells(id, rect)
+	money -= add.size() * Buildings.get_def(id)["cost"]
+	var target := paint_target(id, rect)
+	var cs: Array = add.duplicate()
+	if target.x >= 0:
+		cs.append_array(habitats[target]["cells"])
+	return _set_habitat(target, id, cs)
+
+## Cells right-dragging `rect` would remove: origin -> cells left, or {} if a habitat would split or drop below the
+## minimum (it may go to zero: then it's removed).
+func unpaint_plan(rect: Rect2i) -> Dictionary:
+	var plan := {}
+	for c in rect_cells(rect):
+		var o: Variant = occupied.get(c)
+		if o != null and habitats.has(o) and not plan.has(o):
+			plan[o] = habitats[o]["cells"].filter(func(k: Vector2i) -> bool: return not rect.has_point(k))
+	for o: Vector2i in plan:
+		var left: Array = plan[o]
+		if (left.size() > 0 and left.size() < HABITAT_MIN) or not connected(left):
+			return {}
+	return plan
+
+## Remove habitat cells in `rect`, refunding half their cost. Returns old origin -> new origin ((-1,-1) = gone),
+## {} if nothing changed.
+func unpaint(rect: Rect2i) -> Dictionary:
+	var moved := {}
+	var plan := unpaint_plan(rect)
+	for o: Vector2i in plan:
+		var id: String = buildings[o]
+		var left: Array = plan[o]
+		money += (habitats[o]["cells"].size() - left.size()) * Buildings.get_def(id)["cost"] / 2
+		moved[o] = _set_habitat(o, id, left)
+	return moved
+
+## (Re)write habitat `old` ((-1,-1) = new) as `cs`; the origin moves to the smallest cell. Returns it, or (-1,-1) if empty.
+func _set_habitat(old: Vector2i, id: String, cs: Array) -> Vector2i:
+	var h: Dictionary = habitats.get(old, {"fence": Buildings.get_def(id)["habitat"], "animal": "", "items": []})
+	if habitats.has(old):
+		for c: Vector2i in habitats[old]["cells"]:
+			occupied.erase(c)
+		habitats.erase(old)
+		buildings.erase(old)
+	if cs.is_empty():
+		return Vector2i(-1, -1)
+	cs.sort()
+	h["cells"] = cs
+	var o: Vector2i = cs[0]
+	habitats[o] = h
+	buildings[o] = id
+	for c: Vector2i in cs:
+		occupied[c] = o
+	return o
 
 func fits(id: String, cell: Vector2i, rot := 0) -> bool:
 	for c in footprint(id, cell, rot):
@@ -144,11 +276,12 @@ func remove_at(cell: Vector2i, back := -1) -> bool:
 	levels.erase(origin)
 	rotations.erase(origin)
 	specialties.erase(origin)
+	habitats.erase(origin)
 	return true
 
 ## What removing the building at `origin` gives back: half of all it cost (1×, +1×, +2× per level).
 func refund(origin: Vector2i) -> int:
-	var cost: int = Buildings.get_def(buildings[origin])["cost"]
+	var cost: int = Buildings.get_def(buildings[origin])["cost"] * (habitats[origin]["cells"].size() if habitats.has(origin) else 1)
 	return cost * (1 + (level(origin) - 1) * level(origin) / 2) / 2
 
 func level(origin: Vector2i) -> int:

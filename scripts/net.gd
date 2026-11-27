@@ -3,7 +3,7 @@ extends Node
 # Local network (docs/design/game.md → Decided: networking). Hosts our park over ENet, finds nearby parks by UDP
 # broadcast, and mirrors one visited park live. Host and visit are two separate ENet peers polled by hand, so neither
 # touches the tree's MultiplayerAPI. Wire: plain Dictionaries through var_to_bytes, reliable.
-#   map  {t, map: {buildings, levels, rotations}}   once on connect, again whenever the layout changes
+#   map  {t, map: {buildings, levels, rotations, habitats}}   once on connect, again whenever the layout changes
 #   live {t, tick, guests, staff, builders, jobs, litter, closed, events}   about 10×/s
 #   ledger {t, from, seq, owed, blueprints, inside}   host → one visitor, whenever its entry in sim.ledger changes.
 #        owed and blueprints are running totals; the visitor applies owed minus what it already got from `from`, and
@@ -315,7 +315,7 @@ func _send(peer: ENetMultiplayerPeer, to: int, msg: Dictionary) -> void:
 	peer.put_packet(bytes)
 
 func _map_msg() -> Dictionary:
-	return {"t": "map", "map": {"buildings": map.buildings, "levels": map.levels, "rotations": map.rotations}}
+	return {"t": "map", "map": {"buildings": map.buildings, "levels": map.levels, "rotations": map.rotations, "habitats": map.habitats}}
 
 ## Only what the views draw: guests [id, kind, pos, state, mood, wanted], staff [kind, pos, walking, level].
 func _live_msg() -> Dictionary:
@@ -382,6 +382,7 @@ func _apply(m: Dictionary) -> void:
 		visit_map.occupied.clear()
 		visit_map.levels = d["levels"]
 		visit_map.rotations = d["rotations"]
+		visit_map.habitats = d.get("habitats", {})
 		for o: Vector2i in d["buildings"]:
 			if not Buildings.get_def(d["buildings"][o]).is_empty():  # a building this copy doesn't know is skipped
 				visit_map.buildings[o] = d["buildings"][o]

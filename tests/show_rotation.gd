@@ -7,7 +7,7 @@ func _init() -> void:
 	var stage := Node2D.new()
 	stage.scale = Vector2(1.2, 1.2)
 	root.add_child.call_deferred(stage)
-	var rows := {"zoo_gate": 60.0, "fest_stage": 160.0, "fest_truck": 260.0, "fest_grill": 360.0, "enclosure": 480.0}
+	var rows := {"zoo_gate": 60.0, "fest_stage": 160.0, "fest_truck": 260.0, "fest_grill": 360.0}
 	for id: String in rows:
 		for t in 4:
 			var v := BuildingView.new(id)

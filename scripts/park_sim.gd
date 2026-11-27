@@ -49,8 +49,9 @@ const CRIMES := {"hooligan": "Wreck", "litterbug": "Litter", "thief": "Steal", "
 const BAN_DAYS := 3     # guard catches blacklist for the host's default (ban_days), starting here
 const BAN_MAX := 7
 # Construction (docs/design/game.md → Building). Seconds by building id, else by role, else 20 s per footprint side.
-const BUILD_SECONDS := {"path": 0.0, "entrance": 0.0, "decor": 5.0, "shop": 20.0, "pond": 40.0, "enclosure": 60.0}
-const LEVEL_TIME := [1.0, 1.5, 2.5]  # × build time for building level 1 / upgrading to 2 / to 3
+const BUILD_SECONDS := {"path": 0.0, "entrance": 0.0, "decor": 5.0, "shop": 20.0, "pond": 40.0}
+const FENCE_SECONDS := 1.5  # habitat fence: per side of its outline (a 3×3 is 12 sides, 18 s)
+const LEVEL_TIME :=[1.0, 1.5, 2.5]  # × build time for building level 1 / upgrading to 2 / to 3
 const BUILDER_SPEED := 0.15
 const AVATAR_SPEED := 0.25  # tiles per tick
 const BUILDER_NAMES := ["Bo", "Ada", "Kit", "Nell", "Rio", "Pip", "Sol", "June"]
@@ -207,6 +208,9 @@ func _load(map: ParkMap) -> void:
 		if not job_at(origin).is_empty():
 			continue  # a site: closed until the builder is done
 		var d: Dictionary = Buildings.leveled(id, map.level(origin))
+		if map.habitats.has(origin):  # per cell: a bigger habitat draws more guests (animals add to it in HAB2)
+			d["appeal"] *= map.cells(origin).size()
+			d["capacity"] *= map.cells(origin).size()
 		if d["role"] == "decor":
 			decor_appeal += d["appeal"]
 			for c in map.cells(origin):
@@ -886,6 +890,48 @@ func build(id: String, cell: Vector2i, rot := 0) -> bool:
 	var t := build_ticks(id)
 	if t > 0:
 		jobs.append({"origin": cell, "id": id, "level": 1, "left": t, "total": t, "paid": Buildings.get_def(id)["cost"], "builder": ""})
+	load_map(_map)
+	return true
+
+## Work ticks to fence habitat `origin`: FENCE_SECONDS per side of its outline.
+func fence_ticks(origin: Vector2i) -> int:
+	return roundi(ParkMap.outline(_map.cells(origin)).size() * FENCE_SECONDS * TPS)
+
+## Paint `rect` as habitat `id` (ParkMap.paint, paid now) and open a fence site for it. A habitat already being
+## fenced keeps its work done. False if it can't be painted.
+func paint(id: String, rect: Rect2i) -> bool:
+	_map.money = money
+	var target := _map.paint_target(id, rect)
+	var o := _map.paint(id, rect)
+	if o.x < 0:
+		return false
+	var cost := money - _map.money
+	money = _map.money
+	var t := fence_ticks(o)
+	var j := job_at(target) if target.x >= 0 else {}
+	if j.is_empty():
+		jobs.append({"origin": o, "id": id, "level": 1, "left": t, "total": t, "paid": cost, "builder": ""})
+	else:
+		j["origin"] = o
+		j["left"] = maxi(t - (j["total"] - j["left"]), 1)
+		j["total"] = t
+		j["paid"] += cost
+	load_map(_map)
+	return true
+
+## Remove habitat cells in `rect` (half back); a site follows its habitat's new origin. False if nothing changed.
+func unpaint(rect: Rect2i) -> bool:
+	_map.money = money
+	var moved := _map.unpaint(rect)
+	if moved.is_empty():
+		return false
+	money = _map.money
+	for old: Vector2i in moved:
+		var j := job_at(old)
+		if not j.is_empty() and moved[old].x < 0:
+			jobs.erase(j)
+		elif not j.is_empty():
+			j["origin"] = moved[old]
 	load_map(_map)
 	return true
 

@@ -219,7 +219,8 @@ func pick(id: String) -> void:
 			b.button_pressed = true
 
 static func label(id: String) -> String:
-	return "%s\n$%d" % [Buildings.get_def(id)["name"], Buildings.get_def(id)["cost"]]
+	var d := Buildings.get_def(id)
+	return "%s\n$%d%s" % [d["name"], d["cost"], " / cell" if d.has("habitat") else ""]
 
 ## Show variant `id` on item `b`; a pressed item swaps the placement ghost (picked(id)).
 func set_variant(b: Button, id: String) -> void:

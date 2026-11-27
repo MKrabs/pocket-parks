@@ -8,7 +8,7 @@ var _built := false
 
 const EXTRA := [
 	["path", Vector2i(10, 10)], ["path", Vector2i(10, 9)], ["path", Vector2i(10, 8)], ["path", Vector2i(10, 7)],
-	["path", Vector2i(10, 6)], ["water_tank", Vector2i(7, 4)], ["aviary", Vector2i(11, 7)], ["fountain", Vector2i(11, 10)],
+	["path", Vector2i(10, 6)], ["pond", Vector2i(7, 4)], ["burger_diner", Vector2i(11, 7)], ["fountain", Vector2i(11, 10)],
 	["fountain", Vector2i(8, 12)], ["snack_stand", Vector2i(13, 10)], ["tree", Vector2i(12, 13)], ["tree", Vector2i(5, 13)],
 ]
 

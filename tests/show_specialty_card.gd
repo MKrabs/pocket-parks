@@ -18,7 +18,7 @@ func _process(_delta: float) -> bool:
 	main.hud.speed = 0
 	main.sim.money = 2000
 	main.zoo.map.money = 2000
-	main.zoo.selected = "aviary"
+	main.zoo.selected = "fountain"
 	main.zoo.on_click(Vector2i(12, 13))
 	main.zoo.selected = ""
 	main.advance(100)

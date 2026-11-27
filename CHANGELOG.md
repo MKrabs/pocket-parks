@@ -6,6 +6,13 @@ and the game shows the latest entry in its "What's new" card.
 
 ## [Unreleased]
 
+### Changed
+- **Habitats instead of enclosures:** Attractions → Habitat, pick a fence (wood Fence, or Glass, Net and Wall for
+  Water, Aviary and Heavy builders) and drag a rectangle on your land. A preview shows the outline, the cell count and
+  the cost. Drag again from inside or along the edge to grow it into L shapes and more; right-drag removes cells.
+  A builder puts up the fence, and bigger habitats draw more guests. The old Enclosure, Water Tank, Aviary and
+  Reinforced Enclosure are gone; new parks start with a small fenced habitat.
+
 ## [0.3.0] - 2026-11-27: A nicer park
 
 ### Added
