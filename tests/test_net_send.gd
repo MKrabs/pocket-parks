@@ -70,18 +70,21 @@ func _init() -> void:
 	ok(pump(host, client, func() -> bool: return hsim.sent_by("Carl")["guests"] == 4), "host queues Carl's guests")
 	ok(pump(host, client, func() -> bool: return client.visit_ledger["guests"] == 4), "client sees its guests inside")
 	empty_of(hsim, "Carl")
-	var share: int = hsim.ledger.get("Carl", 0)
+	var paid := 4 * Visit.PRICES["guest"]
+	ok(hsim.charged["Carl"] == paid, "the host charged the sends through the ledger")
+	var share: int = hsim.ledger.get("Carl", 0) + paid
 	ok(share > 0, "guests earned a share (%d)" % share)
-	ok(pump(host, client, func() -> bool: return client.sim.money == m0 + share), "share paid: %d vs %d" % [client.sim.money - m0, share])
+	ok(pump(host, client, func() -> bool: return client.sim.money == m0 + share - paid), "share minus prices paid: %d vs %d" % [client.sim.money - m0, share - paid])
 
 	# A thief that escapes: its loot reaches the client.
 	client.send_person("thief")
 	ok(pump(host, client, func() -> bool: return hsim.sent_by("Carl")["hidden"] == 1), "host queues the thief")
 	var robbed := hsim.events.size()
 	empty_of(hsim, "Carl")
-	var loot: int = hsim.ledger["Carl"] - share
+	paid += Visit.PRICES["thief"]
+	var loot: int = hsim.ledger["Carl"] + paid - share
 	ok(hsim.events.size() > robbed and loot > 0, "thief robbed and left (%d)" % loot)
-	ok(pump(host, client, func() -> bool: return client.sim.money == m0 + share + loot), "loot paid")
+	ok(pump(host, client, func() -> bool: return client.sim.money == m0 + share + loot - paid), "loot paid")
 
 	# Caught with evidence: the fine comes off the client's money.
 	client.send_person("thief")
@@ -95,7 +98,8 @@ func _init() -> void:
 	var r := hsim.accuse(t["id"])
 	ok(not r["wrongful"] and r["fine"] > 0, "host catches it")
 	var owed: int = hsim.ledger["Carl"]
-	ok(owed == share + loot - r["fine"], "ledger fined")
+	paid += Visit.PRICES["thief"]
+	ok(owed == share + loot - r["fine"] - paid, "ledger fined")
 	ok(pump(host, client, func() -> bool: return client.sim.money == m0 + owed), "fine deducted: %d" % (client.sim.money - m0))
 
 	# Replays never pay twice: the same seq, or an older one, is ignored.
@@ -114,7 +118,7 @@ func _init() -> void:
 	ok(pump(host, client, func() -> bool: return host._names.is_empty()), "host notices the visitor left")
 	empty_of(hsim, "Carl")
 	owed = hsim.ledger["Carl"]
-	ok(owed > share + loot - r["fine"], "the guest settled while Carl was away")
+	ok(owed > share + loot - r["fine"] - paid - Visit.PRICES["guest"], "the guest settled while Carl was away")
 	ok(client.sim.money == money, "nothing paid while away")
 	client.join("127.0.0.1", host.port)
 	ok(pump(host, client, func() -> bool: return client.sim.money == m0 + owed), "paid on reconnect, once")

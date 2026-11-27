@@ -9,8 +9,9 @@ extends Node
 #        owed and blueprints are running totals; the visitor applies owed minus what it already got from `from`, and
 #        only for a seq newer than the last one it applied, so a replay or a reconnect never pays twice.
 #        live also carries avatars [name, color, pos, walking]: every character in the host's park, its own included.
-# Visitor → host: hello {t, player, color} once connected (the host adds its avatar), send {t, kind} per person (the
-# host runs sim.send), move {t, cell} to walk its avatar there. A visitor's avatar leaves when it disconnects.
+# Visitor → host: hello {t, player, color, level} once connected (the host adds its avatar), send {t, kind, level} per
+# person (the host runs sim.send_paid: refused at the send limit, otherwise the price comes off the ledger; `inside`
+# carries the limit), move {t, cell} to walk its avatar there. A visitor's avatar leaves when it disconnects.
 
 signal map_changed  # the visited park's layout arrived or changed: rebuild its ZooView
 signal lost         # the visited park went away (host closed, or never answered)
@@ -28,6 +29,7 @@ const CONNECT_TIMEOUT_MS := 4000  # join(): an address that never answers is dro
 var park_name := "Pocket Zoo"
 var player := ""
 var color := Palette.SKY  # our character
+var level := 1      # our park level, told to hosts in hello and each send (send limit = 3 + level)
 var theme := "zoo"
 var sim: ParkSim  # our park, as visitors see it
 var map: ParkMap
@@ -193,14 +195,15 @@ func join(ip: String, game_port: int) -> bool:
 	_client.host.get_peers()[0].set_timeout(0, CONNECT_TIMEOUT_MS, CONNECT_TIMEOUT_MS)  # give up on a dead address fast
 	visit_map = ParkMap.new()
 	visit_sim = ParkSim.new(visit_map, 0)
-	visit_ledger = {"guests": 0, "hidden": 0, "wanted": 0, "earned": 0, "fines": 0}
+	visit_ledger = {"guests": 0, "hidden": 0, "wanted": 0, "earned": 0, "fines": 0, "limit": ParkSim.SEND_BASE + level}
 	return true
 
-## Send one person of `kind` into the park we visit (the caller pays). False until the host has heard our hello.
+## Send one person of `kind` into the park we visit; the host charges it through our ledger, or refuses it at our
+## send limit (free). False until the host has heard our hello.
 func send_person(kind: String) -> bool:
 	if not _hello:
 		return false
-	_send(_client, 1, {"t": "send", "kind": kind})
+	_send(_client, 1, {"t": "send", "kind": kind, "level": level})
 	return true
 
 ## Walk our character in the park we visit to `cell` (the host paths it). False until the host has heard our hello.
@@ -239,7 +242,7 @@ func _poll_client() -> void:
 		return
 	if status == MultiplayerPeer.CONNECTION_CONNECTED and not _hello:
 		_hello = true
-		_send(_client, 1, {"t": "hello", "player": player, "color": color})
+		_send(_client, 1, {"t": "hello", "player": player, "color": color, "level": level})
 		_client.get_peer(1).set_timeout(0, 5000, 30000)  # ENet's defaults again, once connected
 		joined.emit()
 	while _client and _client.get_available_packet_count() > 0:
@@ -275,8 +278,9 @@ func _hear(peer: int, m: Dictionary) -> void:
 		_names[peer] = str(m.get("player", ""))
 		if sim:
 			sim.join_avatar(_names[peer], m["color"] if m.get("color") is Color else Palette.SKY)
+			sim.sender_levels[_names[peer]] = clampi(int(m.get("level", 1)), 1, ParkLevel.MAX)
 	elif m.get("t") == "send" and _names.has(peer) and sim and m.get("kind") in ParkSim.KINDS:
-		sim.send(m["kind"], _names[peer])
+		sim.send_paid(m["kind"], _names[peer], clampi(int(m.get("level", 1)), 1, ParkLevel.MAX))
 	elif m.get("t") == "move" and _names.has(peer) and sim and m.get("cell") is Vector2i:
 		sim.move_avatar(_names[peer], m["cell"])
 

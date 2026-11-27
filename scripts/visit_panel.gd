@@ -13,6 +13,8 @@ var _choices := VBoxContainer.new()
 var _send := PanelContainer.new()
 var _title := Hud._label(18)
 var _ledger := Hud._label(15)
+var _reason := Hud._label(13)
+var _sends: Array[Button] = []
 
 func _ready() -> void:
 	var pbox := BuildBar.box(Palette.CREAM, 20)
@@ -40,6 +42,9 @@ func _ready() -> void:
 	for kind: String in Visit.PRICES:
 		var b := Hud._button("Send %s\n$%d" % [kind, Visit.PRICES[kind]], sent.emit.bind(kind))
 		b.custom_minimum_size = Vector2(96, 0)
+		b.add_theme_stylebox_override("disabled", BuildBar.box(Palette.shade(Palette.STONE, 0.06)))
+		b.add_theme_color_override("font_disabled_color", Palette.shade(Palette.STONE, 0.35))
+		_sends.append(b)
 		row.add_child(b)
 	var back := Hud._button("Back\nhome", home.emit)
 	back.add_theme_stylebox_override("normal", BuildBar.box(Palette.BUTTER))
@@ -47,6 +52,8 @@ func _ready() -> void:
 	back.custom_minimum_size = Vector2(84, 0)
 	row.add_child(back)
 	col.add_child(row)
+	_reason.modulate.a = 0.75
+	col.add_child(_reason)
 	_send.add_child(col)
 	add_child(_send)
 	_send.hide()
@@ -174,13 +181,27 @@ func _section(text: String) -> Label:
 func watch(park_name: String) -> void:
 	_title.text = park_name
 	_send.show()
-	show_ledger({"guests": 0, "hidden": 0, "wanted": 0, "earned": 0, "fines": 0}, 0)
+	show_ledger({"guests": 0, "hidden": 0, "wanted": 0, "earned": 0, "fines": 0, "limit": 1}, 0)
 	_send.reset_size()
 	_send.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM, Control.PRESET_MODE_MINSIZE, 16)
 
+## `t` is sent_by() in the park on screen (or the host's copy of it), with our send limit there.
 func show_ledger(t: Dictionary, money: int) -> void:
-	_ledger.text = "$ %d   Yours inside: %d guests · %d hidden · %d wanted   Earned $ %d   Fines $ %d" % [
-		money, t["guests"], t["hidden"], t["wanted"], t["earned"], t["fines"]]
+	_ledger.text = "$ %d   Inside: %d / %d   %d guests · %d hidden · %d wanted   Earned $ %d   Fines $ %d" % [
+		money, inside(t), t["limit"], t["guests"], t["hidden"], t["wanted"], t["earned"], t["fines"]]
+	var full := not can_send(t)
+	for b in _sends:
+		b.disabled = full
+	_reason.text = ("Full: at most %d of yours inside at once (3 + your park level). Send more when some leave." if full
+		else "Up to %d of yours inside at once (3 + your park level).") % t["limit"]
+
+## Our people in the park (the gate queue included).
+static func inside(t: Dictionary) -> int:
+	return t["guests"] + t["hidden"] + t["wanted"]
+
+## Room for one more of ours under the send limit.
+static func can_send(t: Dictionary) -> bool:
+	return inside(t) < t["limit"]
 
 func close() -> void:
 	_send.hide()

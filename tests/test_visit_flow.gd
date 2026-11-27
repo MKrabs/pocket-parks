@@ -51,7 +51,7 @@ func _init() -> void:
 	var thief: Dictionary = mine.filter(func(g: Dictionary) -> bool: return g["kind"] == "thief")[0]
 	var share := int(guest["spent"] * ParkSim.GUEST_SHARE)
 	ok(thief["loot"] > 0, "thief stole something")
-	ok(park.ledger[Visit.ME] == share + thief["loot"], "ledger = share + loot")
+	ok(park.ledger[Visit.ME] == share + thief["loot"] - 53, "ledger = share + loot - prices")
 	ok(home.money == m0 - 53 + share + thief["loot"], "money: %d vs %d" % [home.money, m0 - 53 + share + thief["loot"]])
 	main.free()
 	done()
