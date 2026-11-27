@@ -8,7 +8,9 @@ extends Node
 #   ledger {t, from, seq, owed, blueprints, inside}   host → one visitor, whenever its entry in sim.ledger changes.
 #        owed and blueprints are running totals; the visitor applies owed minus what it already got from `from`, and
 #        only for a seq newer than the last one it applied, so a replay or a reconnect never pays twice.
-# Visitor → host: hello {t, player} once connected, then send {t, kind} per person (the host runs sim.send).
+#        live also carries avatars [name, color, pos, walking]: every character in the host's park, its own included.
+# Visitor → host: hello {t, player, color} once connected (the host adds its avatar), send {t, kind} per person (the
+# host runs sim.send), move {t, cell} to walk its avatar there. A visitor's avatar leaves when it disconnects.
 
 signal map_changed  # the visited park's layout arrived or changed: rebuild its ZooView
 signal lost         # the visited park went away (host closed, or never answered)
@@ -25,6 +27,7 @@ const CONNECT_TIMEOUT_MS := 4000  # join(): an address that never answers is dro
 
 var park_name := "Pocket Zoo"
 var player := ""
+var color := Palette.SKY  # our character
 var theme := "zoo"
 var sim: ParkSim  # our park, as visitors see it
 var map: ParkMap
@@ -78,6 +81,8 @@ func start() -> void:
 		_send(_host, peer, _map_msg()))
 	_host.peer_disconnected.connect(func(peer: int) -> void:
 		_visitors -= 1
+		if sim and _names.has(peer):
+			sim.leave_avatar(_names[peer])
 		_names.erase(peer)  # their people stay in the park; the ledger waits for the next visit
 		_told.erase(peer))
 	for p in range(DISCO_PORT, DISCO_PORT + DISCO_PORTS):
@@ -198,6 +203,13 @@ func send_person(kind: String) -> bool:
 	_send(_client, 1, {"t": "send", "kind": kind})
 	return true
 
+## Walk our character in the park we visit to `cell` (the host paths it). False until the host has heard our hello.
+func move_avatar(cell: Vector2i) -> bool:
+	if not _hello:
+		return false
+	_send(_client, 1, {"t": "move", "cell": cell})
+	return true
+
 ## What the save keeps of us: our name (the sender id in other parks), the host seq and what we were paid.
 func state() -> Dictionary:
 	return {"player": player, "seq": seq, "got": got}
@@ -227,7 +239,7 @@ func _poll_client() -> void:
 		return
 	if status == MultiplayerPeer.CONNECTION_CONNECTED and not _hello:
 		_hello = true
-		_send(_client, 1, {"t": "hello", "player": player})
+		_send(_client, 1, {"t": "hello", "player": player, "color": color})
 		_client.get_peer(1).set_timeout(0, 5000, 30000)  # ENet's defaults again, once connected
 		joined.emit()
 	while _client and _client.get_available_packet_count() > 0:
@@ -254,14 +266,19 @@ func _live_msg() -> Dictionary:
 		"guests": sim.guests.map(func(g: Dictionary) -> Array:
 			return [g["id"], g["kind"], g["pos"], g["state"], snappedf(g["mood"], 1.0), g["wanted"]]),
 		"staff": sim.staff.map(func(s: Dictionary) -> Array: return [s["kind"], s["pos"], not s["path"].is_empty(), s["level"]]),
-		"builders": sim.builders, "jobs": sim.jobs, "litter": sim.litter, "closed": sim.closed, "events": robbed}
+		"builders": sim.builders, "jobs": sim.jobs, "litter": sim.litter, "closed": sim.closed, "events": robbed,
+		"avatars": sim.avatars.map(func(a: Dictionary) -> Array: return [a["name"], a["color"], a["pos"], not a["path"].is_empty()])}
 
 ## Host: a message from visitor `peer`.
 func _hear(peer: int, m: Dictionary) -> void:
 	if m.get("t") == "hello":
 		_names[peer] = str(m.get("player", ""))
+		if sim:
+			sim.join_avatar(_names[peer], m["color"] if m.get("color") is Color else Palette.SKY)
 	elif m.get("t") == "send" and _names.has(peer) and sim and m.get("kind") in ParkSim.KINDS:
 		sim.send(m["kind"], _names[peer])
+	elif m.get("t") == "move" and _names.has(peer) and sim and m.get("cell") is Vector2i:
+		sim.move_avatar(_names[peer], m["cell"])
 
 ## Host: each visitor whose ledger entry (or people inside) changed gets its new totals.
 func _tell() -> void:
@@ -314,3 +331,5 @@ func _apply(m: Dictionary) -> void:
 		s.litter = m["litter"]
 		s.closed = m["closed"]
 		s.events = m["events"]
+		s.avatars.assign(m.get("avatars", []).map(func(a: Array) -> Dictionary:
+			return {"name": a[0], "color": a[1], "pos": a[2], "cell": Vector2i(a[2].round()), "path": [0] if a[3] else []}))

@@ -1,6 +1,6 @@
 class_name WalkerView
 extends Node2D
-# Draws the sim's guests, staff and litter. One layer node per iso depth row (x+y), with
+# Draws the sim's guests, staff, player characters (avatars) and litter. One layer node per iso depth row (x+y), with
 # z_index 2*depth+1, so walkers slot between buildings (BuildingView z_index = 2*depth).
 
 const GUEST_COLORS := [Palette.SKY, Palette.BUTTER, Palette.CLAY, Palette.WATER, Palette.WOOD]
@@ -13,6 +13,7 @@ var me := ""  # sender whose people get a dot above the bean (only we can see th
 var hovered := -1  # guest id lifted under the mouse (Select mode)
 var hovered_staff := -1  # staff index lifted under the mouse
 const HOVER_LIFT := 4.0
+const TAG_FONT := 9  # name tag text size in world px
 var _layers: Array[Node2D] = []
 var _rows: Array = []  # per depth: [[kind, item], ...]
 var _time := 0.0
@@ -47,6 +48,8 @@ func _process(delta: float) -> void:
 	for g in sim.guests:
 		if g["state"] != "visit":  # inside the building
 			_row(g["pos"]).append(["guest", g])
+	for a in sim.avatars:
+		_row(a["pos"]).append(["avatar", a])
 	for l in _layers:
 		l.queue_redraw()
 
@@ -79,6 +82,15 @@ func _draw_row(ci: Node2D, d: int) -> void:
 			"builder":  # overalls and a BUTTER hard hat; bobs while walking or hammering
 				var b: Dictionary = e[1]
 				_bean(ci, b["pos"], 3, Vector2(5.5, 6.5), Palette.shade(Palette.SKY, 0.2), Palette.BUTTER, b["state"] != "home")
+			"avatar":  # a bigger bean in the player's colour, a cap one shade darker, a name tag above
+				var a: Dictionary = e[1]
+				var col: Color = a["color"]
+				_bean(ci, a["pos"], 5, Vector2(6.5, 8.0), col, Palette.shade(col, 0.22), not a["path"].is_empty())
+				var name: String = a["name"]
+				var w := Palette.FONT_BOLD.get_string_size(name, HORIZONTAL_ALIGNMENT_LEFT, -1, TAG_FONT).x
+				var tag := IsoGrid.project(a["pos"]) - Vector2(0, LIFT + 27.0)
+				ci.draw_colored_polygon(Squircle.points(tag, Vector2(w * 0.5 + 4.0, TAG_FONT * 0.6), 4.0, 24), Color(Palette.CLOUD, 0.92))
+				ci.draw_string(Palette.FONT_BOLD, tag + Vector2(-w * 0.5, TAG_FONT * 0.35), name, HORIZONTAL_ALIGNMENT_LEFT, -1, TAG_FONT, Palette.INK)
 			"guest":
 				var g: Dictionary = e[1]
 				var id: int = g["id"]
